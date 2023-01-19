@@ -1,6 +1,10 @@
 package org.peergos;
 
+import bitswap.message.pb.*;
+import com.google.protobuf.*;
 import identify.pb.*;
+import io.ipfs.cid.*;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
 import io.libp2p.core.dsl.*;
@@ -11,41 +15,63 @@ import io.libp2p.etc.types.*;
 import io.libp2p.protocol.*;
 import io.libp2p.security.noise.*;
 import io.libp2p.transport.tcp.*;
+import org.peergos.bitswap.*;
 
+import java.nio.charset.*;
+import java.security.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Server {
 
     public static void main(String[] args) throws Exception {
-        Host node1 = buildHost(4001);
+        Bitswap bitswap1 = new Bitswap();
+        Host node1 = buildHost(4001, bitswap1);
         node1.start().get();
         System.out.println("Node 1 started and listening on " + node1.listenAddresses());
 
-        Host node2 = buildHost(7001);
+        Bitswap bitswap2 = new Bitswap();
+        Host node2 = buildHost(7001, bitswap2);
         node2.start().get();
         System.out.println("Node 2 started and listening on " + node2.listenAddresses());
 
-        Multiaddr address = node2.listenAddresses().get(0);
-        PingController pinger = new Ping().dial(node1, address).getController().get();
+        Multiaddr address2 = node2.listenAddresses().get(0);
+        PingController pinger = new Ping().dial(node1, address2).getController().join();
 
-        System.out.println("Sending 5 ping messages to " + address);
-        for (int i = 0; i < 5; i++) {
+        System.out.println("Sending 5 ping messages to " + address2);
+        for (int i = 0; i < 2; i++) {
             long latency = pinger.ping().get();
             System.out.println("Ping " + i + ", latency " + latency + "ms");
         }
+
+        System.out.println("Sending a bitswap message");
+        byte[] blockData = "G'day from Java bitswap!".getBytes(StandardCharsets.UTF_8);
+        MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+        Cid block = new Cid(1, Cid.Codec.Raw, Multihash.Type.sha2_256, sha256.digest(blockData));
+        MessageOuterClass.Message.Wantlist.Entry.Builder want = MessageOuterClass.Message.Wantlist.Entry.newBuilder()
+                .setWantType(MessageOuterClass.Message.Wantlist.WantType.Have)
+                .setBlock(ByteString.copyFrom(block.toBytes()));
+        MessageOuterClass.Message msg = MessageOuterClass.Message.newBuilder()
+                .setWantlist(MessageOuterClass.Message.Wantlist.newBuilder().addEntries(want).build()).build();
+        BitswapController bc1 = bitswap1.dial(node1, address2).getController().join();
+        bc1.send(msg);
 
         node1.stop().get();
         node2.stop().get();
     }
 
-    public static Host buildHost(int listenPort) {
+    public static Host buildHost(int listenPort,
+                                 Bitswap bitswap) {
         PrivKey privKey = RsaKt.generateRsaKeyPair(2048).getFirst();
         PeerId peerId = PeerId.fromPubKey(privKey.publicKey());
         Multiaddr advertisedAddr = Multiaddr.fromString("/ip4/127.0.0.1/tcp/" + listenPort).withP2P(peerId);
-        return buildHost(privKey, List.of("/ip4/127.0.0.1/tcp/" + listenPort), advertisedAddr);
+        return buildHost(privKey, List.of("/ip4/127.0.0.1/tcp/" + listenPort), advertisedAddr, bitswap);
     }
 
-    public static Host buildHost(PrivKey privKey, List<String> listenAddrs, Multiaddr advertisedAddr) {
+    public static Host buildHost(PrivKey privKey,
+                                 List<String> listenAddrs,
+                                 Multiaddr advertisedAddr,
+                                 Bitswap bitswap) {
         return BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             b.getTransports().add(TcpTransport::new);
@@ -54,6 +80,7 @@ public class Server {
 
             Ping ping = new Ping();
             b.getProtocols().add(ping);
+            b.getProtocols().add(bitswap);
             b.getProtocols().add(new Identify(IdentifyOuterClass.Identify.newBuilder()
                     .setProtocolVersion("ipfs/0.1.0")
                     .setAgentVersion("nabu/v0.1.0")
@@ -61,6 +88,7 @@ public class Server {
                     .addListenAddrs(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()))
                     .setObservedAddr(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()))
                     .addAllProtocols(ping.getProtocolDescriptor().getAnnounceProtocols())
+                    .addAllProtocols(bitswap.getProtocolDescriptor().getAnnounceProtocols())
                     .build()));
 
             for (String listenAddr : listenAddrs) {

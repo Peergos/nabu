@@ -12,6 +12,7 @@
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <kotlin.version>1.5.10</kotlin.version>
+        <version.multiaddr>v1.4.6</version.multiaddr>
     </properties>
 
     <repositories>
@@ -83,6 +84,11 @@
     </build>
 
     <dependencies>
+        <dependency>
+            <groupId>com.github.multiformats</groupId>
+            <artifactId>java-multiaddr</artifactId>
+            <version>${version.multiaddr}</version>
+        </dependency>
         <dependency>
             <groupId>com.github.libp2p</groupId>
             <artifactId>jvm-libp2p</artifactId>
