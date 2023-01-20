@@ -42,7 +42,10 @@ public class Server {
         Cid hash = blockstore2.put(blockData, Cid.Codec.Raw).join();
         BitswapController bc1 = bitswap1.dial(node1, address2).getController().join();
         byte[] receivedBlock = bitswap1.getEngine().get(hash).join();
+        if (! Arrays.equals(receivedBlock, blockData))
+            throw new IllegalStateException("Incorrect block returned!");
 
+        System.out.println("Stopping nodes...");
         node1.stop().get();
         node2.stop().get();
     }

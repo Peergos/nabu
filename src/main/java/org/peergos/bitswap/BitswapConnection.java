@@ -7,7 +7,6 @@ import kotlin.*;
 import java.util.concurrent.*;
 
 public class BitswapConnection implements BitswapController {
-    //public final LinkedBlockingDeque<MessageOuterClass.Message> incoming = new LinkedBlockingDeque<>(10);
 
     private final Stream conn;
 

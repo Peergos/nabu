@@ -55,7 +55,6 @@ public class BitswapEngine {
                 boolean wantBlock = e.getWantType().getNumber() == 0;
                 if (wantBlock) {
                     Optional<byte[]> block = store.get(c).join();
-                    // TODO split into multiple messages if response is too big
                     if (block.isPresent())
                         blocks.add(MessageOuterClass.Message.Block.newBuilder()
                                         .setPrefix(ByteString.copyFrom(prefixBytes(c)))
@@ -121,12 +120,48 @@ public class BitswapEngine {
             return;
         BitswapController conn = conns.get(source);
         if (conn != null) {
-            MessageOuterClass.Message.Builder builder = MessageOuterClass.Message.newBuilder()
-                    .setWantlist(MessageOuterClass.Message.Wantlist.newBuilder()
-                            .addAllEntries(wants).build())
-                    .addAllBlockPresences(presences)
-                    .addAllPayload(blocks);
-            conn.send(builder.build());
+            List<MessageOuterClass.Message> msgs = new ArrayList<>();
+            // make sure we stay within the message size limit
+            MessageOuterClass.Message.Builder builder = MessageOuterClass.Message.newBuilder();
+            int messageSize = 0;
+            for (int i=0; i < wants.size(); i++) {
+                MessageOuterClass.Message.Wantlist.Entry want = wants.get(i);
+                int wantSize = want.getSerializedSize();
+                if (wantSize + messageSize > Bitswap.MAX_MESSAGE_SIZE) {
+                    msgs.add(builder.build());
+                    builder = MessageOuterClass.Message.newBuilder();
+                    messageSize = 0;
+                }
+                messageSize += wantSize;
+                builder = builder.setWantlist(builder.getWantlist().toBuilder().addEntries(want).build());
+            }
+            for (int i=0; i < presences.size(); i++) {
+                MessageOuterClass.Message.BlockPresence presence = presences.get(i);
+                int presenceSize = presence.getSerializedSize();
+                if (presenceSize + messageSize > Bitswap.MAX_MESSAGE_SIZE) {
+                    msgs.add(builder.build());
+                    builder = MessageOuterClass.Message.newBuilder();
+                    messageSize = 0;
+                }
+                messageSize += presenceSize;
+                builder = builder.addBlockPresences(presence);
+            }
+            for (int i=0; i < blocks.size(); i++) {
+                MessageOuterClass.Message.Block block = blocks.get(i);
+                int blockSize = block.getSerializedSize();
+                if (blockSize + messageSize > Bitswap.MAX_MESSAGE_SIZE) {
+                    msgs.add(builder.build());
+                    builder = MessageOuterClass.Message.newBuilder();
+                    messageSize = 0;
+                }
+                messageSize += blockSize;
+                builder = builder.addPayload(block);
+            }
+            if (messageSize > 0)
+                msgs.add(builder.build());
+            for (MessageOuterClass.Message message : msgs) {
+                conn.send(message);
+            }
         }
         else Logger.getGlobal().info("No connection to send reply bitswap message on!");
     }
