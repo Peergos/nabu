@@ -25,17 +25,16 @@ public class Server {
     public static void main(String[] args) throws Exception {
         Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
         Host node1 = buildHost(4001, bitswap1);
-        node1.start().get();
+        node1.start().join();
         System.out.println("Node 1 started and listening on " + node1.listenAddresses());
 
         RamBlockstore blockstore2 = new RamBlockstore();
         Bitswap bitswap2 = new Bitswap(new BitswapEngine(blockstore2));
         Host node2 = buildHost(7001, bitswap2);
-        node2.start().get();
+        node2.start().join();
         System.out.println("Node 2 started and listening on " + node2.listenAddresses());
 
         Multiaddr address2 = node2.listenAddresses().get(0);
-        pingTest(node1, address2);
 
         System.out.println("Sending a bitswap message");
         byte[] blockData = "G'day from Java bitswap!".getBytes(StandardCharsets.UTF_8);
@@ -48,16 +47,6 @@ public class Server {
         System.out.println("Stopping nodes...");
         node1.stop().get();
         node2.stop().get();
-    }
-
-    public static void pingTest(Host node1, Multiaddr address2) {
-        PingController pinger = new Ping().dial(node1, address2).getController().join();
-
-        System.out.println("Sending 5 ping messages to " + address2);
-        for (int i = 0; i < 2; i++) {
-            long latency = pinger.ping().join();
-            System.out.println("Ping " + i + ", latency " + latency + "ms");
-        }
     }
 
     public static Host buildHost(int listenPort,
