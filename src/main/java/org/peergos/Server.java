@@ -18,46 +18,43 @@ import io.libp2p.transport.tcp.*;
 import org.peergos.bitswap.*;
 
 import java.nio.charset.*;
-import java.security.*;
 import java.util.*;
-import java.util.concurrent.*;
 
 public class Server {
 
     public static void main(String[] args) throws Exception {
-        Bitswap bitswap1 = new Bitswap();
+        Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
         Host node1 = buildHost(4001, bitswap1);
         node1.start().get();
         System.out.println("Node 1 started and listening on " + node1.listenAddresses());
 
-        Bitswap bitswap2 = new Bitswap();
+        RamBlockstore blockstore2 = new RamBlockstore();
+        Bitswap bitswap2 = new Bitswap(new BitswapEngine(blockstore2));
         Host node2 = buildHost(7001, bitswap2);
         node2.start().get();
         System.out.println("Node 2 started and listening on " + node2.listenAddresses());
 
         Multiaddr address2 = node2.listenAddresses().get(0);
+        pingTest(node1, address2);
+
+        System.out.println("Sending a bitswap message");
+        byte[] blockData = "G'day from Java bitswap!".getBytes(StandardCharsets.UTF_8);
+        Cid hash = blockstore2.put(blockData, Cid.Codec.Raw).join();
+        BitswapController bc1 = bitswap1.dial(node1, address2).getController().join();
+        byte[] receivedBlock = bitswap1.getEngine().get(hash).join();
+
+        node1.stop().get();
+        node2.stop().get();
+    }
+
+    public static void pingTest(Host node1, Multiaddr address2) {
         PingController pinger = new Ping().dial(node1, address2).getController().join();
 
         System.out.println("Sending 5 ping messages to " + address2);
         for (int i = 0; i < 2; i++) {
-            long latency = pinger.ping().get();
+            long latency = pinger.ping().join();
             System.out.println("Ping " + i + ", latency " + latency + "ms");
         }
-
-        System.out.println("Sending a bitswap message");
-        byte[] blockData = "G'day from Java bitswap!".getBytes(StandardCharsets.UTF_8);
-        MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
-        Cid block = new Cid(1, Cid.Codec.Raw, Multihash.Type.sha2_256, sha256.digest(blockData));
-        MessageOuterClass.Message.Wantlist.Entry.Builder want = MessageOuterClass.Message.Wantlist.Entry.newBuilder()
-                .setWantType(MessageOuterClass.Message.Wantlist.WantType.Have)
-                .setBlock(ByteString.copyFrom(block.toBytes()));
-        MessageOuterClass.Message msg = MessageOuterClass.Message.newBuilder()
-                .setWantlist(MessageOuterClass.Message.Wantlist.newBuilder().addEntries(want).build()).build();
-        BitswapController bc1 = bitswap1.dial(node1, address2).getController().join();
-        bc1.send(msg);
-
-        node1.stop().get();
-        node2.stop().get();
     }
 
     public static Host buildHost(int listenPort,
