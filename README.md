@@ -18,3 +18,28 @@ In the Future we will support:
 * Kademlia DHT for content discovery
 * QUIC transport (and encryption and multiplexing)
 * Ed25519 peerIDs
+
+## Usage
+You can use this as a standalone application for storing and retrieving blocks. Or you can embed it in your application. 
+
+### Maven, Gradle, SBT
+
+Package managers are supported through [JitPack](https://jitpack.io/#ipfs/java-ipfs-http-client/) which supports Maven, Gradle, SBT, etc.
+
+for Maven, add the following sections to your pom.xml (replacing $LATEST_VERSION):
+```
+  <repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.github.peergos</groupId>
+      <artifactId>nabu</artifactId>
+      <version>$LATEST_VERSION</version>
+    </dependency>
+  </dependencies>
+```
