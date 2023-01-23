@@ -6,12 +6,14 @@ import io.libp2p.protocol.*;
 import org.junit.*;
 import org.peergos.bitswap.*;
 
+import java.util.*;
+
 public class PingTest {
 
     @Test
     public void runPing() {
-        Host node1 = Server.buildHost(11001, new Bitswap(new BitswapEngine(new RamBlockstore())));
-        Host node2 = Server.buildHost(11002, new Bitswap(new BitswapEngine(new RamBlockstore())));
+        Host node1 = Server.buildHost(11001, new Bitswap(new BitswapEngine(new RamBlockstore())), Optional.empty());
+        Host node2 = Server.buildHost(11002, new Bitswap(new BitswapEngine(new RamBlockstore())), Optional.empty());
         node1.start().join();
         node2.start().join();
         try {
