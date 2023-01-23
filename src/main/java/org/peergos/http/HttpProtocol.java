@@ -71,8 +71,10 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     @NotNull
     @Override
     protected CompletableFuture<HttpController> onStartResponder(@NotNull Stream stream) {
-        HttpProxyHandler proxier = new HttpProxyHandler(proxyTarget);
-        stream.pushHandler(proxier);
-        return CompletableFuture.completedFuture(new HttpController(stream));
+        HttpController replyPropagator = new HttpController(stream);
+        stream.pushHandler(new HttpRequestDecoder());
+        stream.pushHandler(new HttpProxyHandler(proxyTarget));
+        stream.pushHandler(new HttpResponseEncoder());
+        return CompletableFuture.completedFuture(replyPropagator);
     }
 }
