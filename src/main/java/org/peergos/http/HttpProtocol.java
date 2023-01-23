@@ -45,9 +45,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
             CompletableFuture<FullHttpResponse> res = new CompletableFuture<>();
             queue.add(res);
-            ByteBuf byteBuf = Unpooled.buffer();
-            req.content().clear().writeBytes(byteBuf);
-            stream.writeAndFlush(byteBuf.array());
+            stream.writeAndFlush(req);
             return res;
         }
     }
@@ -64,7 +62,8 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     @Override
     protected CompletableFuture<HttpController> onStartInitiator(@NotNull Stream stream) {
         HttpController replyPropagator = new HttpController(stream);
-        stream.pushHandler(replyPropagator);
+        stream.pushHandler(new HttpRequestEncoder());
+        stream.pushHandler(new HttpResponseDecoder());
         return CompletableFuture.completedFuture(replyPropagator);
     }
 
