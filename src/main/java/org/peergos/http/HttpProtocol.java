@@ -9,7 +9,7 @@ import io.netty.channel.nio.*;
 import io.netty.channel.socket.nio.*;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.logging.*;
 import org.jetbrains.annotations.*;
 
 import java.net.*;
@@ -48,7 +48,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
     }
 
-    public static class ResponseWriter extends SimpleChannelInboundHandler<FullHttpResponse> {
+    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpObject> {
         private final Stream stream;
 
         public ResponseWriter(Stream stream) {
@@ -56,8 +56,11 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse reply) throws Exception {
-            stream.writeAndFlush(reply.copy());
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) throws Exception {
+            if (reply instanceof HttpContent)
+                stream.writeAndFlush(((HttpContent) reply).copy());
+            else
+                stream.writeAndFlush(reply);
         }
     }
 
@@ -77,13 +80,12 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                 Bootstrap b = new Bootstrap();
                 b.group(group)
                         .channel(NioSocketChannel.class)
-                        .handler(new HttpClientCodec())
-                        .handler(new ResponseWriter(p2pstream));
+                        .handler(new LoggingHandler(LogLevel.INFO));
 
                 Channel ch = b.connect(proxyTarget).awaitUninterruptibly().channel();
+                ch.pipeline().addLast(new LoggingHandler(LogLevel.INFO));
                 ch.pipeline().addLast(new HttpRequestEncoder());
                 ch.pipeline().addLast(new HttpResponseDecoder());
-                ch.pipeline().addLast(new HttpObjectAggregator(1024*1024));
                 ch.pipeline().addLast(new ResponseWriter(p2pstream));
 
                 ch.writeAndFlush(msg);
