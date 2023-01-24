@@ -18,7 +18,6 @@ import java.util.concurrent.*;
 public class HttpProxyTest {
 
     @Test
-    @Ignore
     public void p2pProxyRequest() throws IOException {
         Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
         InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
@@ -47,7 +46,9 @@ public class HttpProxyTest {
                     .getController().join();
             FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
             FullHttpResponse resp = proxier.send(httpRequest).join();
-            byte[] replyBody = resp.content().array();
+            ByteArrayOutputStream bout = new ByteArrayOutputStream();
+            resp.content().readBytes(bout, resp.headers().getInt("content-length"));
+            byte[] replyBody = bout.toByteArray();
             if (! Arrays.equals(replyBody, httpReply))
                 throw new IllegalStateException("Different http response!");
         } finally {
