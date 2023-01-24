@@ -48,7 +48,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
     }
 
-    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpObject> {
+    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpResponse> {
         private final Stream stream;
 
         public ResponseWriter(Stream stream) {
@@ -56,18 +56,18 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) throws Exception {
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpResponse reply) throws Exception {
             stream.writeAndFlush(reply);
         }
     }
 
     public static class Receiver implements ProtocolMessageHandler<HttpRequest>, HttpController {
         private final SocketAddress proxyTarget;
-        private final Stream stream;
+        private final Stream p2pstream;
 
-        public Receiver(SocketAddress proxyTarget, Stream stream) {
+        public Receiver(SocketAddress proxyTarget, Stream p2pstream) {
             this.proxyTarget = proxyTarget;
-            this.stream = stream;
+            this.p2pstream = p2pstream;
         }
 
         @Override
@@ -77,8 +77,9 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                 Bootstrap b = new Bootstrap();
                 b.group(group)
                         .channel(NioSocketChannel.class)
+                        .handler(new HttpRequestEncoder())
                         .handler(new HttpResponseDecoder())
-                        .handler(new ResponseWriter(stream));
+                        .handler(new ResponseWriter(p2pstream));
 
                 Channel ch = b.connect(proxyTarget).awaitUninterruptibly().channel();
 
