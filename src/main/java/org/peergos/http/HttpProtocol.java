@@ -77,11 +77,13 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                 Bootstrap b = new Bootstrap();
                 b.group(group)
                         .channel(NioSocketChannel.class)
-                        .handler(new HttpRequestEncoder())
-                        .handler(new HttpResponseDecoder())
+                        .handler(new HttpClientCodec())
                         .handler(new ResponseWriter(p2pstream));
 
                 Channel ch = b.connect(proxyTarget).awaitUninterruptibly().channel();
+                ch.pipeline().addLast(new HttpRequestEncoder());
+                ch.pipeline().addLast(new HttpResponseDecoder());
+                ch.pipeline().addLast(new ResponseWriter(p2pstream));
 
                 ch.writeAndFlush(msg);
 
@@ -110,7 +112,6 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         Sender replyPropagator = new Sender(stream);
         stream.pushHandler(new HttpRequestEncoder());
         stream.pushHandler(new HttpResponseDecoder());
-        stream.pushHandler(new HttpObjectAggregator(1024*1024));
         stream.pushHandler(replyPropagator);
         return CompletableFuture.completedFuture(replyPropagator);
     }
