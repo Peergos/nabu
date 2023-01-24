@@ -3,11 +3,12 @@ package org.peergos.http;
 import io.libp2p.core.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
-import io.netty.buffer.*;
+import io.netty.bootstrap.*;
 import io.netty.channel.*;
-import io.netty.channel.embedded.*;
+import io.netty.channel.nio.*;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.proxy.*;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import org.jetbrains.annotations.*;
 
 import java.net.*;
@@ -21,25 +22,21 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
     }
 
-    public static class HttpController implements ProtocolMessageHandler<ByteBuf>{
+    public interface HttpController {
+        CompletableFuture<FullHttpResponse> send(FullHttpRequest req);
+    }
+
+    public static class Sender implements ProtocolMessageHandler<FullHttpResponse>, HttpController {
         private final Stream stream;
         private final LinkedBlockingDeque<CompletableFuture<FullHttpResponse>> queue = new LinkedBlockingDeque<>();
 
-        public HttpController(Stream stream) {
+        public Sender(Stream stream) {
             this.stream = stream;
         }
 
         @Override
-        public void onMessage(@NotNull Stream stream, ByteBuf msg) {
-            EmbeddedChannel ch = new EmbeddedChannel();
-            ChannelPipeline p = ch.pipeline();
-            p.addLast(new HttpClientCodec());
-            p.addLast(new HttpContentDecompressor());
-            p.addLast(new HttpObjectAggregator(10_485_760));
-
-            ch.write(msg);
-            Object resp = ch.inboundMessages().poll();
-            queue.poll().complete((FullHttpResponse) resp);
+        public void onMessage(@NotNull Stream stream, FullHttpResponse msg) {
+            queue.poll().complete(msg);
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
@@ -47,6 +44,53 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             queue.add(res);
             stream.writeAndFlush(req);
             return res;
+        }
+    }
+
+    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpResponse> {
+        private final Stream stream;
+
+        public ResponseWriter(Stream stream) {
+            this.stream = stream;
+        }
+
+        @Override
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpResponse reply) throws Exception {
+            stream.writeAndFlush(reply);
+        }
+    }
+
+    public static class Receiver implements ProtocolMessageHandler<HttpRequest>, HttpController {
+        private final SocketAddress proxyTarget;
+        private final Stream stream;
+
+        public Receiver(SocketAddress proxyTarget, Stream stream) {
+            this.proxyTarget = proxyTarget;
+            this.stream = stream;
+        }
+
+        @Override
+        public void onMessage(@NotNull Stream stream, HttpRequest msg) {
+            Bootstrap b = new Bootstrap()
+                    .group(new NioEventLoopGroup())
+                    .remoteAddress(proxyTarget);
+            b.handler(new ChannelInitializer<>() {
+                @Override
+                protected void initChannel(Channel ch) throws Exception {
+                    ch.pipeline().addLast(new HttpResponseDecoder());
+                    ch.pipeline().addLast(new ResponseWriter(stream));
+                }
+            });
+            try {
+                Channel outbound = b.connect().sync().channel();
+                outbound.write(msg);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Cannot send form a receiver!"));
         }
     }
 
@@ -61,19 +105,21 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     @NotNull
     @Override
     protected CompletableFuture<HttpController> onStartInitiator(@NotNull Stream stream) {
-        HttpController replyPropagator = new HttpController(stream);
+        Sender replyPropagator = new Sender(stream);
         stream.pushHandler(new HttpRequestEncoder());
         stream.pushHandler(new HttpResponseDecoder());
+        stream.pushHandler(new HttpObjectAggregator(1024*1024));
+        stream.pushHandler(replyPropagator);
         return CompletableFuture.completedFuture(replyPropagator);
     }
 
     @NotNull
     @Override
     protected CompletableFuture<HttpController> onStartResponder(@NotNull Stream stream) {
-        HttpController replyPropagator = new HttpController(stream);
+        Receiver proxier = new Receiver(proxyTarget, stream);
         stream.pushHandler(new HttpRequestDecoder());
-        stream.pushHandler(new HttpProxyHandler(proxyTarget));
+        stream.pushHandler(proxier);
         stream.pushHandler(new HttpResponseEncoder());
-        return CompletableFuture.completedFuture(replyPropagator);
+        return CompletableFuture.completedFuture(proxier);
     }
 }

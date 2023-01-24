@@ -13,6 +13,7 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class HttpProxyTest {
 
@@ -36,6 +37,7 @@ public class HttpProxyTest {
             ex.getResponseBody().write(httpReply);
             ex.getResponseBody().close();
         });
+        localhostServer.setExecutor(Executors.newSingleThreadExecutor());
         localhostServer.start();
 
         try {
