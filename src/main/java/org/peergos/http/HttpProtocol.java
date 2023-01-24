@@ -6,6 +6,7 @@ import io.libp2p.protocol.*;
 import io.netty.bootstrap.*;
 import io.netty.channel.*;
 import io.netty.channel.nio.*;
+import io.netty.channel.socket.nio.*;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -47,7 +48,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
     }
 
-    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpResponse> {
+    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpObject> {
         private final Stream stream;
 
         public ResponseWriter(Stream stream) {
@@ -55,7 +56,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpResponse reply) throws Exception {
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) throws Exception {
             stream.writeAndFlush(reply);
         }
     }
@@ -71,21 +72,21 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
         @Override
         public void onMessage(@NotNull Stream stream, HttpRequest msg) {
-            Bootstrap b = new Bootstrap()
-                    .group(new NioEventLoopGroup())
-                    .remoteAddress(proxyTarget);
-            b.handler(new ChannelInitializer<>() {
-                @Override
-                protected void initChannel(Channel ch) throws Exception {
-                    ch.pipeline().addLast(new HttpResponseDecoder());
-                    ch.pipeline().addLast(new ResponseWriter(stream));
-                }
-            });
+            EventLoopGroup group = new NioEventLoopGroup();
             try {
-                Channel outbound = b.connect().sync().channel();
-                outbound.write(msg);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+                Bootstrap b = new Bootstrap();
+                b.group(group)
+                        .channel(NioSocketChannel.class)
+                        .handler(new HttpResponseDecoder())
+                        .handler(new ResponseWriter(stream));
+
+                Channel ch = b.connect(proxyTarget).awaitUninterruptibly().channel();
+
+                ch.writeAndFlush(msg);
+
+                ch.closeFuture().awaitUninterruptibly();
+            } finally {
+                group.shutdownGracefully();
             }
         }
 
