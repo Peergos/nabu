@@ -38,7 +38,6 @@ public class KademliaEngine {
 
     public void receiveMessage(Dht.Message msg, PeerId source) {
         KademliaController conn = conns.get(source);
-
-
+        conn.receive(msg);
     }
 }

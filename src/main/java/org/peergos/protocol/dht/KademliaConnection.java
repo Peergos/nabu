@@ -9,14 +9,22 @@ import java.util.concurrent.*;
 public class KademliaConnection implements KademliaController {
 
     private final Stream conn;
+    private final LinkedBlockingDeque<CompletableFuture<Dht.Message>> queue = new LinkedBlockingDeque<>();
 
     public KademliaConnection(Stream conn) {
         this.conn = conn;
     }
 
     @Override
-    public void send(Dht.Message msg) {
+    public CompletableFuture<Dht.Message> send(Dht.Message msg) {
         conn.writeAndFlush(msg);
+        CompletableFuture<Dht.Message> res = new CompletableFuture<>();
+        queue.add(res);
+        return res;
+    }
+
+    public void receive(Dht.Message msg) {
+        queue.poll().complete(msg);
     }
 
     @Override

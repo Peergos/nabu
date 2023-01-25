@@ -7,7 +7,9 @@ import java.util.concurrent.*;
 
 public interface KademliaController {
 
-    void send(Dht.Message msg);
+    CompletableFuture<Dht.Message> send(Dht.Message msg);
+
+    void receive(Dht.Message msg);
 
     CompletableFuture<Unit> close();
 }
