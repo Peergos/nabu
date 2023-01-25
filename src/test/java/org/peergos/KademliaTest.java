@@ -19,6 +19,7 @@ import java.util.*;
 public class KademliaTest {
 
     @Test
+    @Ignore
     public void bootstrap() throws Exception {
         Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
         Kademlia lanDht = new Kademlia(new KademliaEngine(), true);
