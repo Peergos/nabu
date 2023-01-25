@@ -5,6 +5,7 @@ import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
 import io.libp2p.core.dsl.*;
 import io.libp2p.core.multiformats.*;
+import io.libp2p.core.multistream.*;
 import io.libp2p.core.mux.*;
 import io.libp2p.crypto.keys.*;
 import io.libp2p.etc.types.*;
@@ -12,69 +13,56 @@ import io.libp2p.protocol.*;
 import io.libp2p.security.noise.*;
 import io.libp2p.transport.tcp.*;
 import org.peergos.bitswap.*;
-import org.peergos.http.*;
+import org.peergos.dht.*;
 
-import java.net.*;
 import java.util.*;
 
 public class Server {
 
     public static void main(String[] args) throws Exception {
-        Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
-        InetSocketAddress unusedProxyTarget = new InetSocketAddress("localhost", 7000);
-        Host node1 = buildHost(6001, bitswap1, Optional.of(unusedProxyTarget));
+        Kademlia dht = new Kademlia(new KademliaEngine());
+        Host node1 = buildHost(6001, List.of(
+                new Ping(),
+                new Bitswap(new BitswapEngine(new RamBlockstore())),
+                dht));
         node1.start().join();
         System.out.println("Node 1 started and listening on " + node1.listenAddresses());
 
-        RamBlockstore blockstore2 = new RamBlockstore();
-        Bitswap bitswap2 = new Bitswap(new BitswapEngine(blockstore2));
-        InetSocketAddress proxyTarget = new InetSocketAddress("localhost", 8000);
-        Host node2 = buildHost(7001, bitswap2, Optional.of(proxyTarget));
-        node2.start().join();
-        System.out.println("Node 2 started and listening on " + node2.listenAddresses());
+        Multiaddr bootstrapNode = Multiaddr.fromString("/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt");
+        KademliaController bootstrap = dht.dial(node1, bootstrapNode).getController().join();
 
-        Multiaddr address2 = node2.listenAddresses().get(0);
-
-        System.out.println("Stopping nodes...");
+        System.out.println("Stopping server...");
         node1.stop().get();
-        node2.stop().get();
     }
 
     public static Host buildHost(int listenPort,
-                                 Bitswap bitswap,
-                                 Optional<SocketAddress> httpProxyTarget) {
+                                 List<? extends ProtocolBinding<? extends Object>> protocols) {
         PrivKey privKey = RsaKt.generateRsaKeyPair(2048).getFirst();
         PeerId peerId = PeerId.fromPubKey(privKey.publicKey());
         Multiaddr advertisedAddr = Multiaddr.fromString("/ip4/127.0.0.1/tcp/" + listenPort).withP2P(peerId);
-        return buildHost(privKey, List.of("/ip4/127.0.0.1/tcp/" + listenPort), advertisedAddr, bitswap, httpProxyTarget);
+        return buildHost(privKey, List.of("/ip4/127.0.0.1/tcp/" + listenPort), advertisedAddr, protocols);
     }
 
     public static Host buildHost(PrivKey privKey,
                                  List<String> listenAddrs,
                                  Multiaddr advertisedAddr,
-                                 Bitswap bitswap,
-                                 Optional<SocketAddress> httpProxyTarget) {
+                                 List<? extends ProtocolBinding<? extends Object>> protocols) {
         return BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             b.getTransports().add(TcpTransport::new);
             b.getSecureChannels().add(NoiseXXSecureChannel::new);
             b.getMuxers().add(StreamMuxerProtocol.getMplex());
 
-            Ping ping = new Ping();
-            b.getProtocols().add(ping);
-            b.getProtocols().add(bitswap);
+            b.getProtocols().addAll(protocols);
+
             IdentifyOuterClass.Identify.Builder identifyBuilder = IdentifyOuterClass.Identify.newBuilder()
                     .setProtocolVersion("ipfs/0.1.0")
                     .setAgentVersion("nabu/v0.1.0")
                     .setPublicKey(ByteArrayExtKt.toProtobuf(privKey.publicKey().bytes()))
                     .addListenAddrs(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()))
-                    .setObservedAddr(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()))
-                    .addAllProtocols(ping.getProtocolDescriptor().getAnnounceProtocols())
-                    .addAllProtocols(bitswap.getProtocolDescriptor().getAnnounceProtocols());
-            if (httpProxyTarget.isPresent()) {
-                HttpProtocol.Binding httpProxy = new HttpProtocol.Binding(httpProxyTarget.get());
-                b.getProtocols().add(httpProxy);
-                identifyBuilder = identifyBuilder.addAllProtocols(httpProxy.getProtocolDescriptor().getAnnounceProtocols());
+                    .setObservedAddr(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()));
+            for (ProtocolBinding<?> protocol : protocols) {
+                identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());
             }
             b.getProtocols().add(new Identify(identifyBuilder.build()));
 

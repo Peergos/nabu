@@ -21,10 +21,12 @@ public class HttpProxyTest {
     public void p2pProxyRequest() throws IOException {
         Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
         InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
-        Host node1 = Server.buildHost(10000 + new Random().nextInt(50000), bitswap1, Optional.of(unusedProxyTarget));
+        Host node1 = Server.buildHost(10000 + new Random().nextInt(50000),
+                List.of(bitswap1, new HttpProtocol.Binding(unusedProxyTarget)));
         RamBlockstore blockstore2 = new RamBlockstore();
         InetSocketAddress proxyTarget = new InetSocketAddress("127.0.0.1", 8000);
-        Host node2 = Server.buildHost(10000 + new Random().nextInt(50000), new Bitswap(new BitswapEngine(blockstore2)), Optional.of(proxyTarget));
+        Host node2 = Server.buildHost(10000 + new Random().nextInt(50000),
+                List.of(new Bitswap(new BitswapEngine(blockstore2)), new HttpProtocol.Binding(proxyTarget)));
         node1.start().join();
         node2.start().join();
 

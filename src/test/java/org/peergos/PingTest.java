@@ -12,8 +12,8 @@ public class PingTest {
 
     @Test
     public void runPing() {
-        Host node1 = Server.buildHost(11001, new Bitswap(new BitswapEngine(new RamBlockstore())), Optional.empty());
-        Host node2 = Server.buildHost(11002, new Bitswap(new BitswapEngine(new RamBlockstore())), Optional.empty());
+        Host node1 = Server.buildHost(11001, List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore()))));
+        Host node2 = Server.buildHost(11002, List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore()))));
         node1.start().join();
         node2.start().join();
         try {

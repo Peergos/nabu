@@ -14,9 +14,9 @@ public class BitswapTest {
     @Test
     public void getBlock() {
         Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
-        Host node1 = Server.buildHost(10000 + new Random().nextInt(50000), bitswap1, Optional.empty());
+        Host node1 = Server.buildHost(10000 + new Random().nextInt(50000), List.of(bitswap1));
         RamBlockstore blockstore2 = new RamBlockstore();
-        Host node2 = Server.buildHost(10000 + new Random().nextInt(50000), new Bitswap(new BitswapEngine(blockstore2)), Optional.empty());
+        Host node2 = Server.buildHost(10000 + new Random().nextInt(50000), List.of(new Bitswap(new BitswapEngine(blockstore2))));
         node1.start().join();
         node2.start().join();
         try {
