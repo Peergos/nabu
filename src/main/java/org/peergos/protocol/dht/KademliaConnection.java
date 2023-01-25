@@ -1,21 +1,21 @@
-package org.peergos.bitswap;
+package org.peergos.protocol.dht;
 
-import io.libp2p.core.Stream;
+import io.libp2p.core.*;
 import kotlin.*;
-import org.peergos.bitswap.pb.*;
+import org.peergos.protocol.dht.pb.*;
 
 import java.util.concurrent.*;
 
-public class BitswapConnection implements BitswapController {
+public class KademliaConnection implements KademliaController {
 
     private final Stream conn;
 
-    public BitswapConnection(Stream conn) {
+    public KademliaConnection(Stream conn) {
         this.conn = conn;
     }
 
     @Override
-    public void send(MessageOuterClass.Message msg) {
+    public void send(Dht.Message msg) {
         conn.writeAndFlush(msg);
     }
 

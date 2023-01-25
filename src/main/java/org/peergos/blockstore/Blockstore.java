@@ -1,4 +1,4 @@
-package org.peergos;
+package org.peergos.blockstore;
 
 import io.ipfs.cid.*;
 

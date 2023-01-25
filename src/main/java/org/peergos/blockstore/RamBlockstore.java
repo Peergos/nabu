@@ -1,7 +1,8 @@
-package org.peergos;
+package org.peergos.blockstore;
 
 import io.ipfs.cid.*;
 import io.ipfs.multihash.*;
+import org.peergos.*;
 
 import java.util.*;
 import java.util.concurrent.*;

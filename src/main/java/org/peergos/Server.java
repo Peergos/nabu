@@ -12,8 +12,9 @@ import io.libp2p.etc.types.*;
 import io.libp2p.protocol.*;
 import io.libp2p.security.noise.*;
 import io.libp2p.transport.tcp.*;
-import org.peergos.bitswap.*;
-import org.peergos.dht.*;
+import org.peergos.blockstore.*;
+import org.peergos.protocol.bitswap.*;
+import org.peergos.protocol.dht.*;
 
 import java.util.*;
 

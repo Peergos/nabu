@@ -1,4 +1,4 @@
-package org.peergos.http;
+package org.peergos.protocol.http;
 
 import io.libp2p.core.*;
 import io.libp2p.core.multistream.*;

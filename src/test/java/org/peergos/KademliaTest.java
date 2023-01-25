@@ -8,9 +8,10 @@ import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.protocol.*;
 import org.junit.*;
-import org.peergos.bitswap.*;
-import org.peergos.dht.*;
-import org.peergos.dht.pb.*;
+import org.peergos.blockstore.*;
+import org.peergos.protocol.bitswap.*;
+import org.peergos.protocol.dht.*;
+import org.peergos.protocol.dht.pb.*;
 
 import java.util.*;
 

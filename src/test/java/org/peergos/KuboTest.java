@@ -5,7 +5,8 @@ import io.ipfs.cid.*;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import org.junit.*;
-import org.peergos.bitswap.*;
+import org.peergos.protocol.bitswap.*;
+import org.peergos.blockstore.*;
 
 import java.io.*;
 import java.nio.charset.*;

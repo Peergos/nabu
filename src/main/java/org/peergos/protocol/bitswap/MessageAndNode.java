@@ -1,7 +1,7 @@
-package org.peergos.bitswap;
+package org.peergos.protocol.bitswap;
 
 import io.ipfs.cid.*;
-import org.peergos.bitswap.pb.*;
+import org.peergos.protocol.bitswap.pb.*;
 
 public class MessageAndNode {
     public final MessageOuterClass.Message msg;

@@ -1,4 +1,4 @@
-package org.peergos.bitswap;
+package org.peergos.protocol.bitswap;
 
 import io.libp2p.core.multistream.*;
 

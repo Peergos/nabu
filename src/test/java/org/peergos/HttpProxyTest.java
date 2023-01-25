@@ -1,13 +1,13 @@
 package org.peergos;
 
 import com.sun.net.httpserver.*;
-import io.ipfs.cid.*;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.netty.handler.codec.http.*;
 import org.junit.*;
-import org.peergos.bitswap.*;
-import org.peergos.http.*;
+import org.peergos.blockstore.*;
+import org.peergos.protocol.bitswap.*;
+import org.peergos.protocol.http.*;
 
 import java.io.*;
 import java.net.*;

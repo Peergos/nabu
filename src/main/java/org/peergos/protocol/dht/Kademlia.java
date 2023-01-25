@@ -1,4 +1,4 @@
-package org.peergos.dht;
+package org.peergos.protocol.dht;
 
 import io.libp2p.core.multistream.*;
 

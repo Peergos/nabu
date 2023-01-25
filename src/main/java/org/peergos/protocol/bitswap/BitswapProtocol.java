@@ -1,9 +1,9 @@
-package org.peergos.bitswap;
+package org.peergos.protocol.bitswap;
 
 import io.libp2p.core.*;
 import io.libp2p.protocol.*;
 import org.jetbrains.annotations.*;
-import org.peergos.bitswap.pb.*;
+import org.peergos.protocol.bitswap.pb.*;
 
 import java.util.concurrent.*;
 

@@ -1,7 +1,8 @@
-package org.peergos.dht;
+package org.peergos.protocol.dht;
 
 import io.ipfs.cid.*;
 import io.libp2p.core.*;
+import org.peergos.protocol.dht.pb.*;
 
 import java.io.*;
 import java.util.*;
@@ -35,7 +36,7 @@ public class KademliaEngine {
         }
     }
 
-    public void receiveMessage(org.peergos.dht.pb.Dht.Message msg, PeerId source) {
+    public void receiveMessage(Dht.Message msg, PeerId source) {
         KademliaController conn = conns.get(source);
 
 

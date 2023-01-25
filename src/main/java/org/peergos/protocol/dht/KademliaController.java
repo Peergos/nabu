@@ -1,7 +1,7 @@
-package org.peergos.dht;
+package org.peergos.protocol.dht;
 
 import kotlin.*;
-import org.peergos.dht.pb.*;
+import org.peergos.protocol.dht.pb.*;
 
 import java.util.concurrent.*;
 

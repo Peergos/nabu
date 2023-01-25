@@ -1,9 +1,9 @@
-package org.peergos.dht;
+package org.peergos.protocol.dht;
 
 import io.libp2p.core.*;
 import io.libp2p.protocol.*;
 import org.jetbrains.annotations.*;
-import org.peergos.dht.pb.Dht;
+import org.peergos.protocol.dht.pb.Dht;
 
 import java.util.concurrent.*;
 
