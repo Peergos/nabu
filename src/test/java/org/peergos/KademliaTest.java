@@ -20,7 +20,7 @@ public class KademliaTest {
     @Test
     public void bootstrap() throws Exception {
         Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
-        Kademlia dht = new Kademlia(new KademliaEngine(), false);
+        Kademlia dht = new Kademlia(new KademliaEngine(), true);
         Ping ping = new Ping();
         Host node1 = Server.buildHost(10000 + new Random().nextInt(50000), List.of(ping, bitswap1, dht));
         node1.start().join();
