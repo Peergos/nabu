@@ -15,7 +15,7 @@ public class KademliaConnection implements KademliaController {
     }
 
     @Override
-    public void send(Dht msg) {
+    public void send(Dht.Message msg) {
         conn.writeAndFlush(msg);
     }
 
