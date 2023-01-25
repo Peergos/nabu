@@ -1,11 +1,11 @@
 package org.peergos.bitswap;
 
-import bitswap.message.pb.*;
 import com.google.protobuf.*;
 import io.ipfs.cid.*;
 import io.ipfs.multihash.*;
 import io.libp2p.core.*;
 import org.peergos.*;
+import org.peergos.bitswap.pb.*;
 
 import java.io.*;
 import java.util.*;

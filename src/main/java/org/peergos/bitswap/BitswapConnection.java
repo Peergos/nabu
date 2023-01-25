@@ -1,8 +1,8 @@
 package org.peergos.bitswap;
 
-import bitswap.message.pb.*;
 import io.libp2p.core.Stream;
 import kotlin.*;
+import org.peergos.bitswap.pb.*;
 
 import java.util.concurrent.*;
 

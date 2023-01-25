@@ -1,12 +1,11 @@
 package org.peergos.bitswap;
 
-import bitswap.message.pb.*;
 import io.libp2p.core.*;
 import io.libp2p.protocol.*;
 import org.jetbrains.annotations.*;
+import org.peergos.bitswap.pb.*;
 
 import java.util.concurrent.*;
-import java.util.function.*;
 
 public class BitswapProtocol extends ProtobufProtocolHandler<BitswapController> {
 

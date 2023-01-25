@@ -1,7 +1,7 @@
 package org.peergos.bitswap;
 
-import bitswap.message.pb.*;
 import kotlin.*;
+import org.peergos.bitswap.pb.*;
 
 import java.util.concurrent.*;
 
