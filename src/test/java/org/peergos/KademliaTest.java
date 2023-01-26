@@ -21,7 +21,8 @@ public class KademliaTest {
 
     @Test
     public void bootstrap() throws Exception {
-        Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
+        RamBlockstore blockstore1 = new RamBlockstore();
+        Bitswap bitswap1 = new Bitswap(new BitswapEngine(blockstore1));
         Kademlia lanDht = new Kademlia(new KademliaEngine(), true);
         Kademlia wanDht = new Kademlia(new KademliaEngine(), false);
         Ping ping = new Ping();
@@ -44,13 +45,23 @@ public class KademliaTest {
 
             IdentifyOuterClass.Identify id = new Identify().dial(node1, address2).getController().join().id().join();
             Kademlia dht = id.getProtocolsList().contains("/ipfs/lan/kad/1.0.0") ? lanDht : wanDht;
-            KademliaController bootstrap = dht.dial(node1, address2).getController().join();
-            List<PeerAddresses> peers = bootstrap.closerPeers(Cid.cast(node2.getPeerId().getBytes())).join();
+            KademliaController bootstrap1 = dht.dial(node1, address2).getController().join();
+            List<PeerAddresses> peers = bootstrap1.closerPeers(Cid.cast(node2.getPeerId().getBytes())).join();
             Optional<PeerAddresses> matching = peers.stream()
                     .filter(p -> Arrays.equals(p.peerId.toBytes(), node2.getPeerId().getBytes()))
                     .findFirst();
             if (matching.isEmpty())
                 throw new IllegalStateException("Couldn't find node2 from kubo!");
+
+            Cid block = blockstore1.put("Provide me.".getBytes(), Cid.Codec.Raw).join();
+            bootstrap1.provide(block, PeerAddresses.fromHost(node1)).join();
+
+            Providers providers = bootstrap1.getProviders(block).join();
+            Optional<PeerAddresses> matchingProvider = providers.providers.stream()
+                    .filter(p -> Arrays.equals(p.peerId.toBytes(), node1.getPeerId().getBytes()))
+                    .findFirst();
+            if (matchingProvider.isEmpty())
+                throw new IllegalStateException("Node1 is not a provider for block!");
         } finally {
             node1.stop();
             node2.stop();

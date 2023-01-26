@@ -16,11 +16,17 @@ public class KademliaConnection implements KademliaController {
     }
 
     @Override
-    public CompletableFuture<Dht.Message> send(Dht.Message msg) {
+    public CompletableFuture<Dht.Message> rpc(Dht.Message msg) {
         conn.writeAndFlush(msg);
         CompletableFuture<Dht.Message> res = new CompletableFuture<>();
         queue.add(res);
         return res;
+    }
+
+    @Override
+    public CompletableFuture<Boolean> send(Dht.Message msg) {
+        conn.writeAndFlush(msg);
+        return CompletableFuture.completedFuture(true);
     }
 
     public void receive(Dht.Message msg) {

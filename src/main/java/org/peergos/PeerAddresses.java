@@ -2,6 +2,7 @@ package org.peergos;
 
 import io.ipfs.cid.*;
 import io.ipfs.multiaddr.*;
+import io.libp2p.core.*;
 import org.peergos.protocol.dht.pb.*;
 
 import java.util.*;
@@ -21,6 +22,15 @@ public class PeerAddresses {
         List<MultiAddress> addrs = peer.getAddrsList()
                 .stream()
                 .map(b -> new MultiAddress(b.toByteArray()))
+                .collect(Collectors.toList());
+        return new PeerAddresses(peerId, addrs);
+    }
+
+    public static PeerAddresses fromHost(Host host) {
+        Cid peerId = Cid.cast(host.getPeerId().getBytes());
+        List<MultiAddress> addrs = host.listenAddresses()
+                .stream()
+                .map(b -> new MultiAddress(b.serialize()))
                 .collect(Collectors.toList());
         return new PeerAddresses(peerId, addrs);
     }
