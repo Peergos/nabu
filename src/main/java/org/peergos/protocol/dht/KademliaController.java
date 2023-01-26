@@ -2,6 +2,7 @@ package org.peergos.protocol.dht;
 
 import com.google.protobuf.*;
 import io.ipfs.cid.*;
+import io.ipfs.multihash.*;
 import kotlin.*;
 import org.peergos.*;
 import org.peergos.protocol.dht.pb.*;
@@ -29,7 +30,8 @@ public interface KademliaController {
     default CompletableFuture<Boolean> provide(Cid block, PeerAddresses us) {
         return send(Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.ADD_PROVIDER)
-                .setKey(ByteString.copyFrom(block.toBytes()))
+                // only provide the bare Multihash
+                .setKey(ByteString.copyFrom(new Multihash(block.getType(), block.getHash()).toBytes()))
                 .addAllProviderPeers(List.of(Dht.Message.Peer.newBuilder()
                         .setId(ByteString.copyFrom(us.peerId.toBytes()))
                         .addAllAddrs(us.addresses.stream()
@@ -42,7 +44,7 @@ public interface KademliaController {
     default CompletableFuture<Providers> getProviders(Cid block) {
         return rpc(Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.GET_PROVIDERS)
-                .setKey(ByteString.copyFrom(block.toBytes()))
+                .setKey(ByteString.copyFrom(new Multihash(block.getType(), block.getHash()).toBytes()))
                 .build())
                 .thenApply(Providers::fromProtobuf);
     }
