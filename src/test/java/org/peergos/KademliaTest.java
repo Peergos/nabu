@@ -45,18 +45,10 @@ public class KademliaTest {
             IdentifyOuterClass.Identify id = new Identify().dial(node1, address2).getController().join().id().join();
             Kademlia dht = id.getProtocolsList().contains("/ipfs/lan/kad/1.0.0") ? lanDht : wanDht;
             KademliaController bootstrap = dht.dial(node1, address2).getController().join();
-            Dht.Message find = bootstrap.send(Dht.Message.newBuilder()
-                    .setType(Dht.Message.MessageType.FIND_NODE)
-                    .setKey(ByteString.copyFrom(node2.getPeerId().getBytes()))
-                    .build()).join();
-            List<PeerAddresses> peers = find.getCloserPeersList().stream()
-                    .map(PeerAddresses::fromProtobuf)
-                    .collect(Collectors.toList());
+            List<PeerAddresses> peers = bootstrap.closerPeers(Cid.cast(node2.getPeerId().getBytes())).join();
             Optional<PeerAddresses> matching = peers.stream()
                     .filter(p -> Arrays.equals(p.peerId.toBytes(), node2.getPeerId().getBytes()))
                     .findFirst();
-            Dht.Record record = find.getRecord();
-            List<Dht.Message.Peer> providerPeersList = find.getProviderPeersList();
             if (matching.isEmpty())
                 throw new IllegalStateException("Couldn't find node2 from kubo!");
         } finally {
