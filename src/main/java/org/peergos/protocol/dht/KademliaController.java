@@ -63,7 +63,7 @@ public interface KademliaController {
         return rpc(outgoing).thenApply(reply -> reply.equals(outgoing));
     }
 
-    default CompletableFuture<GetResult> getValue(Cid peerId) {
+    default CompletableFuture<GetResult> getValue(Multihash peerId) {
         byte[] ipnsRecordKey = ("/ipns/" + peerId).getBytes();
         Dht.Message outgoing = Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.GET_VALUE)
