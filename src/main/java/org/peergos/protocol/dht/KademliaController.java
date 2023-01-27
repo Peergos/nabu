@@ -6,6 +6,7 @@ import io.ipfs.multihash.*;
 import kotlin.*;
 import org.peergos.*;
 import org.peergos.protocol.dht.pb.*;
+import org.peergos.protocol.ipns.*;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -47,6 +48,28 @@ public interface KademliaController {
                 .setKey(ByteString.copyFrom(new Multihash(block.getType(), block.getHash()).toBytes()))
                 .build())
                 .thenApply(Providers::fromProtobuf);
+    }
+
+    default CompletableFuture<Boolean> putValue(Cid peerId, byte[] value) {
+        byte[] ipnsRecordKey = ("/ipns/" + peerId).getBytes();
+        Dht.Message outgoing = Dht.Message.newBuilder()
+                .setType(Dht.Message.MessageType.PUT_VALUE)
+                .setKey(ByteString.copyFrom(ipnsRecordKey))
+                .setRecord(Dht.Record.newBuilder()
+                        .setKey(ByteString.copyFrom(ipnsRecordKey))
+                        .setValue(ByteString.copyFrom(value))
+                        .build())
+                .build();
+        return rpc(outgoing).thenApply(reply -> reply.equals(outgoing));
+    }
+
+    default CompletableFuture<GetResult> getValue(Cid peerId) {
+        byte[] ipnsRecordKey = ("/ipns/" + peerId).getBytes();
+        Dht.Message outgoing = Dht.Message.newBuilder()
+                .setType(Dht.Message.MessageType.GET_VALUE)
+                .setKey(ByteString.copyFrom(ipnsRecordKey))
+                .build();
+        return rpc(outgoing).thenApply(GetResult::fromProtobuf);
     }
 
     void receive(Dht.Message msg);

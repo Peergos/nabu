@@ -1,5 +1,5 @@
 syntax = "proto3";
-package org.peergos.dht.pb;
+package org.peergos.protocol.dht.pb;
 
 // Record represents a dht record that contains a value
 // for a key value pair
