@@ -9,7 +9,11 @@ import java.time.format.*;
 import java.util.*;
 
 public class IPNS {
-    public static final DateTimeFormatter rfc3339nano = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.nZ");
+    private static final DateTimeFormatter rfc3339nano = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.n");
+    
+    public static String formatExpiry(LocalDateTime expiry) {
+        return expiry.atOffset(ZoneOffset.UTC).format(rfc3339nano)+"Z";
+    }
 
     public static byte[] createCborDataForIpnsEntry(String pathToPublish,
                                                     LocalDateTime expiry,
@@ -17,11 +21,12 @@ public class IPNS {
                                                     long sequence,
                                                     long ttl) {
         SortedMap<String, Cborable> state = new TreeMap<>();
-        state.put("Value", new CborObject.CborByteArray(pathToPublish.getBytes()));
-        state.put("Validity", new CborObject.CborByteArray(expiry.atOffset(ZoneOffset.UTC).format(rfc3339nano).getBytes(StandardCharsets.UTF_8)));
-        state.put("ValidityType", new CborObject.CborLong(validityType));
-        state.put("Sequence", new CborObject.CborLong(sequence));
         state.put("TTL", new CborObject.CborLong(ttl));
+        state.put("Value", new CborObject.CborByteArray(pathToPublish.getBytes()));
+        state.put("Sequence", new CborObject.CborLong(sequence));
+        String expiryString = formatExpiry(expiry);
+        state.put("Validity", new CborObject.CborByteArray(expiryString.getBytes(StandardCharsets.UTF_8)));
+        state.put("ValidityType", new CborObject.CborLong(validityType));
         return CborObject.CborMap.build(state).serialize();
     }
 

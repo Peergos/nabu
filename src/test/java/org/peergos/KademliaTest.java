@@ -1,6 +1,5 @@
 package org.peergos;
 
-import com.google.protobuf.*;
 import identify.pb.*;
 import io.ipfs.api.*;
 import io.ipfs.cid.*;
@@ -11,9 +10,7 @@ import org.junit.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.dht.*;
-import org.peergos.protocol.dht.pb.*;
 import org.peergos.protocol.ipns.*;
-import org.peergos.protocol.ipns.pb.*;
 
 import java.time.*;
 import java.util.*;
@@ -42,7 +39,9 @@ public class KademliaTest {
 
         try {
             IPFS kubo = new IPFS("localhost", 5001);
-            Multiaddr address2 = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kubo.id().get("ID"));
+            String kuboID = (String)kubo.id().get("ID");
+            io.ipfs.multihash.Multihash kuboId = Cid.fromBase58(kuboID);
+            Multiaddr address2 = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kuboID);
             bitswap2.dial(node2, address2).getController().join();
 
             IdentifyOuterClass.Identify id = new Identify().dial(node1, address2).getController().join().id().join();
@@ -65,25 +64,42 @@ public class KademliaTest {
             if (matchingProvider.isEmpty())
                 throw new IllegalStateException("Node1 is not a provider for block!");
 
+            // publish a cid in kubo ipns
+//            Map publish = kubo.name.publish(block);
+            Cid kuboPeerId = new Cid(1, Cid.Codec.Libp2pKey, kuboId.getType(), kuboId.getHash());
+            GetResult kuboIpnsGet = wanDht.dial(node1, address2).getController().join().getValue(kuboId).join();
+//            LinkedBlockingDeque<PeerAddresses> queue = new LinkedBlockingDeque<>();
+//            queue.addAll(kuboIpnsGet.closerPeers);
+//            outer: for (int i=0; i < 1000; i++) {
+//                if (kuboIpnsGet.record.isPresent())
+//                    break;
+//                PeerAddresses closer = queue.poll();
+//                List<String> candidates = closer.addresses.stream()
+//                        .map(MultiAddress::toString)
+//                        .filter(a -> a.contains("tcp") && a.contains("ip4") && !a.contains("127.0.0.1") && !a.contains("/172."))
+//                        .collect(Collectors.toList());
+//                for (String candidate: candidates) {
+//                    try {
+//                        kuboIpnsGet = wanDht.dial(node1, Multiaddr.fromString(candidate + "/p2p/" + closer.peerId)).getController().join()
+//                                .getValue(kuboId).join();
+//                        queue.addAll(kuboIpnsGet.closerPeers);
+//                        continue outer;
+//                    } catch (Exception e) {
+//                        System.out.println(e.getMessage());
+//                    }
+//                }
+//            }
+
+//            GetResult join = dht.dial(node1, node2.listenAddresses().get(0)).getController().join().getValue(kuboPeerId).join();
+
             // sign an ipns record to publish
             String pathToPublish = "/ipfs/" + block;
-            LocalDateTime expiry = LocalDateTime.now().plusDays(1);
+            LocalDateTime expiry = LocalDateTime.now().plusHours(1);
             int sequence = 1;
-            long ttl = 86400_000_000_000L;
-            byte[] cborEntryData = IPNS.createCborDataForIpnsEntry(pathToPublish, expiry,
-                    Ipns.IpnsEntry.ValidityType.EOL_VALUE, sequence, ttl);
-            String expiryString = expiry.atOffset(ZoneOffset.UTC).format(IPNS.rfc3339nano);
-            byte[] record = Ipns.IpnsEntry.newBuilder()
-                    .setSequence(sequence)
-                    .setTtl(ttl)
-                    .setValue(ByteString.copyFrom(pathToPublish.getBytes()))
-                    .setValidityType(Ipns.IpnsEntry.ValidityType.EOL)
-                    .setValidity(ByteString.copyFrom(expiryString.getBytes()))
-                    .setData(ByteString.copyFrom(cborEntryData))
-                    .setSignatureV2(ByteString.copyFrom(node1.getPrivKey().sign(IPNS.createSigV2Data(cborEntryData))))
-                    .setPubKey(ByteString.copyFrom(node1.getPrivKey().publicKey().bytes())) // not needed with Ed25519
-                    .build().toByteArray();
-//            boolean success = bootstrap1.putValue(node1Id, record).join();
+            long ttl = 3600_000_000_000L;
+
+            System.out.println("Sending put value...");
+//            boolean success = bootstrap1.putValue(pathToPublish, expiry, sequence, ttl, node1Id, node1.getPrivKey()).join();
             GetResult getresult = bootstrap1.getValue(node1Id).join();
             System.out.println();
         } finally {
