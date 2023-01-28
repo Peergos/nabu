@@ -99,9 +99,12 @@ public class KademliaTest {
             long ttl = 3600_000_000_000L;
 
             System.out.println("Sending put value...");
-//            boolean success = bootstrap1.putValue(pathToPublish, expiry, sequence, ttl, node1Id, node1.getPrivKey()).join();
+            boolean success = bootstrap1.putValue(pathToPublish, expiry, sequence, ttl, node1Id, node1.getPrivKey()).join();
+            if (! success)
+                throw new IllegalStateException("Failed to publish IPNS record!");
             GetResult getresult = bootstrap1.getValue(node1Id).join();
-            System.out.println();
+            if (! getresult.record.isPresent())
+                throw new IllegalStateException("Kubo didn't return our published IPNS record!");
         } finally {
             node1.stop();
             node2.stop();

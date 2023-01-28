@@ -1,5 +1,6 @@
 package org.peergos.protocol.ipns;
 
+import io.ipfs.multihash.*;
 import org.peergos.cbor.*;
 
 import java.io.*;
@@ -13,6 +14,15 @@ public class IPNS {
     
     public static String formatExpiry(LocalDateTime expiry) {
         return expiry.atOffset(ZoneOffset.UTC).format(rfc3339nano)+"Z";
+    }
+
+    public static byte[] getKey(Multihash peerId) {
+        ByteArrayOutputStream bout = new ByteArrayOutputStream();
+        try {
+            bout.write("/ipns/".getBytes());
+            bout.write(peerId.toBytes());
+        } catch (IOException e) {}
+        return bout.toByteArray();
     }
 
     public static byte[] createCborDataForIpnsEntry(String pathToPublish,

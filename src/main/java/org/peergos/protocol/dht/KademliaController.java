@@ -79,8 +79,8 @@ public interface KademliaController {
         return putValue(peerId, ipnsEntry);
     }
 
-    default CompletableFuture<Boolean> putValue(Cid peerId, byte[] value) {
-        byte[] ipnsRecordKey = ("/ipns/" + peerId).getBytes();
+    default CompletableFuture<Boolean> putValue(Multihash peerId, byte[] value) {
+        byte[] ipnsRecordKey = IPNS.getKey(peerId);
         Dht.Message outgoing = Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.PUT_VALUE)
                 .setKey(ByteString.copyFrom(ipnsRecordKey))
@@ -89,11 +89,12 @@ public interface KademliaController {
                         .setValue(ByteString.copyFrom(value))
                         .build())
                 .build();
-        return rpc(outgoing).thenApply(reply -> reply.equals(outgoing));
+        return rpc(outgoing).thenApply(reply -> reply.getKey().equals(outgoing.getKey()) &&
+                reply.getRecord().getValue().equals(outgoing.getRecord().getValue()));
     }
 
     default CompletableFuture<GetResult> getValue(Multihash peerId) {
-        byte[] ipnsRecordKey = ("/ipns/" + peerId).getBytes();
+        byte[] ipnsRecordKey = IPNS.getKey(peerId);
         Dht.Message outgoing = Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.GET_VALUE)
                 .setKey(ByteString.copyFrom(ipnsRecordKey))
