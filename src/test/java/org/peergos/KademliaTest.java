@@ -66,8 +66,8 @@ public class KademliaTest {
 
             // publish a cid in kubo ipns
 //            Map publish = kubo.name.publish(block);
-            Cid kuboPeerId = new Cid(1, Cid.Codec.Libp2pKey, kuboId.getType(), kuboId.getHash());
-            GetResult kuboIpnsGet = wanDht.dial(node1, address2).getController().join().getValue(kuboId).join();
+//            Cid kuboPeerId = new Cid(1, Cid.Codec.Libp2pKey, kuboId.getType(), kuboId.getHash());
+//            GetResult kuboIpnsGet = wanDht.dial(node1, address2).getController().join().getValue(kuboId).join();
 //            LinkedBlockingDeque<PeerAddresses> queue = new LinkedBlockingDeque<>();
 //            queue.addAll(kuboIpnsGet.closerPeers);
 //            outer: for (int i=0; i < 1000; i++) {
