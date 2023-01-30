@@ -38,7 +38,7 @@ public class Server {
 
     public static Host buildHost(int listenPort,
                                  List<? extends ProtocolBinding<? extends Object>> protocols) {
-        PrivKey privKey = RsaKt.generateRsaKeyPair(2048).getFirst();
+        PrivKey privKey = Ed25519Kt.generateEd25519KeyPair().getFirst();
         PeerId peerId = PeerId.fromPubKey(privKey.publicKey());
         Multiaddr advertisedAddr = Multiaddr.fromString("/ip4/127.0.0.1/tcp/" + listenPort).withP2P(peerId);
         return buildHost(privKey, List.of("/ip4/127.0.0.1/tcp/" + listenPort), advertisedAddr, protocols);
