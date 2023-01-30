@@ -37,12 +37,7 @@ public interface KademliaController {
                 .setType(Dht.Message.MessageType.ADD_PROVIDER)
                 // only provide the bare Multihash
                 .setKey(ByteString.copyFrom(new Multihash(block.getType(), block.getHash()).toBytes()))
-                .addAllProviderPeers(List.of(Dht.Message.Peer.newBuilder()
-                        .setId(ByteString.copyFrom(us.peerId.toBytes()))
-                        .addAllAddrs(us.addresses.stream()
-                                .map(a -> ByteString.copyFrom(a.getBytes()))
-                                .collect(Collectors.toList()))
-                        .build()))
+                .addAllProviderPeers(List.of(us.toProtobuf()))
                 .build());
     }
 

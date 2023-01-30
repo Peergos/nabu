@@ -19,6 +19,7 @@ import java.nio.charset.*;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.*;
 
 public class KademliaEngine {
 
@@ -97,6 +98,10 @@ public class KademliaEngine {
         }
     }
 
+    public List<PeerAddresses> getKClosestPeers(byte[] key) {
+        throw new IllegalStateException("Unimplemented");
+    }
+
     public void receiveRequest(Dht.Message msg, PeerId source, Stream stream) {
         switch (msg.getType()) {
             case PUT_VALUE: {
@@ -106,7 +111,19 @@ public class KademliaEngine {
                 break;
             }
             case GET_VALUE: {
+                Cid key = IPNS.getCidFromKey(msg.getKey());
+                Optional<IpnsRecord> ipnsRecord = ipnsStore.get(key);
 
+                Dht.Message.Builder builder = msg.toBuilder();
+                if (ipnsRecord.isPresent())
+                    builder = builder.setRecord(Dht.Record.newBuilder()
+                            .setKey(msg.getKey())
+                            .setValue(ByteString.copyFrom(ipnsRecord.get().raw)).build());
+                builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
+                        .stream()
+                        .map(PeerAddresses::toProtobuf)
+                        .collect(Collectors.toList()));
+                stream.writeAndFlush(builder.build());
                 break;
             }
             case ADD_PROVIDER: {
@@ -126,14 +143,27 @@ public class KademliaEngine {
                 try {
                     Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
                     Set<PeerAddresses> providers = providersStore.getProviders(hash);
-
+                    Dht.Message.Builder builder = msg.toBuilder();
+                    builder = builder.addAllProviderPeers(providers.stream()
+                            .map(PeerAddresses::toProtobuf)
+                            .collect(Collectors.toList()));
+                    builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
+                            .stream()
+                            .map(PeerAddresses::toProtobuf)
+                            .collect(Collectors.toList()));
+                    stream.writeAndFlush(builder.build());
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
                 break;
             }
             case FIND_NODE: {
-
+                Dht.Message.Builder builder = msg.toBuilder();
+                builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
+                        .stream()
+                        .map(PeerAddresses::toProtobuf)
+                        .collect(Collectors.toList()));
+                stream.writeAndFlush(builder.build());
                 break;
             }
             case PING: {break;} // Not used any more

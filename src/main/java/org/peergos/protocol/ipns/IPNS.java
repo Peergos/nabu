@@ -1,5 +1,7 @@
 package org.peergos.protocol.ipns;
 
+import com.google.protobuf.*;
+import io.ipfs.cid.*;
 import io.ipfs.multihash.*;
 import org.peergos.cbor.*;
 
@@ -25,6 +27,12 @@ public class IPNS {
             bout.write(peerId.toBytes());
         } catch (IOException e) {}
         return bout.toByteArray();
+    }
+
+    public static Cid getCidFromKey(ByteString key) {
+        if (! key.startsWith(ByteString.copyFrom("/ipns/".getBytes(StandardCharsets.UTF_8))))
+            throw new IllegalStateException("Unknown IPNS key space: " + key);
+        return Cid.cast(key.substring(6).toByteArray());
     }
 
     public static byte[] createCborDataForIpnsEntry(String pathToPublish,

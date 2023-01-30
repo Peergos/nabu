@@ -1,5 +1,6 @@
 package org.peergos;
 
+import com.google.protobuf.*;
 import io.ipfs.cid.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.*;
@@ -30,6 +31,15 @@ public class PeerAddresses {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public Dht.Message.Peer toProtobuf() {
+        return Dht.Message.Peer.newBuilder()
+                .setId(ByteString.copyFrom(peerId.toBytes()))
+                .addAllAddrs(addresses.stream()
+                        .map(a -> ByteString.copyFrom(a.getBytes()))
+                        .collect(Collectors.toList()))
+                .build();
     }
 
     public static PeerAddresses fromHost(Host host) {
