@@ -21,7 +21,7 @@ import java.util.*;
 public class Server {
 
     public static void main(String[] args) throws Exception {
-        Kademlia dht = new Kademlia(new KademliaEngine(), false);
+        Kademlia dht = new Kademlia(new KademliaEngine(new RamProviderStore(), new RamRecordStore()), false);
         Host node1 = buildHost(6001, List.of(
                 new Ping(),
                 new Bitswap(new BitswapEngine(new RamBlockstore())),

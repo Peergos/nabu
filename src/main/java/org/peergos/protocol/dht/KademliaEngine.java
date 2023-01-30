@@ -1,43 +1,143 @@
 package org.peergos.protocol.dht;
 
+import com.google.protobuf.*;
+import crypto.pb.*;
 import io.ipfs.cid.*;
+import io.ipfs.multihash.*;
 import io.libp2p.core.*;
+import io.libp2p.core.Stream;
+import io.libp2p.core.crypto.*;
+import io.libp2p.crypto.keys.*;
+import org.peergos.*;
+import org.peergos.cbor.*;
 import org.peergos.protocol.dht.pb.*;
+import org.peergos.protocol.ipns.*;
+import org.peergos.protocol.ipns.pb.*;
 
 import java.io.*;
+import java.nio.charset.*;
+import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 
 public class KademliaEngine {
 
-    private final Map<PeerId, KademliaController> conns = new ConcurrentHashMap<>();
+    private final Map<PeerId, KademliaController> outgoing = new ConcurrentHashMap<>();
+    private final ProviderStore providersStore;
+    private final RecordStore ipnsStore;
 
-    public KademliaEngine() {
-
+    public KademliaEngine(ProviderStore providersStore, RecordStore ipnsStore) {
+        this.providersStore = providersStore;
+        this.ipnsStore = ipnsStore;
     }
 
-    public void addConnection(PeerId peer, KademliaController controller) {
-        if (conns.containsKey(peer))
+    public void addOutgoingConnection(PeerId peer, KademliaController controller) {
+        if (outgoing.containsKey(peer))
             System.out.println("WARNING overwriting peer connection value");
-        conns.put(peer, controller);
+        outgoing.put(peer, controller);
     }
 
+    public void addIncomingConnection(PeerId peer, KademliaController controller) {
 
-    private static byte[] prefixBytes(Cid c) {
-        ByteArrayOutputStream res = new ByteArrayOutputStream();
+    }
+
+    public void receiveReply(Dht.Message msg, PeerId source) {
+        KademliaController conn = outgoing.get(source);
+        conn.receive(msg);
+    }
+
+    public boolean validateAndStoreIpnsEntry(Dht.Message msg, boolean addToStore) {
+        if (! msg.hasRecord() || msg.getRecord().getValue().size() > IPNS.MAX_RECORD_SIZE)
+            return false;
+        if (! msg.getKey().equals(msg.getRecord().getKey()))
+            return false;
+        if (! msg.getRecord().getKey().startsWith(ByteString.copyFrom("/ipns/".getBytes(StandardCharsets.UTF_8))))
+            return false;
+        byte[] cidBytes = msg.getRecord().getKey().substring(6).toByteArray();
+        Cid signer = Cid.cast(cidBytes);
         try {
-            Cid.putUvarint(res, c.version);
-            Cid.putUvarint(res, c.codec.type);
-            Cid.putUvarint(res, c.getType().index);
-            Cid.putUvarint(res, c.getType().length);;
-            return res.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            Ipns.IpnsEntry entry = Ipns.IpnsEntry.parseFrom(msg.getRecord().getValue());
+            if (! entry.hasSignatureV2() || ! entry.hasData())
+                return false;
+            PubKey pub;
+            if (signer.getType() == Multihash.Type.id) {
+                pub = new Ed25519PublicKey(new org.bouncycastle.crypto.params.Ed25519PublicKeyParameters(signer.getHash(), 0));
+            } else {
+                Crypto.PublicKey publicKey = Crypto.PublicKey.parseFrom(entry.getPubKey());
+                pub = RsaKt.unmarshalRsaPublicKey(publicKey.getData().toByteArray());
+            }
+            if (! pub.verify(entry.getSignatureV2().toByteArray(),
+                    ByteString.copyFrom("ipns-signature:".getBytes()).concat(entry.getData()).toByteArray()))
+                return false;
+            CborObject cbor = CborObject.fromByteArray(entry.getData().toByteArray());
+            if (! (cbor instanceof CborObject.CborMap))
+                return false;
+            CborObject.CborMap map = (CborObject.CborMap) cbor;
+            if (map.getLong("Sequence") != entry.getSequence())
+                return false;
+            if (map.getLong("TTL") != entry.getTtl())
+                return false;
+            if (map.getLong("ValidityType") != entry.getValidityType().getNumber())
+                return false;
+            if (! Arrays.equals(map.getByteArray("Value"), entry.getValue().toByteArray()))
+                return false;
+            byte[] validity = entry.getValidity().toByteArray();
+            if (! Arrays.equals(map.getByteArray("Validity"), validity))
+                return false;
+            LocalDateTime expiry = LocalDateTime.parse(new String(validity).substring(0, validity.length - 1), IPNS.rfc3339nano);
+            if (expiry.isBefore(LocalDateTime.now()))
+                return false;
+            if (addToStore) {
+                byte[] entryBytes = msg.getRecord().getValue().toByteArray();
+                ipnsStore.put(signer, new IpnsRecord(entryBytes, entry.getSequence(), entry.getTtl(), expiry, entry.getValue().toStringUtf8()));
+            }
+            return true;
+        } catch (InvalidProtocolBufferException e) {
+            return false;
         }
     }
 
-    public void receiveMessage(Dht.Message msg, PeerId source) {
-        KademliaController conn = conns.get(source);
-        conn.receive(msg);
+    public void receiveRequest(Dht.Message msg, PeerId source, Stream stream) {
+        switch (msg.getType()) {
+            case PUT_VALUE: {
+                if (validateAndStoreIpnsEntry(msg, true)) {
+                    stream.writeAndFlush(msg);
+                }
+                break;
+            }
+            case GET_VALUE: {
+
+                break;
+            }
+            case ADD_PROVIDER: {
+                List<Dht.Message.Peer> providers = msg.getProviderPeersList();
+                byte[] remotePeerIdBytes = source.getBytes();
+                try {
+                    Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
+                    if (providers.stream().allMatch(p -> Arrays.equals(p.getId().toByteArray(), remotePeerIdBytes))) {
+                        providers.stream().map(PeerAddresses::fromProtobuf).forEach(p -> providersStore.addProvider(hash, p));
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                break;
+            }
+            case GET_PROVIDERS: {
+                try {
+                    Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
+                    Set<PeerAddresses> providers = providersStore.getProviders(hash);
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                break;
+            }
+            case FIND_NODE: {
+
+                break;
+            }
+            case PING: {break;} // Not used any more
+            default: throw new IllegalStateException("Unknown message kademlia type: " + msg.getType());
+        }
     }
 }

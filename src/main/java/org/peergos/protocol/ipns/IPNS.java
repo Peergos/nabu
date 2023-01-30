@@ -10,7 +10,9 @@ import java.time.format.*;
 import java.util.*;
 
 public class IPNS {
-    private static final DateTimeFormatter rfc3339nano = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.n");
+    public static final int MAX_RECORD_SIZE = 10*1024;
+
+    public static final DateTimeFormatter rfc3339nano = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.n");
     
     public static String formatExpiry(LocalDateTime expiry) {
         return expiry.atOffset(ZoneOffset.UTC).format(rfc3339nano)+"Z";

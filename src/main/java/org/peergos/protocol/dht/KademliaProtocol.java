@@ -21,8 +21,8 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
     @Override
     protected CompletableFuture<KademliaController> onStartInitiator(@NotNull Stream stream) {
         KademliaConnection conn = new KademliaConnection(stream);
-        engine.addConnection(stream.remotePeerId(), conn);
-        stream.pushHandler(new MessageHandler(engine));
+        engine.addOutgoingConnection(stream.remotePeerId(), conn);
+        stream.pushHandler(new ReplyHandler(engine));
         return CompletableFuture.completedFuture(conn);
     }
 
@@ -30,21 +30,36 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
     @Override
     protected CompletableFuture<KademliaController> onStartResponder(@NotNull Stream stream) {
         KademliaConnection conn = new KademliaConnection(stream);
-        engine.addConnection(stream.remotePeerId(), conn);
-        stream.pushHandler(new MessageHandler(engine));
+        engine.addIncomingConnection(stream.remotePeerId(), conn);
+        stream.pushHandler(new IncomingRequestHandler(engine, stream));
         return CompletableFuture.completedFuture(conn);
     }
 
-    class MessageHandler implements ProtocolMessageHandler<Dht.Message> {
+    class ReplyHandler implements ProtocolMessageHandler<Dht.Message> {
         private KademliaEngine engine;
 
-        public MessageHandler(KademliaEngine engine) {
+        public ReplyHandler(KademliaEngine engine) {
             this.engine = engine;
         }
 
         @Override
         public void onMessage(@NotNull Stream stream, Dht.Message msg) {
-            engine.receiveMessage(msg, stream.remotePeerId());
+            engine.receiveReply(msg, stream.remotePeerId());
+        }
+    }
+
+    class IncomingRequestHandler implements ProtocolMessageHandler<Dht.Message> {
+        private final KademliaEngine engine;
+        private final Stream stream;
+
+        public IncomingRequestHandler(KademliaEngine engine, Stream stream) {
+            this.engine = engine;
+            this.stream = stream;
+        }
+
+        @Override
+        public void onMessage(@NotNull Stream stream, Dht.Message msg) {
+            engine.receiveRequest(msg, stream.remotePeerId(), stream);
         }
     }
 }

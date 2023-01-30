@@ -21,8 +21,8 @@ public class KademliaTest {
     public void dhtMessages() throws Exception {
         RamBlockstore blockstore1 = new RamBlockstore();
         Bitswap bitswap1 = new Bitswap(new BitswapEngine(blockstore1));
-        Kademlia lanDht = new Kademlia(new KademliaEngine(), true);
-        Kademlia wanDht = new Kademlia(new KademliaEngine(), false);
+        Kademlia lanDht = new Kademlia(new KademliaEngine(new RamProviderStore(), new RamRecordStore()), true);
+        Kademlia wanDht = new Kademlia(new KademliaEngine(new RamProviderStore(), new RamRecordStore()), false);
         Ping ping = new Ping();
         Host node1 = Server.buildHost(10000 + new Random().nextInt(50000),
                 List.of(ping, bitswap1, lanDht, wanDht));
@@ -33,8 +33,8 @@ public class KademliaTest {
         Bitswap bitswap2 = new Bitswap(new BitswapEngine(new RamBlockstore()));
         Host node2 = Server.buildHost(10000 + new Random().nextInt(50000),
                 List.of(ping, bitswap2,
-                        new Kademlia(new KademliaEngine(), true),
-                        new Kademlia(new KademliaEngine(), false)));
+                        new Kademlia(new KademliaEngine(new RamProviderStore(), new RamRecordStore()), true),
+                        new Kademlia(new KademliaEngine(new RamProviderStore(), new RamRecordStore()), false)));
         node2.start().join();
 
         try {
@@ -45,7 +45,7 @@ public class KademliaTest {
             bitswap2.dial(node2, address2).getController().join();
 
             IdentifyOuterClass.Identify id = new Identify().dial(node1, address2).getController().join().id().join();
-            Kademlia dht = id.getProtocolsList().contains("/ipfs/lan/kad/1.0.0") ? lanDht : wanDht;
+            Kademlia dht = id.getProtocolsList().contains("/ipfs/lan/kad/1.0.0") ? lanDht : lanDht;
             KademliaController bootstrap1 = dht.dial(node1, address2).getController().join();
             List<PeerAddresses> peers = bootstrap1.closerPeers(Cid.cast(node2.getPeerId().getBytes())).join();
             Optional<PeerAddresses> matching = peers.stream()
