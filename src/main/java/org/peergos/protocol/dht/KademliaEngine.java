@@ -99,6 +99,7 @@ public class KademliaEngine {
     }
 
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
+        int k = 20;
         throw new IllegalStateException("Unimplemented");
     }
 

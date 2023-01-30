@@ -43,12 +43,16 @@ public class PeerAddresses {
     }
 
     public static PeerAddresses fromHost(Host host) {
-        Cid peerId = Cid.cast(host.getPeerId().getBytes());
-        List<MultiAddress> addrs = host.listenAddresses()
-                .stream()
-                .map(b -> new MultiAddress(b.serialize()))
-                .collect(Collectors.toList());
-        return new PeerAddresses(peerId, addrs);
+        try {
+            Multihash peerId = Multihash.deserialize(host.getPeerId().getBytes());
+            List<MultiAddress> addrs = host.listenAddresses()
+                    .stream()
+                    .map(b -> new MultiAddress(b.serialize()))
+                    .collect(Collectors.toList());
+            return new PeerAddresses(peerId, addrs);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

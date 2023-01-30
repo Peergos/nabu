@@ -3,6 +3,7 @@ package org.peergos;
 import identify.pb.*;
 import io.ipfs.api.*;
 import io.ipfs.cid.*;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.protocol.*;
@@ -27,7 +28,7 @@ public class KademliaTest {
         Host node1 = Server.buildHost(10000 + new Random().nextInt(50000),
                 List.of(ping, bitswap1, lanDht, wanDht));
         node1.start().join();
-        Cid node1Id = Cid.cast(node1.getPeerId().getBytes());
+        io.ipfs.multihash.Multihash node1Id = Multihash.deserialize(node1.getPeerId().getBytes());
 
         // connect node 2 to kubo, but not node 1
         Bitswap bitswap2 = new Bitswap(new BitswapEngine(new RamBlockstore()));
@@ -47,7 +48,8 @@ public class KademliaTest {
             IdentifyOuterClass.Identify id = new Identify().dial(node1, address2).getController().join().id().join();
             Kademlia dht = id.getProtocolsList().contains("/ipfs/lan/kad/1.0.0") ? lanDht : lanDht;
             KademliaController bootstrap1 = dht.dial(node1, address2).getController().join();
-            List<PeerAddresses> peers = bootstrap1.closerPeers(Cid.cast(node2.getPeerId().getBytes())).join();
+            Multihash peerId2 = Multihash.deserialize(node2.getPeerId().getBytes());
+            List<PeerAddresses> peers = bootstrap1.closerPeers(new Cid(1, Cid.Codec.Libp2pKey, peerId2.getType(), peerId2.getHash())).join();
             Optional<PeerAddresses> matching = peers.stream()
                     .filter(p -> Arrays.equals(p.peerId.toBytes(), node2.getPeerId().getBytes()))
                     .findFirst();
