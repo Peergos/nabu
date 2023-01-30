@@ -10,14 +10,13 @@ This is a WIP.
 Currently supported properties:
 * TCP transport
 * Noise encryption and authentication
-* RSA peer IDs
+* RSA and Ed25519 peer IDs
 * mplex
+* Kademlia DHT for content discovery
 * Bitswap 1.2.0
 
 In the Future we will support:
-* Kademlia DHT for content discovery
 * QUIC transport (and encryption and multiplexing)
-* Ed25519 peerIDs
 
 ## Usage
 You can use this as a standalone application for storing and retrieving blocks. Or you can embed it in your application. 
