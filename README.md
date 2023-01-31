@@ -14,6 +14,7 @@ Currently supported properties:
 * mplex
 * Kademlia DHT for content discovery
 * Bitswap 1.2.0
+* p2p http proxy
 
 In the Future we will support:
 * QUIC transport (and encryption and multiplexing)
