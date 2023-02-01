@@ -1,12 +1,15 @@
 package org.peergos.protocol.dht;
 
 import com.google.protobuf.*;
+import com.offbynull.kademlia.*;
 import crypto.pb.*;
 import io.ipfs.cid.*;
-import io.ipfs.multihash.*;
+import io.ipfs.multiaddr.*;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.Stream;
 import io.libp2p.core.crypto.*;
+import io.libp2p.core.multiformats.*;
 import io.libp2p.crypto.keys.*;
 import org.peergos.*;
 import org.peergos.cbor.*;
@@ -26,20 +29,28 @@ public class KademliaEngine {
     private final Map<PeerId, KademliaController> outgoing = new ConcurrentHashMap<>();
     private final ProviderStore providersStore;
     private final RecordStore ipnsStore;
+    public final Router router;
+    private AddressBook addressBook;
 
     public KademliaEngine(ProviderStore providersStore, RecordStore ipnsStore) {
         this.providersStore = providersStore;
         this.ipnsStore = ipnsStore;
+        this.router = new Router(Id.create(new byte[32], 256), 2, 2, 2);
     }
 
-    public void addOutgoingConnection(PeerId peer, KademliaController controller) {
+    public void setAddressBook(AddressBook addrs) {
+        this.addressBook = addrs;
+    }
+
+    public void addOutgoingConnection(PeerId peer, KademliaController controller, Multiaddr addr) {
         if (outgoing.containsKey(peer))
             System.out.println("WARNING overwriting peer connection value");
         outgoing.put(peer, controller);
+        router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
     }
 
-    public void addIncomingConnection(PeerId peer, KademliaController controller) {
-
+    public void addIncomingConnection(PeerId peer, KademliaController controller, Multiaddr addr) {
+        router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
     }
 
     public void receiveReply(Dht.Message msg, PeerId source) {
@@ -100,7 +111,16 @@ public class KademliaEngine {
 
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
         int k = 20;
-        throw new IllegalStateException("Unimplemented");
+        List<Node> nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
+        return nodes.stream()
+                .map(n -> {
+                    List<MultiAddress> addrs = addressBook.getAddrs(PeerId.fromBase58(n.getLink())).join()
+                            .stream()
+                            .map(m -> new MultiAddress(m.toString()))
+                            .collect(Collectors.toList());
+                    return new PeerAddresses(Multihash.decode(n.getLink()), addrs);
+                })
+                .collect(Collectors.toList());
     }
 
     public void receiveRequest(Dht.Message msg, PeerId source, Stream stream) {
@@ -130,32 +150,24 @@ public class KademliaEngine {
             case ADD_PROVIDER: {
                 List<Dht.Message.Peer> providers = msg.getProviderPeersList();
                 byte[] remotePeerIdBytes = source.getBytes();
-                try {
-                    Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
-                    if (providers.stream().allMatch(p -> Arrays.equals(p.getId().toByteArray(), remotePeerIdBytes))) {
-                        providers.stream().map(PeerAddresses::fromProtobuf).forEach(p -> providersStore.addProvider(hash, p));
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
+                Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
+                if (providers.stream().allMatch(p -> Arrays.equals(p.getId().toByteArray(), remotePeerIdBytes))) {
+                    providers.stream().map(PeerAddresses::fromProtobuf).forEach(p -> providersStore.addProvider(hash, p));
                 }
                 break;
             }
             case GET_PROVIDERS: {
-                try {
-                    Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
-                    Set<PeerAddresses> providers = providersStore.getProviders(hash);
-                    Dht.Message.Builder builder = msg.toBuilder();
-                    builder = builder.addAllProviderPeers(providers.stream()
-                            .map(PeerAddresses::toProtobuf)
-                            .collect(Collectors.toList()));
-                    builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
-                            .stream()
-                            .map(PeerAddresses::toProtobuf)
-                            .collect(Collectors.toList()));
-                    stream.writeAndFlush(builder.build());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
+                Set<PeerAddresses> providers = providersStore.getProviders(hash);
+                Dht.Message.Builder builder = msg.toBuilder();
+                builder = builder.addAllProviderPeers(providers.stream()
+                        .map(PeerAddresses::toProtobuf)
+                        .collect(Collectors.toList()));
+                builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
+                        .stream()
+                        .map(PeerAddresses::toProtobuf)
+                        .collect(Collectors.toList()));
+                stream.writeAndFlush(builder.build());
                 break;
             }
             case FIND_NODE: {

@@ -21,16 +21,12 @@ public class PeerAddresses {
     }
 
     public static PeerAddresses fromProtobuf(Dht.Message.Peer peer) {
-        try {
-            Multihash peerId = Multihash.deserialize(peer.getId().toByteArray());
-            List<MultiAddress> addrs = peer.getAddrsList()
-                    .stream()
-                    .map(b -> new MultiAddress(b.toByteArray()))
-                    .collect(Collectors.toList());
-            return new PeerAddresses(peerId, addrs);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        Multihash peerId = Multihash.deserialize(peer.getId().toByteArray());
+        List<MultiAddress> addrs = peer.getAddrsList()
+                .stream()
+                .map(b -> new MultiAddress(b.toByteArray()))
+                .collect(Collectors.toList());
+        return new PeerAddresses(peerId, addrs);
     }
 
     public Dht.Message.Peer toProtobuf() {
@@ -43,16 +39,25 @@ public class PeerAddresses {
     }
 
     public static PeerAddresses fromHost(Host host) {
-        try {
-            Multihash peerId = Multihash.deserialize(host.getPeerId().getBytes());
-            List<MultiAddress> addrs = host.listenAddresses()
-                    .stream()
-                    .map(b -> new MultiAddress(b.serialize()))
-                    .collect(Collectors.toList());
-            return new PeerAddresses(peerId, addrs);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        Multihash peerId = Multihash.deserialize(host.getPeerId().getBytes());
+        List<MultiAddress> addrs = host.listenAddresses()
+                .stream()
+                .map(b -> new MultiAddress(b.serialize()))
+                .collect(Collectors.toList());
+        return new PeerAddresses(peerId, addrs);
+    }
+
+    public String serializeToString() {
+        return peerId.toString() + ":[" + addresses.stream().map(MultiAddress::toString).collect(Collectors.joining(",")) + "]";
+    }
+
+    public static PeerAddresses fromString(String in) {
+        int start = in.indexOf(":");
+        Multihash peerId = Multihash.decode(in.substring(0, start));
+        List<MultiAddress> addresses = Arrays.stream(in.substring(start + 2, in.length() - 1).split(","))
+                .map(MultiAddress::new)
+                .collect(Collectors.toList());
+        return new PeerAddresses(peerId, addresses);
     }
 
     @Override

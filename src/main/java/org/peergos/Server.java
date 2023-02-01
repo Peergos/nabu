@@ -55,6 +55,10 @@ public class Server {
             b.getMuxers().add(StreamMuxerProtocol.getMplex());
 
             b.getProtocols().addAll(protocols);
+            for (ProtocolBinding<?> protocol : protocols) {
+                if (protocol instanceof Kademlia)
+                    ((Kademlia) protocol).setAddressBook(b.getAddressBook().getImpl());
+            }
 
             IdentifyOuterClass.Identify.Builder identifyBuilder = IdentifyOuterClass.Identify.newBuilder()
                     .setProtocolVersion("ipfs/0.1.0")
