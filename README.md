@@ -14,6 +14,7 @@ Currently supported properties:
 * mplex
 * Kademlia DHT for content discovery
 * Bitswap 1.2.0
+* IPNS publishing on Kademlia
 * p2p http proxy
 
 In the Future we will support:
