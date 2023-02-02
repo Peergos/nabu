@@ -74,7 +74,7 @@ public class HostBuilder {
     }
 
     public static HostBuilder build(int listenPort, ProviderStore providers, RecordStore records, Blockstore blocks) {
-        HostBuilder builder = new HostBuilder().generateIdentity().advertiseLocalhost(listenPort);
+        HostBuilder builder = new HostBuilder().generateIdentity().listenLocalhost(listenPort);
         Kademlia dht = new Kademlia(new KademliaEngine(Multihash.deserialize(builder.peerId.getBytes()), providers, records), false);
         return builder.addProtocols(List.of(
                 new Ping(),
