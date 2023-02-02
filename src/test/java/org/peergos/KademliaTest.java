@@ -24,13 +24,15 @@ public class KademliaTest {
     @Test
     public void dhtMessages() throws Exception {
         RamBlockstore blockstore1 = new RamBlockstore();
-        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000), new RamProviderStore(), new RamRecordStore(), blockstore1);
+        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
+                new RamProviderStore(), new RamRecordStore(), blockstore1);
         Host node1 = builder1.build();
         node1.start().join();
         io.ipfs.multihash.Multihash node1Id = Multihash.deserialize(node1.getPeerId().getBytes());
 
         // connect node 2 to kubo, but not node 1
-        HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000), new RamProviderStore(), new RamRecordStore(), new RamBlockstore());
+        HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore());
         Host node2 = builder2.build();
         node2.start().join();
 
@@ -44,7 +46,7 @@ public class KademliaTest {
             Kademlia dht = builder1.getWanDht().get();
             KademliaController bootstrap1 = dht.dial(node1, address2).getController().join();
             Multihash peerId2 = Multihash.deserialize(node2.getPeerId().getBytes());
-            List<PeerAddresses> peers = bootstrap1.closerPeers(new Cid(1, Cid.Codec.Libp2pKey, peerId2.getType(), peerId2.getHash())).join();
+            List<PeerAddresses> peers = bootstrap1.closerPeers(peerId2).join();
             Optional<PeerAddresses> matching = peers.stream()
                     .filter(p -> Arrays.equals(p.peerId.toBytes(), node2.getPeerId().getBytes()))
                     .findFirst();
@@ -90,26 +92,26 @@ public class KademliaTest {
 //            GetResult join = dht.dial(node1, node2.listenAddresses().get(0)).getController().join().getValue(kuboPeerId).join();
 
             // Do a dht lookup for ourself
-            List<PeerAddresses> closerPeers = dht.dial(node1, address2).getController().join().closerPeers(node1Id).join();
-            LinkedBlockingDeque<PeerAddresses> queue = new LinkedBlockingDeque<>();
-            queue.addAll(closerPeers);
-            outer: for (int i=0; i < 100; i++) {
-                PeerAddresses closer = queue.poll();
-                List<String> candidates = closer.addresses.stream()
-                        .map(MultiAddress::toString)
-                        .filter(a -> a.contains("tcp") && a.contains("ip4") && !a.contains("127.0.0.1") && !a.contains("/172."))
-                        .collect(Collectors.toList());
-                for (String candidate: candidates) {
-                    try {
-                        closerPeers = dht.dial(node1, Multiaddr.fromString(candidate + "/p2p/" + closer.peerId)).getController().join()
-                                .closerPeers(node1Id).join();
-                        queue.addAll(closerPeers);
-                        continue outer;
-                    } catch (Exception e) {
-                        System.out.println(e.getMessage());
-                    }
-                }
-            }
+//            List<PeerAddresses> closerPeers = dht.dial(node1, address2).getController().join().closerPeers(node1Id).join();
+//            LinkedBlockingDeque<PeerAddresses> queue = new LinkedBlockingDeque<>();
+//            queue.addAll(closerPeers);
+//            outer: for (int i=0; i < 100; i++) {
+//                PeerAddresses closer = queue.poll();
+//                List<String> candidates = closer.addresses.stream()
+//                        .map(MultiAddress::toString)
+//                        .filter(a -> a.contains("tcp") && a.contains("ip4") && !a.contains("127.0.0.1") && !a.contains("/172."))
+//                        .collect(Collectors.toList());
+//                for (String candidate: candidates) {
+//                    try {
+//                        closerPeers = dht.dial(node1, Multiaddr.fromString(candidate + "/p2p/" + closer.peerId)).getController().join()
+//                                .closerPeers(node1Id).join();
+//                        queue.addAll(closerPeers);
+//                        continue outer;
+//                    } catch (Exception e) {
+//                        System.out.println(e.getMessage());
+//                    }
+//                }
+//            }
 
             // sign an ipns record to publish
             String pathToPublish = "/ipfs/" + block;
