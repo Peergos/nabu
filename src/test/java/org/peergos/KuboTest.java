@@ -17,7 +17,7 @@ public class KuboTest {
     @Test
     public void getBlock() throws IOException {
         Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
-        Host node1 = Server.buildHost(10000 + new Random().nextInt(50000), List.of(bitswap1));
+        Host node1 = HostBuilder.build(10000 + new Random().nextInt(50000), List.of(bitswap1));
         node1.start().join();
         try {
             IPFS kubo = new IPFS("localhost", 5001);

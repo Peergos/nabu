@@ -22,7 +22,7 @@ public interface KademliaController {
 
     CompletableFuture<Boolean> send(Dht.Message msg);
 
-    default CompletableFuture<List<PeerAddresses>> closerPeers(Cid peerID) {
+    default CompletableFuture<List<PeerAddresses>> closerPeers(Multihash peerID) {
         return rpc(Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.FIND_NODE)
                 .setKey(ByteString.copyFrom(peerID.toBytes()))
@@ -36,7 +36,7 @@ public interface KademliaController {
         return send(Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.ADD_PROVIDER)
                 // only provide the bare Multihash
-                .setKey(ByteString.copyFrom(new Multihash(block.getType(), block.getHash()).toBytes()))
+                .setKey(ByteString.copyFrom(block.bareMultihash().toBytes()))
                 .addAllProviderPeers(List.of(us.toProtobuf()))
                 .build());
     }
@@ -44,7 +44,7 @@ public interface KademliaController {
     default CompletableFuture<Providers> getProviders(Cid block) {
         return rpc(Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.GET_PROVIDERS)
-                .setKey(ByteString.copyFrom(new Multihash(block.getType(), block.getHash()).toBytes()))
+                .setKey(ByteString.copyFrom(block.bareMultihash().toBytes()))
                 .build())
                 .thenApply(Providers::fromProtobuf);
     }

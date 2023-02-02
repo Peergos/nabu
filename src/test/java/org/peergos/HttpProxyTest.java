@@ -7,6 +7,7 @@ import io.netty.handler.codec.http.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.bitswap.*;
+import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
 
 import java.io.*;
@@ -19,14 +20,17 @@ public class HttpProxyTest {
 
     @Test
     public void p2pProxyRequest() throws IOException {
-        Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
         InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
-        Host node1 = Server.buildHost(10000 + new Random().nextInt(50000),
-                List.of(bitswap1, new HttpProtocol.Binding(unusedProxyTarget)));
+        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore())
+                .addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
+        Host node1 = builder1.build();
         RamBlockstore blockstore2 = new RamBlockstore();
         InetSocketAddress proxyTarget = new InetSocketAddress("127.0.0.1", 8000);
-        Host node2 = Server.buildHost(10000 + new Random().nextInt(50000),
-                List.of(new Bitswap(new BitswapEngine(blockstore2)), new HttpProtocol.Binding(proxyTarget)));
+        HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
+                        new RamProviderStore(), new RamRecordStore(), new RamBlockstore())
+                .addProtocol(new HttpProtocol.Binding(proxyTarget));
+        Host node2 = builder2.build();
         node1.start().join();
         node2.start().join();
 

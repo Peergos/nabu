@@ -16,13 +16,9 @@ public class BootstrapTest {
 
     @Test
     public void bootstrap() {
-        RamBlockstore blockstore1 = new RamBlockstore();
-        Bitswap bitswap1 = new Bitswap(new BitswapEngine(blockstore1));
-        KademliaEngine engine = new KademliaEngine(new RamProviderStore(), new RamRecordStore());
-        Kademlia wanDht = new Kademlia(engine, false);
-        Ping ping = new Ping();
-        Host node1 = Server.buildHost(10000 + new Random().nextInt(50000),
-                List.of(ping, bitswap1, wanDht));
+        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore());
+        Host node1 = builder1.build();
         node1.start().join();
         Multihash node1Id = Multihash.deserialize(node1.getPeerId().getBytes());
 
@@ -45,7 +41,7 @@ public class BootstrapTest {
                     ).stream()
                     .map(MultiAddress::new)
                     .collect(Collectors.toList());
-            int connections = wanDht.bootstrapRoutingTable(node1, bootStrapNodes);
+            int connections = builder1.getWanDht().get().bootstrapRoutingTable(node1, bootStrapNodes);
             if (connections == 0)
                 throw new IllegalStateException("No connected peers!");
         } finally {

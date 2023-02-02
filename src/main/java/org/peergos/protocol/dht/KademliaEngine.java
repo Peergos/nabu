@@ -32,10 +32,10 @@ public class KademliaEngine {
     public final Router router;
     private AddressBook addressBook;
 
-    public KademliaEngine(ProviderStore providersStore, RecordStore ipnsStore) {
+    public KademliaEngine(Multihash ourPeerId, ProviderStore providersStore, RecordStore ipnsStore) {
         this.providersStore = providersStore;
         this.ipnsStore = ipnsStore;
-        this.router = new Router(Id.create(new byte[32], 256), 2, 2, 2);
+        this.router = new Router(Id.create(ourPeerId.bareMultihash().toBytes(), 256), 2, 2, 2);
     }
 
     public void setAddressBook(AddressBook addrs) {
@@ -112,6 +112,7 @@ public class KademliaEngine {
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
         int k = 20;
         List<Node> nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
+        System.out.println("Nodes: " + nodes.size());
         return nodes.stream()
                 .map(n -> {
                     List<MultiAddress> addrs = addressBook.getAddrs(PeerId.fromBase58(n.getLink())).join()

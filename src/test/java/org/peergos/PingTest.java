@@ -13,8 +13,8 @@ public class PingTest {
 
     @Test
     public void runPing() {
-        Host node1 = Server.buildHost(11001, List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore()))));
-        Host node2 = Server.buildHost(11002, List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore()))));
+        Host node1 = HostBuilder.build(11001, List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore()))));
+        Host node2 = HostBuilder.build(11002, List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore()))));
         node1.start().join();
         node2.start().join();
         try {

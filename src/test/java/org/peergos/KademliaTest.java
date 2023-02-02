@@ -3,6 +3,7 @@ package org.peergos;
 import identify.pb.*;
 import io.ipfs.api.*;
 import io.ipfs.cid.*;
+import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
@@ -15,27 +16,22 @@ import org.peergos.protocol.ipns.*;
 
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.*;
 
 public class KademliaTest {
 
     @Test
     public void dhtMessages() throws Exception {
         RamBlockstore blockstore1 = new RamBlockstore();
-        Bitswap bitswap1 = new Bitswap(new BitswapEngine(blockstore1));
-        Kademlia lanDht = new Kademlia(new KademliaEngine(new RamProviderStore(), new RamRecordStore()), true);
-        Kademlia wanDht = new Kademlia(new KademliaEngine(new RamProviderStore(), new RamRecordStore()), false);
-        Ping ping = new Ping();
-        Host node1 = Server.buildHost(10000 + new Random().nextInt(50000),
-                List.of(ping, bitswap1, lanDht, wanDht));
+        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000), new RamProviderStore(), new RamRecordStore(), blockstore1);
+        Host node1 = builder1.build();
         node1.start().join();
         io.ipfs.multihash.Multihash node1Id = Multihash.deserialize(node1.getPeerId().getBytes());
 
         // connect node 2 to kubo, but not node 1
-        Bitswap bitswap2 = new Bitswap(new BitswapEngine(new RamBlockstore()));
-        Host node2 = Server.buildHost(10000 + new Random().nextInt(50000),
-                List.of(ping, bitswap2,
-                        new Kademlia(new KademliaEngine(new RamProviderStore(), new RamRecordStore()), true),
-                        new Kademlia(new KademliaEngine(new RamProviderStore(), new RamRecordStore()), false)));
+        HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000), new RamProviderStore(), new RamRecordStore(), new RamBlockstore());
+        Host node2 = builder2.build();
         node2.start().join();
 
         try {
@@ -43,10 +39,9 @@ public class KademliaTest {
             String kuboID = (String)kubo.id().get("ID");
             io.ipfs.multihash.Multihash kuboId = Cid.fromBase58(kuboID);
             Multiaddr address2 = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kuboID);
-            bitswap2.dial(node2, address2).getController().join();
+            builder2.getBitswap().get().dial(node2, address2).getController().join();
 
-            IdentifyOuterClass.Identify id = new Identify().dial(node1, address2).getController().join().id().join();
-            Kademlia dht = id.getProtocolsList().contains("/ipfs/lan/kad/1.0.0") ? lanDht : lanDht;
+            Kademlia dht = builder1.getWanDht().get();
             KademliaController bootstrap1 = dht.dial(node1, address2).getController().join();
             Multihash peerId2 = Multihash.deserialize(node2.getPeerId().getBytes());
             List<PeerAddresses> peers = bootstrap1.closerPeers(new Cid(1, Cid.Codec.Libp2pKey, peerId2.getType(), peerId2.getHash())).join();
@@ -93,6 +88,28 @@ public class KademliaTest {
 //            }
 
 //            GetResult join = dht.dial(node1, node2.listenAddresses().get(0)).getController().join().getValue(kuboPeerId).join();
+
+            // Do a dht lookup for ourself
+            List<PeerAddresses> closerPeers = dht.dial(node1, address2).getController().join().closerPeers(node1Id).join();
+            LinkedBlockingDeque<PeerAddresses> queue = new LinkedBlockingDeque<>();
+            queue.addAll(closerPeers);
+            outer: for (int i=0; i < 100; i++) {
+                PeerAddresses closer = queue.poll();
+                List<String> candidates = closer.addresses.stream()
+                        .map(MultiAddress::toString)
+                        .filter(a -> a.contains("tcp") && a.contains("ip4") && !a.contains("127.0.0.1") && !a.contains("/172."))
+                        .collect(Collectors.toList());
+                for (String candidate: candidates) {
+                    try {
+                        closerPeers = dht.dial(node1, Multiaddr.fromString(candidate + "/p2p/" + closer.peerId)).getController().join()
+                                .closerPeers(node1Id).join();
+                        queue.addAll(closerPeers);
+                        continue outer;
+                    } catch (Exception e) {
+                        System.out.println(e.getMessage());
+                    }
+                }
+            }
 
             // sign an ipns record to publish
             String pathToPublish = "/ipfs/" + block;
