@@ -20,7 +20,7 @@ public class BitswapTest {
         Host node1 = builder1.build();
         RamBlockstore blockstore2 = new RamBlockstore();
         HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore());
+                new RamProviderStore(), new RamRecordStore(), blockstore2);
         Host node2 = builder2.build();
         node1.start().join();
         node2.start().join();
