@@ -50,7 +50,8 @@ public class BootstrapTest {
             // lookup ourselves in DHT to find our nearest nodes
             List<PeerAddresses> closestPeers = dht.findClosestPeers(node1Id, 20, node1);
             if (closestPeers.size() < connections)
-                throw new IllegalStateException("Didn't find more close peers after bootstrap");
+                throw new IllegalStateException("Didn't find more close peers after bootstrap: " +
+                        closestPeers.size() + " < " + connections);
         } finally {
             node1.stop();
         }
