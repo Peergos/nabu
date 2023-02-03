@@ -16,6 +16,7 @@ Currently supported properties:
 * Bitswap 1.2.0
 * IPNS publishing on Kademlia
 * p2p http proxy
+* dnsaddr multiaddr resolution during bootstrap
 
 In the Future we will support:
 * QUIC transport (and encryption and multiplexing)
