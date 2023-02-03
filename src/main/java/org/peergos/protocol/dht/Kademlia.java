@@ -7,9 +7,11 @@ import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
 import org.peergos.*;
+import org.peergos.protocol.dnsaddr.*;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.*;
 import java.util.stream.*;
 
 public class Kademlia extends StrictProtocolBinding<KademliaController> {
@@ -25,10 +27,14 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> {
         engine.setAddressBook(addrs);
     }
 
-    public int bootstrapRoutingTable(Host host, List<MultiAddress> addrs) {
-        List<? extends CompletableFuture<? extends KademliaController>> futures = addrs.stream()
+    public int bootstrapRoutingTable(Host host, List<MultiAddress> addrs, Predicate<String> filter) {
+        List<String> resolved = addrs.stream()
+                .flatMap(a -> DnsAddr.resolve(a.toString()).stream())
+                .filter(filter)
+                .collect(Collectors.toList());
+        List<? extends CompletableFuture<? extends KademliaController>> futures = resolved.stream()
                 .parallel()
-                .map(addr -> dial(host, Multiaddr.fromString(addr.toString())).getController())
+                .map(addr -> dial(host, Multiaddr.fromString(addr)).getController())
                 .collect(Collectors.toList());
         int successes = 0;
         for (CompletableFuture<? extends KademliaController> future : futures) {
