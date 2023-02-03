@@ -19,6 +19,10 @@ Currently supported properties:
 
 In the Future we will support:
 * QUIC transport (and encryption and multiplexing)
+* autonat
+* dcutr (direct connection upgrade through relay)
+* circuit-relay
+* S3 blockstores
 
 ## Usage
 You can use this as a standalone application for storing and retrieving blocks. Or you can embed it in your application. 
