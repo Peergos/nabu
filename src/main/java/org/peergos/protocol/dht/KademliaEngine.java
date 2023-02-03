@@ -47,10 +47,12 @@ public class KademliaEngine {
             System.out.println("WARNING overwriting peer connection value");
         outgoing.put(peer, controller);
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
+        addressBook.addAddrs(peer, 0, addr);
     }
 
     public void addIncomingConnection(PeerId peer, KademliaController controller, Multiaddr addr) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
+        addressBook.addAddrs(peer, 0, addr);
     }
 
     public void receiveReply(Dht.Message msg, PeerId source) {
@@ -119,12 +121,13 @@ public class KademliaEngine {
                             .stream()
                             .map(m -> new MultiAddress(m.toString()))
                             .collect(Collectors.toList());
-                    return new PeerAddresses(Multihash.decode(n.getLink()), addrs);
+                    return new PeerAddresses(Multihash.fromBase58(n.getLink()), addrs);
                 })
                 .collect(Collectors.toList());
     }
 
     public void receiveRequest(Dht.Message msg, PeerId source, Stream stream) {
+        System.out.println("Received: " + msg.getType());
         switch (msg.getType()) {
             case PUT_VALUE: {
                 if (validateAndStoreIpnsEntry(msg, true)) {
