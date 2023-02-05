@@ -124,16 +124,16 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> {
     }
 
     private CompletableFuture<List<PeerAddresses>> getCloserPeers(Multihash peerIDKey, PeerAddresses target, Host us) {
-        for (MultiAddress address : target.addresses) {
-            CompletableFuture<List<PeerAddresses>> res = dial(us, Multiaddr.fromString(address.toString() + "/p2p/" + target.peerId))
-                    .getController()
-                    .thenCompose(c -> c.closerPeers(peerIDKey));
-            try {
-                return CompletableFuture.completedFuture(res.orTimeout(2, TimeUnit.SECONDS).join());
-            } catch (CompletionException e) {
-                e.printStackTrace();
-            }
-        }
-        return CompletableFuture.completedFuture(Collections.emptyList());
+        Multiaddr[] multiaddrs = target.addresses.stream()
+                .map(a -> Multiaddr.fromString(a.toString()))
+                .collect(Collectors.toList()).toArray(new Multiaddr[0]);
+        return dial(us, PeerId.fromBase58(target.peerId.toBase58()), multiaddrs)
+                .getController()
+                .thenCompose(c -> c.closerPeers(peerIDKey))
+                .orTimeout(2, TimeUnit.SECONDS)
+                .exceptionally(e -> {
+                    e.printStackTrace();
+                    return Collections.emptyList();
+                });
     }
 }
