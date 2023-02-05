@@ -32,7 +32,7 @@ public interface KademliaController {
                         .collect(Collectors.toList()));
     }
 
-    default CompletableFuture<Boolean> provide(Cid block, PeerAddresses us) {
+    default CompletableFuture<Boolean> provide(Multihash block, PeerAddresses us) {
         return send(Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.ADD_PROVIDER)
                 // only provide the bare Multihash
@@ -41,7 +41,7 @@ public interface KademliaController {
                 .build());
     }
 
-    default CompletableFuture<Providers> getProviders(Cid block) {
+    default CompletableFuture<Providers> getProviders(Multihash block) {
         return rpc(Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.GET_PROVIDERS)
                 .setKey(ByteString.copyFrom(block.bareMultihash().toBytes()))

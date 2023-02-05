@@ -124,16 +124,39 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> {
     }
 
     private CompletableFuture<List<PeerAddresses>> getCloserPeers(Multihash peerIDKey, PeerAddresses target, Host us) {
-        Multiaddr[] multiaddrs = target.addresses.stream()
-                .map(a -> Multiaddr.fromString(a.toString()))
-                .collect(Collectors.toList()).toArray(new Multiaddr[0]);
-        return dial(us, PeerId.fromBase58(target.peerId.toBase58()), multiaddrs)
-                .getController()
+        return dialPeer(target, us)
                 .thenCompose(c -> c.closerPeers(peerIDKey))
                 .orTimeout(2, TimeUnit.SECONDS)
                 .exceptionally(e -> {
                     e.printStackTrace();
                     return Collections.emptyList();
                 });
+    }
+
+    private CompletableFuture<? extends KademliaController> dialPeer(PeerAddresses target, Host us) {
+        Multiaddr[] multiaddrs = target.addresses.stream()
+                .map(a -> Multiaddr.fromString(a.toString()))
+                .collect(Collectors.toList()).toArray(new Multiaddr[0]);
+        return dial(us, PeerId.fromBase58(target.peerId.toBase58()), multiaddrs).getController();
+    }
+
+    public CompletableFuture<Void> provideBlock(Multihash block, Host us, PeerAddresses ourAddrs) {
+        List<PeerAddresses> closestPeers = findClosestPeers(block, 20, us);
+        List<CompletableFuture<Boolean>> provides = closestPeers.stream()
+                .parallel()
+                .map(p -> dialPeer(p, us)
+                        .thenCompose(c -> c.provide(block, ourAddrs)))
+                .collect(Collectors.toList());
+        return CompletableFuture.allOf(provides.toArray(new CompletableFuture[0]));
+    }
+
+    public CompletableFuture<List<Providers>> lookupProviders(Multihash block, Host us) {
+        List<PeerAddresses> closestPeers = findClosestPeers(block, 20, us);
+        List<CompletableFuture<Providers>> providers = closestPeers.stream()
+                .parallel()
+                .map(p -> dialPeer(p, us)
+                        .thenCompose(c -> c.getProviders(block)))
+                .collect(Collectors.toList());
+        return CompletableFuture.completedFuture(providers.stream().map(f -> f.join()).collect(Collectors.toList()));
     }
 }
