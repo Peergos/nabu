@@ -15,6 +15,7 @@ import java.util.stream.*;
 public class ProvideTest {
 
     @Test
+    @Ignore // until we can figure out NAT traversal and get a public ip
     public void provideBlock() {
         RamBlockstore blockstore = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),

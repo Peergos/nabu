@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
 import java.util.stream.*;
+import java.util.stream.Stream;
 
 public class Kademlia extends StrictProtocolBinding<KademliaController> {
     public static final int BOOTSTRAP_PERIOD_MILLIS = 300_000;
@@ -96,6 +97,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> {
         int queryParallelism = 3;
         while (true) {
             List<RoutingEntry> queryThisRound = toQuery.stream().limit(queryParallelism).collect(Collectors.toList());
+            toQuery.removeAll(queryThisRound);
             queryThisRound.forEach(r -> queried.add(r.addresses.peerId));
             List<CompletableFuture<List<PeerAddresses>>> futures = queryThisRound.stream()
                     .parallel()
@@ -114,7 +116,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> {
                     }
                 }
             }
-            // if now new peers in top k were returned we are done
+            // if no new peers in top k were returned we are done
             if (! foundCloser)
                 break;
         }
@@ -157,6 +159,14 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> {
                 .map(p -> dialPeer(p, us)
                         .thenCompose(c -> c.getProviders(block)))
                 .collect(Collectors.toList());
-        return CompletableFuture.completedFuture(providers.stream().map(f -> f.join()).collect(Collectors.toList()));
+        return CompletableFuture.completedFuture(providers.stream()
+                .flatMap(f -> {
+                    try {
+                        return Stream.of(f.orTimeout(2, TimeUnit.SECONDS).join());
+                    } catch (Exception e) {
+                        return Stream.empty();
+                    }
+                })
+                .collect(Collectors.toList()));
     }
 }

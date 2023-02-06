@@ -7,7 +7,7 @@ A minimal Java implementation of [IPFS](https:/ipfs.io)
 ## Status
 This is a WIP.
 
-Currently supported properties:
+Currently implemented properties:
 * TCP transport
 * Noise encryption and authentication
 * RSA and Ed25519 peer IDs
@@ -18,11 +18,13 @@ Currently supported properties:
 * p2p http proxy
 * dnsaddr multiaddr resolution during bootstrap
 
-In the Future we will support:
-* QUIC transport (and encryption and multiplexing)
+In the Future we will add:
 * autonat
-* dcutr (direct connection upgrade through relay)
 * circuit-relay
+* uPnP
+* nat-pmp
+* dcutr (direct connection upgrade through relay)
+* QUIC transport (and encryption and multiplexing)
 * S3 blockstores
 
 ## Usage
