@@ -1,6 +1,7 @@
 package org.peergos.protocol.dht;
 
 import io.ipfs.cid.*;
+import io.ipfs.multihash.*;
 import org.peergos.protocol.ipns.*;
 
 import java.util.*;
@@ -8,10 +9,10 @@ import java.util.concurrent.*;
 
 public class RamRecordStore implements RecordStore {
 
-    private final Map<Cid, IpnsRecord> records = new ConcurrentHashMap<>();
+    private final Map<Multihash, IpnsRecord> records = new ConcurrentHashMap<>();
 
     @Override
-    public void put(Cid peerId, IpnsRecord record) {
+    public void put(Multihash peerId, IpnsRecord record) {
         IpnsRecord existing = records.get(peerId);
         if (existing == null || existing.compareTo(record) < 0)
             records.put(peerId, record);

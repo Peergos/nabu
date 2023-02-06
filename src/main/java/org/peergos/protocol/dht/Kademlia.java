@@ -4,11 +4,15 @@ import com.offbynull.kademlia.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
+import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
 import org.peergos.*;
 import org.peergos.protocol.dnsaddr.*;
+import org.peergos.protocol.ipns.*;
+import org.peergos.protocol.ipns.pb.*;
 
+import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
@@ -168,5 +172,43 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> {
                     }
                 })
                 .collect(Collectors.toList()));
+    }
+
+    public CompletableFuture<Void> publishIpnsValue(PrivKey priv, Multihash publisher, Multihash value, long sequence, Host us) {
+        int hours = 1;
+        LocalDateTime expiry = LocalDateTime.now().plusHours(hours);
+        long ttl = hours * 3600_000_000_000L;
+
+        int publishes = 0;
+        while (publishes < 20) {
+            List<PeerAddresses> closestPeers = findClosestPeers(publisher, 20, us);
+            for (PeerAddresses peer : closestPeers) {
+                boolean success = dialPeer(peer, us).join().putValue("/ipfs/" + value, expiry, sequence,
+                        ttl, publisher, priv).join();
+                if (success)
+                    publishes++;
+            }
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    public CompletableFuture<String> resolveIpnsValue(Multihash publisher, Host us) {
+        List<PeerAddresses> closestPeers = findClosestPeers(publisher, 20, us);
+        List<IpnsRecord> candidates = new ArrayList<>();
+        Set<PeerAddresses> queryCandidates = new HashSet<>();
+        Set<Multihash> queriedPeers = new HashSet<>();
+        for (PeerAddresses peer : closestPeers) {
+            if (queriedPeers.contains(peer.peerId))
+                continue;
+            queriedPeers.add(peer.peerId);
+            GetResult res = dialPeer(peer, us).join().getValue(publisher).join();
+            if (res.record.isPresent() && res.record.get().publisher.equals(publisher))
+                candidates.add(res.record.get().value);
+            queryCandidates.addAll(res.closerPeers);
+        }
+
+        // Validate and sort records by sequence number
+        List<IpnsRecord> records = candidates.stream().sorted().collect(Collectors.toList());
+        return CompletableFuture.completedFuture(records.get(records.size() - 1).value);
     }
 }

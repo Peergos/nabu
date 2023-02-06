@@ -60,57 +60,6 @@ public class KademliaEngine {
         conn.receive(msg);
     }
 
-    public boolean validateAndStoreIpnsEntry(Dht.Message msg, boolean addToStore) {
-        if (! msg.hasRecord() || msg.getRecord().getValue().size() > IPNS.MAX_RECORD_SIZE)
-            return false;
-        if (! msg.getKey().equals(msg.getRecord().getKey()))
-            return false;
-        if (! msg.getRecord().getKey().startsWith(ByteString.copyFrom("/ipns/".getBytes(StandardCharsets.UTF_8))))
-            return false;
-        byte[] cidBytes = msg.getRecord().getKey().substring(6).toByteArray();
-        Cid signer = Cid.cast(cidBytes);
-        try {
-            Ipns.IpnsEntry entry = Ipns.IpnsEntry.parseFrom(msg.getRecord().getValue());
-            if (! entry.hasSignatureV2() || ! entry.hasData())
-                return false;
-            PubKey pub;
-            if (signer.getType() == Multihash.Type.id) {
-                pub = new Ed25519PublicKey(new org.bouncycastle.crypto.params.Ed25519PublicKeyParameters(signer.getHash(), 0));
-            } else {
-                Crypto.PublicKey publicKey = Crypto.PublicKey.parseFrom(entry.getPubKey());
-                pub = RsaKt.unmarshalRsaPublicKey(publicKey.getData().toByteArray());
-            }
-            if (! pub.verify(entry.getSignatureV2().toByteArray(),
-                    ByteString.copyFrom("ipns-signature:".getBytes()).concat(entry.getData()).toByteArray()))
-                return false;
-            CborObject cbor = CborObject.fromByteArray(entry.getData().toByteArray());
-            if (! (cbor instanceof CborObject.CborMap))
-                return false;
-            CborObject.CborMap map = (CborObject.CborMap) cbor;
-            if (map.getLong("Sequence") != entry.getSequence())
-                return false;
-            if (map.getLong("TTL") != entry.getTtl())
-                return false;
-            if (map.getLong("ValidityType") != entry.getValidityType().getNumber())
-                return false;
-            if (! Arrays.equals(map.getByteArray("Value"), entry.getValue().toByteArray()))
-                return false;
-            byte[] validity = entry.getValidity().toByteArray();
-            if (! Arrays.equals(map.getByteArray("Validity"), validity))
-                return false;
-            LocalDateTime expiry = LocalDateTime.parse(new String(validity).substring(0, validity.length - 1), IPNS.rfc3339nano);
-            if (expiry.isBefore(LocalDateTime.now()))
-                return false;
-            if (addToStore) {
-                byte[] entryBytes = msg.getRecord().getValue().toByteArray();
-                ipnsStore.put(signer, new IpnsRecord(entryBytes, entry.getSequence(), entry.getTtl(), expiry, entry.getValue().toStringUtf8()));
-            }
-            return true;
-        } catch (InvalidProtocolBufferException e) {
-            return false;
-        }
-    }
-
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
         int k = 20;
         List<Node> nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
@@ -130,7 +79,9 @@ public class KademliaEngine {
         System.out.println("Received: " + msg.getType());
         switch (msg.getType()) {
             case PUT_VALUE: {
-                if (validateAndStoreIpnsEntry(msg, true)) {
+                Optional<IpnsMapping> mapping = IPNS.validateIpnsEntry(msg);
+                if (mapping.isPresent()) {
+                    ipnsStore.put(mapping.get().publisher, mapping.get().value);
                     stream.writeAndFlush(msg);
                 }
                 break;
