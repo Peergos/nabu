@@ -14,6 +14,7 @@ import io.libp2p.protocol.*;
 import io.libp2p.security.noise.*;
 import io.libp2p.transport.tcp.*;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.dht.*;
 
@@ -78,6 +79,7 @@ public class HostBuilder {
         Kademlia dht = new Kademlia(new KademliaEngine(Multihash.deserialize(builder.peerId.getBytes()), providers, records), false);
         return builder.addProtocols(List.of(
                 new Ping(),
+                new AutonatProtocol.Binding(),
                 new Bitswap(new BitswapEngine(blocks)),
                 dht));
     }
