@@ -17,9 +17,9 @@ Currently implemented properties:
 * IPNS publishing on Kademlia
 * p2p http proxy
 * dnsaddr multiaddr resolution during bootstrap
+* autonat
 
 In the Future we will add:
-* autonat
 * circuit-relay
 * uPnP
 * nat-pmp

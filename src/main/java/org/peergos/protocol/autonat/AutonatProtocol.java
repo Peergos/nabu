@@ -62,6 +62,13 @@ public class AutonatProtocol extends ProtobufProtocolHandler<AutonatProtocol.Aut
         }
     }
 
+    public static boolean isPublicAndReachable(MultiAddress addr, Multiaddr source) {
+        if (addr.isRelayed())
+            return false;
+
+       return addr.isPublic(true);
+    }
+
     public static class Receiver implements ProtocolMessageHandler<Autonat.Message>, AutoNatController {
         private final Stream p2pstream;
 
@@ -85,11 +92,13 @@ public class AutonatProtocol extends ProtobufProtocolHandler<AutonatProtocol.Aut
                     }
 
                     Multiaddr remote = stream.getConnection().remoteAddress();
-                    // TODO: filter addrs and dial
-                    boolean connected = false;
+                    boolean reachable = requestedDials.stream()
+                            .filter(a -> isPublicAndReachable(a, remote))
+                            .findAny()
+                            .isPresent();
                     Autonat.Message.Builder resp = Autonat.Message.newBuilder()
                             .setType(Autonat.Message.MessageType.DIAL_RESPONSE);
-                    if (connected) {
+                    if (reachable) {
                         resp = resp.setDialResponse(Autonat.Message.DialResponse.newBuilder()
                                 .setStatus(Autonat.Message.ResponseStatus.OK));
                     } else {
