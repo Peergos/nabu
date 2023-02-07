@@ -92,15 +92,15 @@ public class AutonatProtocol extends ProtobufProtocolHandler<AutonatProtocol.Aut
                     }
 
                     Multiaddr remote = stream.getConnection().remoteAddress();
-                    boolean reachable = requestedDials.stream()
+                    Optional<MultiAddress> reachable = requestedDials.stream()
                             .filter(a -> isPublicAndReachable(a, remote))
-                            .findAny()
-                            .isPresent();
+                            .findAny();
                     Autonat.Message.Builder resp = Autonat.Message.newBuilder()
                             .setType(Autonat.Message.MessageType.DIAL_RESPONSE);
-                    if (reachable) {
+                    if (reachable.isPresent()) {
                         resp = resp.setDialResponse(Autonat.Message.DialResponse.newBuilder()
-                                .setStatus(Autonat.Message.ResponseStatus.OK));
+                                .setStatus(Autonat.Message.ResponseStatus.OK)
+                                .setAddr(ByteString.copyFrom(reachable.get().getBytes())));
                     } else {
                         resp = resp.setDialResponse(Autonat.Message.DialResponse.newBuilder()
                                 .setStatus(Autonat.Message.ResponseStatus.E_DIAL_ERROR));
