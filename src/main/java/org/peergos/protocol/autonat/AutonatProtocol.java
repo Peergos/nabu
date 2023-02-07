@@ -92,7 +92,9 @@ public class AutonatProtocol extends ProtobufProtocolHandler<AutonatProtocol.Aut
                     }
 
                     Multiaddr remote = stream.getConnection().remoteAddress();
+                    String remoteIp = new MultiAddress(remote.toString()).getHost();
                     Optional<MultiAddress> reachable = requestedDials.stream()
+                            .filter(a -> a.getHost().equals(remoteIp))
                             .filter(a -> isPublicAndReachable(a, remote))
                             .findAny();
                     Autonat.Message.Builder resp = Autonat.Message.newBuilder()
