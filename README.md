@@ -21,7 +21,7 @@ Currently implemented properties:
 * uPnP port forwarding
 * nat-pmp port forwarding
 
-In the Future we will add:
+In the future we will add:
 * circuit-relay
 * dcutr (direct connection upgrade through relay)
 * persistent identities and config
@@ -29,6 +29,7 @@ In the Future we will add:
 * file based datastores (IPNS and peer records)
 * block HTTP API
 * QUIC transport (and encryption and multiplexing)
+* mDNS peer discovery
 * S3 blockstores
 
 ## Usage
