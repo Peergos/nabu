@@ -18,11 +18,11 @@ Currently implemented properties:
 * p2p http proxy
 * dnsaddr multiaddr resolution during bootstrap
 * autonat
+* uPnP port forwarding
+* nat-pmp port forwarding
 
 In the Future we will add:
 * circuit-relay
-* uPnP
-* nat-pmp
 * dcutr (direct connection upgrade through relay)
 * QUIC transport (and encryption and multiplexing)
 * S3 blockstores
