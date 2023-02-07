@@ -135,7 +135,16 @@ public class KademliaTest {
             long ttl = 3600_000_000_000L;
 
             System.out.println("Sending put value...");
-            boolean success = bootstrap1.putValue(pathToPublish, expiry, sequence, ttl, node1Id, node1.getPrivKey()).join();
+            boolean success = false;
+
+            for (int i = 0; i < 10; i++) {
+                try {
+                    success = bootstrap1.putValue(pathToPublish, expiry, sequence, ttl, node1Id, node1.getPrivKey())
+                            .orTimeout(2, TimeUnit.SECONDS).join();
+                    break;
+                } catch (Exception timeout) {
+                }
+            }
             if (! success)
                 throw new IllegalStateException("Failed to publish IPNS record!");
             GetResult getresult = bootstrap1.getValue(node1Id).join();
