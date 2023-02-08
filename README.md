@@ -24,6 +24,7 @@ Currently implemented properties:
 In the future we will add:
 * circuit-relay
 * dcutr (direct connection upgrade through relay)
+* AutoRelay
 * persistent identities and config
 * file blockstores
 * file based datastores (IPNS and peer records)

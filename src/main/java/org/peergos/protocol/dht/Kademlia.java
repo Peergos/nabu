@@ -10,7 +10,6 @@ import io.libp2p.core.multistream.*;
 import org.peergos.*;
 import org.peergos.protocol.dnsaddr.*;
 import org.peergos.protocol.ipns.*;
-import org.peergos.protocol.ipns.pb.*;
 
 import java.time.*;
 import java.util.*;
