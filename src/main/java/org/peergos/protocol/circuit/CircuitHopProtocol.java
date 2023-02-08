@@ -43,10 +43,16 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                 .setExpiration(expiry.toEpochSecond(ZoneOffset.UTC) * 1_000_000_000)
                 .build().toByteArray();
         byte[] signDomain = "libp2p-relay-rsvp".getBytes(StandardCharsets.UTF_8);
-        byte[] toSign = new byte[signDomain.length + payload.length];
-        System.arraycopy(signDomain, 0, toSign, 0, toSign.length);
-        System.arraycopy(payload, 0, toSign, toSign.length, payload.length);
-        byte[] signature = priv.sign(toSign);
+        ByteArrayOutputStream toSign = new ByteArrayOutputStream();
+        try {
+            Multihash.putUvarint(toSign, signDomain.length);
+            toSign.write(signDomain);
+            Multihash.putUvarint(toSign, typeMulticodec.length);
+            toSign.write(typeMulticodec);
+            Multihash.putUvarint(toSign, payload.length);
+            toSign.write(payload);
+        } catch (IOException e) {}
+        byte[] signature = priv.sign(toSign.toByteArray());
         return Crypto.Envelope.newBuilder()
                 .setPayloadType(ByteString.copyFrom(typeMulticodec))
                 .setPayload(ByteString.copyFrom(payload))
@@ -134,7 +140,7 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                 case RESERVE: {
                     Multihash requestor = Multihash.deserialize(stream.remotePeerId().getBytes());
                     Optional<Reservation> reservation = manager.createReservation(requestor, stream);
-                    if (reservation.isEmpty()) {
+                    if (reservation.isEmpty()) { // TODO reject if requestor is already a relayed MultiAddress
                         stream.writeAndFlush(Circuit.HopMessage.newBuilder()
                                 .setType(Circuit.HopMessage.Type.STATUS)
                                 .setStatus(Circuit.Status.RESERVATION_REFUSED));
