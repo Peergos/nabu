@@ -2,9 +2,11 @@ package org.peergos.protocol.circuit;
 
 import com.google.protobuf.*;
 import io.ipfs.multiaddr.*;
-import io.ipfs.multihash.*;
+import io.ipfs.multihash.Multihash;
+import io.libp2p.core.*;
 import io.libp2p.core.Stream;
 import io.libp2p.core.crypto.*;
+import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
 import org.jetbrains.annotations.*;
@@ -23,8 +25,8 @@ import java.util.stream.*;
 public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtocol.HopController> {
 
     public static class Binding extends StrictProtocolBinding<HopController> {
-        public Binding(RelayManager manager, Supplier<List<MultiAddress>> publicAddresses) {
-            super("/libp2p/circuit/relay/0.2.0/hop", new CircuitHopProtocol(manager, publicAddresses));
+        public Binding(RelayManager manager, Supplier<List<MultiAddress>> publicAddresses, CircuitStopProtocol.Binding stop) {
+            super("/libp2p/circuit/relay/0.2.0/hop", new CircuitHopProtocol(manager, publicAddresses, stop));
         }
     }
 
@@ -63,26 +65,26 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                 .build().toByteArray();
     }
 
-    static class Reservation {
+    public static class Reservation {
         public final LocalDateTime expiry;
-        public final int maxSeconds;
+        public final int durationSeconds;
         public final long maxBytes;
         public final byte[] voucher;
 
-        public Reservation(LocalDateTime expiry, int maxSeconds, long maxBytes, byte[] voucher) {
+        public Reservation(LocalDateTime expiry, int durationSeconds, long maxBytes, byte[] voucher) {
             this.expiry = expiry;
-            this.maxSeconds = maxSeconds;
+            this.durationSeconds = durationSeconds;
             this.maxBytes = maxBytes;
             this.voucher = voucher;
         }
     }
 
     public interface RelayManager {
-        Optional<Reservation> createReservation(Multihash requestor, Stream stream);
-
-        boolean allowConnection(Multihash target, Multihash initiator);
-
         boolean hasReservation(Multihash source);
+
+        Optional<Reservation> createReservation(Multihash requestor);
+
+        Optional<Reservation> allowConnection(Multihash target, Multihash initiator);
     }
 
     public interface HopController {
@@ -124,14 +126,22 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
     }
 
     public static class Receiver implements ProtocolMessageHandler<Circuit.HopMessage>, HopController {
-        private final Stream p2pstream;
+        private final Host us;
         private final RelayManager manager;
         private final Supplier<List<MultiAddress>> publicAddresses;
+        private final CircuitStopProtocol.Binding stop;
+        private final AddressBook addressBook;
 
-        public Receiver(Stream p2pstream, RelayManager manager, Supplier<List<MultiAddress>> publicAddresses) {
-            this.p2pstream = p2pstream;
+        public Receiver(Host us,
+                        RelayManager manager,
+                        Supplier<List<MultiAddress>> publicAddresses,
+                        CircuitStopProtocol.Binding stop,
+                        AddressBook addressBook) {
+            this.us = us;
             this.manager = manager;
             this.publicAddresses = publicAddresses;
+            this.stop = stop;
+            this.addressBook = addressBook;
         }
 
         @Override
@@ -139,7 +149,7 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
             switch (msg.getType()) {
                 case RESERVE: {
                     Multihash requestor = Multihash.deserialize(stream.remotePeerId().getBytes());
-                    Optional<Reservation> reservation = manager.createReservation(requestor, stream);
+                    Optional<Reservation> reservation = manager.createReservation(requestor);
                     if (reservation.isEmpty()) { // TODO reject if requestor is already a relayed MultiAddress
                         stream.writeAndFlush(Circuit.HopMessage.newBuilder()
                                 .setType(Circuit.HopMessage.Type.STATUS)
@@ -157,15 +167,33 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                                             .collect(Collectors.toList()))
                                     .setVoucher(ByteString.copyFrom(resv.voucher)))
                             .setLimit(Circuit.Limit.newBuilder()
-                                    .setDuration(resv.maxSeconds)
+                                    .setDuration(resv.durationSeconds)
                                     .setData(resv.maxBytes)));
                 } case CONNECT: {
                     Multihash targetPeerId = Multihash.deserialize(msg.getPeer().getId().toByteArray());
                     if (manager.hasReservation(targetPeerId)) {
                         Multihash initiator = Multihash.deserialize(stream.remotePeerId().getBytes());
-                        if (manager.allowConnection(targetPeerId, initiator)) {
-                            // TODO
-
+                        Optional<Reservation> res = manager.allowConnection(targetPeerId, initiator);
+                        if (res.isPresent()) {
+                            Reservation resv = res.get();
+                            PeerId target = PeerId.fromBase58(targetPeerId.toBase58());
+                            CircuitStopProtocol.StopController stop = this.stop.dial(us, target,
+                                    addressBook.getAddrs(target).join().toArray(new Multiaddr[0])).getController().join();
+                            Circuit.StopMessage reply = stop.connect(initiator, resv.durationSeconds, resv.maxBytes).join();
+                            if (reply.getStatus().equals(Circuit.Status.OK)) {
+                                stream.writeAndFlush(Circuit.StopMessage.newBuilder()
+                                    .setType(Circuit.StopMessage.Type.STATUS)
+                                    .setStatus(Circuit.Status.OK));
+                                Stream toTarget = stop.getStream();
+                                Stream fromRequestor = stream;
+                                // TODO connect these streams with time + bytes enforcement
+//                                toTarget.pushHandler();
+//                                fromRequestor.pushHandler();
+                            } else {
+                                stream.writeAndFlush(Circuit.HopMessage.newBuilder()
+                                    .setType(Circuit.HopMessage.Type.STATUS)
+                                    .setStatus(reply.getStatus()));
+                            }
                         } else {
                             stream.writeAndFlush(Circuit.HopMessage.newBuilder()
                                     .setType(Circuit.HopMessage.Type.STATUS)
@@ -188,11 +216,20 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
     private static final int TRAFFIC_LIMIT = 2*1024;
     private final RelayManager manager;
     private final Supplier<List<MultiAddress>> publicAddresses;
+    private final CircuitStopProtocol.Binding stop;
+    private Host us;
 
-    public CircuitHopProtocol(RelayManager manager, Supplier<List<MultiAddress>> publicAddresses) {
+    public CircuitHopProtocol(RelayManager manager,
+                              Supplier<List<MultiAddress>> publicAddresses,
+                              CircuitStopProtocol.Binding stop) {
         super(Circuit.HopMessage.getDefaultInstance(), TRAFFIC_LIMIT, TRAFFIC_LIMIT);
         this.manager = manager;
         this.publicAddresses = publicAddresses;
+        this.stop = stop;
+    }
+
+    public void setHost(Host us) {
+        this.us = us;
     }
 
     @NotNull
@@ -206,7 +243,9 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
     @NotNull
     @Override
     protected CompletableFuture<HopController> onStartResponder(@NotNull Stream stream) {
-        Receiver dialer = new Receiver(stream, manager, publicAddresses);
+        if (us == null)
+            throw new IllegalStateException("null Host for us!");
+        Receiver dialer = new Receiver(us, manager, publicAddresses, stop, us.getAddressBook());
         stream.pushHandler(dialer);
         return CompletableFuture.completedFuture(dialer);
     }
