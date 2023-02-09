@@ -12,17 +12,16 @@ import java.util.*;
 import java.util.function.*;
 import java.util.stream.*;
 
-public class ProvideTest {
+public class FindProviderTest {
 
     @Test
-    @Ignore // until we can figure out NAT traversal and get a public ip
-    public void provideBlock() {
+    @Ignore // TODO: Figure out why these get provder calls timeout
+    public void findBlockProvider() {
         RamBlockstore blockstore = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), blockstore);
         Host node1 = builder1.build();
         node1.start().join();
-        Multihash node1Id = Multihash.deserialize(node1.getPeerId().getBytes());
 
         try {
             // Don't connect to local kubo
@@ -51,21 +50,11 @@ public class ProvideTest {
                 throw new IllegalStateException("No connected peers!");
             dht.bootstrap(node1);
 
-            // publish a block
-            byte[] blockData = ("This is hopefully a unique block" + System.currentTimeMillis()).getBytes();
-            Cid block = blockstore.put(blockData, Cid.Codec.Raw).join();
-            PeerAddresses ourAddresses = new PeerAddresses(node1Id, node1.listenAddresses().stream()
-                    .map(m -> new MultiAddress(m.toString()))
-                    .collect(Collectors.toList()));
-            dht.provideBlock(block, node1, ourAddresses).join();
-
+            Multihash block = Cid.decode("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
             // retrieve our published block from kubo
             List<PeerAddresses> providers = dht.findProviders(block, node1, 10).join();
-            List<PeerAddresses> withNode1 = providers.stream()
-                    .filter(p -> p.peerId.equals(node1Id))
-                    .collect(Collectors.toList());
-            if (withNode1.isEmpty())
-                throw new IllegalStateException("Couldn't find us as a provider of block!");
+            if (providers.isEmpty())
+                throw new IllegalStateException("Couldn't find provider of block!");
         } finally {
             node1.stop();
         }

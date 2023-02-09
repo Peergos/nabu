@@ -65,15 +65,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> {
 
     public void bootstrap(Host us) {
         // lookup a random peer id
-        byte[] hash = new byte[36];
+        byte[] hash = new byte[32];
         new Random().nextBytes(hash);
-        hash[0] = 8;
-        hash[1] = 1;
-        hash[2] = 18;
-        hash[3] = 32;
-        Multihash randomPeerId = new Multihash(Multihash.Type.id, hash);
+        Multihash randomPeerId = new Multihash(Multihash.Type.sha2_256, hash);
         findClosestPeers(randomPeerId, 20, us);
-        // lookup our own peer id to keep our nearest neighbours uptodate
+        // lookup our own peer id to keep our nearest neighbours up-to-date
         findClosestPeers(Multihash.deserialize(us.getPeerId().getBytes()), 20, us);
     }
 
@@ -128,6 +124,55 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> {
                 .collect(Collectors.toList());
     }
 
+    public CompletableFuture<List<PeerAddresses>> findProviders(Multihash block, Host us, int desiredCount) {
+        byte[] key = block.toBytes();
+        Id keyId = Id.create(key, 256);
+        List<PeerAddresses> providers = new ArrayList<>();
+
+        SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> b.key.getSharedPrefixLength(keyId) - a.key.getSharedPrefixLength(keyId));
+        toQuery.addAll(engine.getKClosestPeers(key).stream()
+                .map(p -> new RoutingEntry(Id.create(Hash.sha256(p.peerId.toBytes()), 256), p))
+                .collect(Collectors.toList()));
+
+        Set<Multihash> queried = new HashSet<>();
+        int queryParallelism = 3;
+        while (true) {
+            if (providers.size() >= desiredCount)
+                return CompletableFuture.completedFuture(providers);
+            List<RoutingEntry> queryThisRound = toQuery.stream().limit(queryParallelism).collect(Collectors.toList());
+            toQuery.removeAll(queryThisRound);
+            queryThisRound.forEach(r -> queried.add(r.addresses.peerId));
+            List<CompletableFuture<Providers>> futures = queryThisRound.stream()
+                    .parallel()
+                    .map(r -> dialPeer(r.addresses, us)
+                            .thenCompose(c -> c.getProviders(block).orTimeout(2, TimeUnit.SECONDS)))
+                    .collect(Collectors.toList());
+            boolean foundCloser = false;
+            for (CompletableFuture<Providers> future : futures) {
+                try {
+                    Providers newProviders = future.join();
+                    providers.addAll(newProviders.providers);
+                    for (PeerAddresses peer : newProviders.closerPeers) {
+                        if (!queried.contains(peer.peerId)) {
+                            queried.add(peer.peerId);
+                            RoutingEntry e = new RoutingEntry(Id.create(Hash.sha256(peer.peerId.toBytes()), 256), peer);
+                            toQuery.add(e);
+                            foundCloser = true;
+                        }
+                    }
+                } catch (Exception e) {
+                    if (! (e.getCause() instanceof TimeoutException))
+                        e.printStackTrace();
+                }
+            }
+            // if no new peers in top k were returned we are done
+            if (! foundCloser)
+                break;
+        }
+
+        return CompletableFuture.completedFuture(providers);
+    }
+
     private CompletableFuture<List<PeerAddresses>> getCloserPeers(Multihash peerIDKey, PeerAddresses target, Host us) {
         return dialPeer(target, us)
                 .thenCompose(c -> c.closerPeers(peerIDKey))
@@ -153,24 +198,6 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> {
                         .thenCompose(c -> c.provide(block, ourAddrs)))
                 .collect(Collectors.toList());
         return CompletableFuture.allOf(provides.toArray(new CompletableFuture[0]));
-    }
-
-    public CompletableFuture<List<Providers>> lookupProviders(Multihash block, Host us) {
-        List<PeerAddresses> closestPeers = findClosestPeers(block, 20, us);
-        List<CompletableFuture<Providers>> providers = closestPeers.stream()
-                .parallel()
-                .map(p -> dialPeer(p, us)
-                        .thenCompose(c -> c.getProviders(block)))
-                .collect(Collectors.toList());
-        return CompletableFuture.completedFuture(providers.stream()
-                .flatMap(f -> {
-                    try {
-                        return Stream.of(f.orTimeout(2, TimeUnit.SECONDS).join());
-                    } catch (Exception e) {
-                        return Stream.empty();
-                    }
-                })
-                .collect(Collectors.toList()));
     }
 
     public CompletableFuture<Void> publishIpnsValue(PrivKey priv, Multihash publisher, Multihash value, long sequence, Host us) {
