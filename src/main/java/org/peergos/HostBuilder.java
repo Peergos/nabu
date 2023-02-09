@@ -16,6 +16,7 @@ import io.libp2p.transport.tcp.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
+import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 
 import java.util.*;
@@ -41,6 +42,13 @@ public class HostBuilder {
         return protocols.stream()
                 .filter(p -> p instanceof Bitswap)
                 .map(p -> (Bitswap)p)
+                .findFirst();
+    }
+
+    public Optional<CircuitHopProtocol.Binding> getRelayHop() {
+        return protocols.stream()
+                .filter(p -> p instanceof CircuitHopProtocol.Binding)
+                .map(p -> (CircuitHopProtocol.Binding)p)
                 .findFirst();
     }
 
@@ -76,10 +84,14 @@ public class HostBuilder {
 
     public static HostBuilder build(int listenPort, ProviderStore providers, RecordStore records, Blockstore blocks) {
         HostBuilder builder = new HostBuilder().generateIdentity().listenLocalhost(listenPort);
-        Kademlia dht = new Kademlia(new KademliaEngine(Multihash.deserialize(builder.peerId.getBytes()), providers, records), false);
+        Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
+        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
+        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
         return builder.addProtocols(List.of(
                 new Ping(),
                 new AutonatProtocol.Binding(),
+                new CircuitHopProtocol.Binding(relayManager, stop),
                 new Bitswap(new BitswapEngine(blocks)),
                 dht));
     }
@@ -101,7 +113,7 @@ public class HostBuilder {
                              List<String> listenAddrs,
                              Multiaddr advertisedAddr,
                              List<ProtocolBinding> protocols) {
-        return BuilderJKt.hostJ(Builder.Defaults.None, b -> {
+        Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             b.getTransports().add(TcpTransport::new);
             b.getSecureChannels().add(NoiseXXSecureChannel::new);
@@ -109,8 +121,8 @@ public class HostBuilder {
 
             for (ProtocolBinding<?> protocol : protocols) {
                 b.getProtocols().add(protocol);
-                if (protocol instanceof Kademlia)
-                    ((Kademlia) protocol).setAddressBook(b.getAddressBook().getImpl());
+                if (protocol instanceof AddressBookConsumer)
+                    ((AddressBookConsumer) protocol).setAddressBook(b.getAddressBook().getImpl());
             }
 
             IdentifyOuterClass.Identify.Builder identifyBuilder = IdentifyOuterClass.Identify.newBuilder()
@@ -132,5 +144,10 @@ public class HostBuilder {
                     " received connection from " + conn.remoteAddress() +
                     " on transport " + conn.transport()));
         });
+        for (ProtocolBinding protocol : protocols) {
+            if (protocol instanceof HostConsumer)
+                ((HostConsumer)protocol).setHost(host);
+        }
+        return host;
     }
 }

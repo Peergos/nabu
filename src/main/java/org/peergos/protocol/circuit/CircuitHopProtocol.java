@@ -24,9 +24,25 @@ import java.util.stream.*;
 
 public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtocol.HopController> {
 
-    public static class Binding extends StrictProtocolBinding<HopController> {
-        public Binding(RelayManager manager, Supplier<List<MultiAddress>> publicAddresses, CircuitStopProtocol.Binding stop) {
-            super("/libp2p/circuit/relay/0.2.0/hop", new CircuitHopProtocol(manager, publicAddresses, stop));
+    public static class Binding extends StrictProtocolBinding<HopController> implements HostConsumer {
+        private final CircuitHopProtocol hop;
+
+        private Binding(CircuitHopProtocol hop) {
+            super("/libp2p/circuit/relay/0.2.0/hop", hop);
+            this.hop = hop;
+        }
+
+        public Binding(RelayManager manager, CircuitStopProtocol.Binding stop) {
+            this(new CircuitHopProtocol(manager, stop));
+        }
+
+        @Override
+        public void setHost(Host us) {
+            hop.setHost(us);
+        }
+
+        public CircuitHopProtocol getHop() {
+            return hop;
         }
     }
 
@@ -85,6 +101,34 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
         Optional<Reservation> createReservation(Multihash requestor);
 
         Optional<Reservation> allowConnection(Multihash target, Multihash initiator);
+
+        static RelayManager limitTo(PrivKey priv, Multihash relayPeerId, int concurrent) {
+            return new RelayManager() {
+                Map<Multihash, Reservation> reservations = new HashMap<>();
+
+                @Override
+                public synchronized boolean hasReservation(Multihash source) {
+                    return reservations.containsKey(source);
+                }
+
+                @Override
+                public synchronized Optional<Reservation> createReservation(Multihash requestor) {
+                    if (reservations.size() >= concurrent)
+                        return Optional.empty();
+                    LocalDateTime now = LocalDateTime.now();
+                    LocalDateTime expiry = now.plusHours(1);
+                    byte[] voucher = createVoucher(priv, relayPeerId, requestor, now);
+                    Reservation resv = new Reservation(expiry, 3600, 4096, voucher);
+                    reservations.put(requestor, resv);
+                    return Optional.of(resv);
+                }
+
+                @Override
+                public synchronized Optional<Reservation> allowConnection(Multihash target, Multihash initiator) {
+                    return Optional.ofNullable(reservations.get(target));
+                }
+            };
+        }
     }
 
     public interface HopController {
@@ -215,16 +259,13 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
 
     private static final int TRAFFIC_LIMIT = 2*1024;
     private final RelayManager manager;
-    private final Supplier<List<MultiAddress>> publicAddresses;
     private final CircuitStopProtocol.Binding stop;
     private Host us;
 
     public CircuitHopProtocol(RelayManager manager,
-                              Supplier<List<MultiAddress>> publicAddresses,
                               CircuitStopProtocol.Binding stop) {
         super(Circuit.HopMessage.getDefaultInstance(), TRAFFIC_LIMIT, TRAFFIC_LIMIT);
         this.manager = manager;
-        this.publicAddresses = publicAddresses;
         this.stop = stop;
     }
 
@@ -245,7 +286,11 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
     protected CompletableFuture<HopController> onStartResponder(@NotNull Stream stream) {
         if (us == null)
             throw new IllegalStateException("null Host for us!");
-        Receiver dialer = new Receiver(us, manager, publicAddresses, stop, us.getAddressBook());
+        Supplier<List<MultiAddress>> ourpublicAddresses = () -> us.getAddressBook().get(us.getPeerId()).join()
+                .stream()
+                .map(a -> new MultiAddress(a.toString()))
+                .collect(Collectors.toList());
+        Receiver dialer = new Receiver(us, manager, ourpublicAddresses, stop, us.getAddressBook());
         stream.pushHandler(dialer);
         return CompletableFuture.completedFuture(dialer);
     }

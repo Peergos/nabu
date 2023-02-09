@@ -16,9 +16,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
 import java.util.stream.*;
-import java.util.stream.Stream;
 
-public class Kademlia extends StrictProtocolBinding<KademliaController> {
+public class Kademlia extends StrictProtocolBinding<KademliaController> implements AddressBookConsumer {
     public static final int BOOTSTRAP_PERIOD_MILLIS = 300_000;
     private final KademliaEngine engine;
 

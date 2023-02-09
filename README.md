@@ -11,7 +11,7 @@ Currently implemented properties:
 * TCP transport
 * Noise encryption and authentication
 * RSA and Ed25519 peer IDs
-* mplex
+* mplex muxer
 * Kademlia DHT for content discovery
 * Bitswap 1.2.0
 * IPNS publishing on Kademlia
@@ -23,6 +23,7 @@ Currently implemented properties:
 
 In the future we will add:
 * circuit-relay
+* yamux muxer
 * dcutr (direct connection upgrade through relay)
 * AutoRelay
 * persistent identities and config
