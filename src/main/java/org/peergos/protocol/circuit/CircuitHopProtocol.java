@@ -150,7 +150,7 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                 case RESERVE: {
                     Multihash requestor = Multihash.deserialize(stream.remotePeerId().getBytes());
                     Optional<Reservation> reservation = manager.createReservation(requestor);
-                    if (reservation.isEmpty()) { // TODO reject if requestor is already a relayed MultiAddress
+                    if (reservation.isEmpty() || new MultiAddress(stream.getConnection().remoteAddress().toString()).isRelayed()) {
                         stream.writeAndFlush(Circuit.HopMessage.newBuilder()
                                 .setType(Circuit.HopMessage.Type.STATUS)
                                 .setStatus(Circuit.Status.RESERVATION_REFUSED));
