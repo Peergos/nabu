@@ -116,9 +116,9 @@
             <version>${version.multiaddr}</version>
         </dependency>
         <dependency>
-            <groupId>com.github.libp2p</groupId>
+            <groupId>com.github.peergos</groupId>
             <artifactId>jvm-libp2p</artifactId>
-            <version>0.9.2</version>
+            <version>0.9.3</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>

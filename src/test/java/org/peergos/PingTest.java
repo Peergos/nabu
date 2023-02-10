@@ -21,7 +21,7 @@ public class PingTest {
             Multiaddr address2 = node2.listenAddresses().get(0);
             PingController pinger = new Ping().dial(node1, address2).getController().join();
 
-            System.out.println("Sending 5 ping messages to " + address2);
+            System.out.println("Sending ping messages to " + address2);
             for (int i = 0; i < 2; i++) {
                 long latency = pinger.ping().join();
                 System.out.println("Ping " + i + ", latency " + latency + "ms");

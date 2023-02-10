@@ -27,6 +27,7 @@ public class HostBuilder {
     private List<String> listenAddrs = new ArrayList<>();
     private Multiaddr advertisedAddr;
     private List<ProtocolBinding> protocols = new ArrayList<>();
+    private List<StreamMuxerProtocol> muxers = new ArrayList<>();
 
     public HostBuilder() {
     }
@@ -50,6 +51,11 @@ public class HostBuilder {
                 .filter(p -> p instanceof CircuitHopProtocol.Binding)
                 .map(p -> (CircuitHopProtocol.Binding)p)
                 .findFirst();
+    }
+
+    public HostBuilder addMuxers(List<StreamMuxerProtocol> muxers) {
+        this.muxers.addAll(muxers);
+        return this;
     }
 
     public HostBuilder addProtocols(List<ProtocolBinding> protocols) {
@@ -106,18 +112,21 @@ public class HostBuilder {
     }
 
     public Host build() {
-        return build(privKey, listenAddrs, advertisedAddr, protocols);
+        if (muxers.isEmpty())
+            muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
+        return build(privKey, listenAddrs, advertisedAddr, protocols, muxers);
     }
 
     public static Host build(PrivKey privKey,
                              List<String> listenAddrs,
                              Multiaddr advertisedAddr,
-                             List<ProtocolBinding> protocols) {
+                             List<ProtocolBinding> protocols,
+                             List<StreamMuxerProtocol> muxers) {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             b.getTransports().add(TcpTransport::new);
             b.getSecureChannels().add(NoiseXXSecureChannel::new);
-            b.getMuxers().add(StreamMuxerProtocol.getMplex());
+            b.getMuxers().addAll(muxers);
 
             for (ProtocolBinding<?> protocol : protocols) {
                 b.getProtocols().add(protocol);
