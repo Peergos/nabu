@@ -23,15 +23,17 @@ Currently implemented properties:
 
 In the future we will add:
 * circuit-relay
-* dcutr (direct connection upgrade through relay)
 * AutoRelay
+* dcutr (direct connection upgrade through relay)
 * persistent identities and config
-* file blockstores
+* file based blockstore
 * file based datastores (IPNS and peer records)
 * block HTTP API
 * QUIC transport (and encryption and multiplexing)
 * mDNS peer discovery
 * S3 blockstores
+* bloom filtered blockstore
+* Android compatibility
 
 ## Usage
 You can use this as a standalone application for storing and retrieving blocks. Or you can embed it in your application. 
