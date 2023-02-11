@@ -113,7 +113,8 @@ public class HostBuilder {
 
     public Host build() {
         if (muxers.isEmpty())
-            muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
+            muxers.addAll(List.of(StreamMuxerProtocol.getMplex()));
+//            muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
         return build(privKey, listenAddrs, advertisedAddr, protocols, muxers);
     }
 
