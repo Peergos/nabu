@@ -117,7 +117,6 @@ public class KademliaTest {
             Multiaddr address2 = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kuboID);
             Cid block = blockstore1.put("Provide me.".getBytes(), Cid.Codec.Raw).join();
             Kademlia dht = builder1.getWanDht().get();
-            KademliaController bootstrap1 = dht.dial(node1, address2).getController().join();
 
             // sign an ipns record to publish
             String pathToPublish = "/ipfs/" + block;
@@ -130,7 +129,8 @@ public class KademliaTest {
 
             for (int i = 0; i < 10; i++) {
                 try {
-                    success = bootstrap1.putValue(pathToPublish, expiry, sequence, ttl, node1Id, node1.getPrivKey())
+                    success = dht.dial(node1, address2).getController().join()
+                            .putValue(pathToPublish, expiry, sequence, ttl, node1Id, node1.getPrivKey())
                             .orTimeout(2, TimeUnit.SECONDS).join();
                     break;
                 } catch (Exception timeout) {
@@ -138,7 +138,7 @@ public class KademliaTest {
             }
             if (! success)
                 throw new IllegalStateException("Failed to publish IPNS record!");
-            GetResult getresult = bootstrap1.getValue(node1Id).join();
+            GetResult getresult = dht.dial(node1, address2).getController().join().getValue(node1Id).join();
             if (! getresult.record.isPresent())
                 throw new IllegalStateException("Kubo didn't return our published IPNS record!");
         } finally {
