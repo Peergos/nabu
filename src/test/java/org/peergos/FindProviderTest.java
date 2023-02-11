@@ -15,7 +15,7 @@ import java.util.stream.*;
 public class FindProviderTest {
 
     @Test
-    @Ignore // TODO: Figure out why these get provder calls timeout
+    @Ignore // TODO: Figure out why these get provider calls timeout
     public void findBlockProvider() {
         RamBlockstore blockstore = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),

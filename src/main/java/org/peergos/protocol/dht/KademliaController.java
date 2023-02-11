@@ -2,10 +2,8 @@ package org.peergos.protocol.dht;
 
 import com.google.protobuf.*;
 import crypto.pb.*;
-import io.ipfs.cid.*;
 import io.ipfs.multihash.*;
 import io.libp2p.core.crypto.*;
-import kotlin.*;
 import org.peergos.*;
 import org.peergos.protocol.dht.pb.*;
 import org.peergos.protocol.ipns.*;
@@ -96,8 +94,4 @@ public interface KademliaController {
                 .build();
         return rpc(outgoing).thenApply(GetResult::fromProtobuf);
     }
-
-    void receive(Dht.Message msg);
-
-    CompletableFuture<Unit> close();
 }

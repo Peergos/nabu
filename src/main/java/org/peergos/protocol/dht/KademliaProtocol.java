@@ -13,53 +13,85 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
     private final KademliaEngine engine;
 
     public KademliaProtocol(KademliaEngine engine) {
-        super(Dht.Message.getDefaultInstance().getDefaultInstance(), MAX_MESSAGE_SIZE, MAX_MESSAGE_SIZE);
+        super(Dht.Message.getDefaultInstance(), MAX_MESSAGE_SIZE, MAX_MESSAGE_SIZE);
         this.engine = engine;
     }
 
     @NotNull
     @Override
     protected CompletableFuture<KademliaController> onStartInitiator(@NotNull Stream stream) {
-        KademliaConnection conn = new KademliaConnection(stream);
-        engine.addOutgoingConnection(stream.remotePeerId(), conn, stream.getConnection().remoteAddress());
-        stream.pushHandler(new ReplyHandler(engine));
-        return CompletableFuture.completedFuture(conn);
+        engine.addOutgoingConnection(stream.remotePeerId(), stream.getConnection().remoteAddress());
+        ReplyHandler handler = new ReplyHandler(stream);
+        stream.pushHandler(handler);
+        return CompletableFuture.completedFuture(handler);
     }
 
     @NotNull
     @Override
     protected CompletableFuture<KademliaController> onStartResponder(@NotNull Stream stream) {
-        KademliaConnection conn = new KademliaConnection(stream);
-        engine.addIncomingConnection(stream.remotePeerId(), conn, stream.getConnection().remoteAddress());
-        stream.pushHandler(new IncomingRequestHandler(engine, stream));
-        return CompletableFuture.completedFuture(conn);
+        engine.addIncomingConnection(stream.remotePeerId(), stream.getConnection().remoteAddress());
+        IncomingRequestHandler handler = new IncomingRequestHandler(engine);
+        stream.pushHandler(handler);
+        return CompletableFuture.completedFuture(handler);
     }
 
-    class ReplyHandler implements ProtocolMessageHandler<Dht.Message> {
-        private KademliaEngine engine;
+    class ReplyHandler implements ProtocolMessageHandler<Dht.Message>, KademliaController {
+        private final CompletableFuture<Dht.Message> resp = new CompletableFuture<>();
+        private final Stream stream;
 
-        public ReplyHandler(KademliaEngine engine) {
-            this.engine = engine;
+        public ReplyHandler(Stream stream) {
+            this.stream = stream;
+        }
+
+        @Override
+        public CompletableFuture<Dht.Message> rpc(Dht.Message msg) {
+            stream.writeAndFlush(msg);
+            return resp;
+        }
+
+        @Override
+        public CompletableFuture<Boolean> send(Dht.Message msg) {
+            stream.writeAndFlush(msg);
+            return CompletableFuture.completedFuture(true);
         }
 
         @Override
         public void onMessage(@NotNull Stream stream, Dht.Message msg) {
-            engine.receiveReply(msg, stream.remotePeerId());
+            resp.complete(msg);
+            stream.closeWrite();
+        }
+
+        @Override
+        public void onClosed(@NotNull Stream stream) {
+            resp.completeExceptionally(new ConnectionClosedException());
+        }
+
+        @Override
+        public void onException(@Nullable Throwable cause) {
+            resp.completeExceptionally(cause);
         }
     }
 
-    class IncomingRequestHandler implements ProtocolMessageHandler<Dht.Message> {
+    class IncomingRequestHandler implements ProtocolMessageHandler<Dht.Message>, KademliaController {
         private final KademliaEngine engine;
-        private final Stream stream;
 
-        public IncomingRequestHandler(KademliaEngine engine, Stream stream) {
+        public IncomingRequestHandler(KademliaEngine engine) {
             this.engine = engine;
-            this.stream = stream;
         }
 
         @Override
         public void onMessage(@NotNull Stream stream, Dht.Message msg) {
             engine.receiveRequest(msg, stream.remotePeerId(), stream);
+        }
+
+        @Override
+        public CompletableFuture<Dht.Message> rpc(Dht.Message msg) {
+            throw new IllegalStateException("Responder only!");
+        }
+
+        @Override
+        public CompletableFuture<Boolean> send(Dht.Message msg) {
+            throw new IllegalStateException("Responder only!");
         }
     }
 }

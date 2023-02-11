@@ -2,31 +2,22 @@ package org.peergos.protocol.dht;
 
 import com.google.protobuf.*;
 import com.offbynull.kademlia.*;
-import crypto.pb.*;
 import io.ipfs.cid.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.Stream;
-import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
-import io.libp2p.crypto.keys.*;
 import org.peergos.*;
-import org.peergos.cbor.*;
 import org.peergos.protocol.dht.pb.*;
 import org.peergos.protocol.ipns.*;
-import org.peergos.protocol.ipns.pb.*;
 
-import java.io.*;
-import java.nio.charset.*;
 import java.time.*;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.stream.*;
 
 public class KademliaEngine {
 
-    private final Map<PeerId, KademliaController> outgoing = new ConcurrentHashMap<>();
     private final ProviderStore providersStore;
     private final RecordStore ipnsStore;
     public final Router router;
@@ -42,22 +33,14 @@ public class KademliaEngine {
         this.addressBook = addrs;
     }
 
-    public void addOutgoingConnection(PeerId peer, KademliaController controller, Multiaddr addr) {
-        if (outgoing.containsKey(peer))
-            System.out.println("WARNING overwriting peer connection value");
-        outgoing.put(peer, controller);
+    public void addOutgoingConnection(PeerId peer, Multiaddr addr) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
         addressBook.addAddrs(peer, 0, addr);
     }
 
-    public void addIncomingConnection(PeerId peer, KademliaController controller, Multiaddr addr) {
+    public void addIncomingConnection(PeerId peer, Multiaddr addr) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
         addressBook.addAddrs(peer, 0, addr);
-    }
-
-    public void receiveReply(Dht.Message msg, PeerId source) {
-        KademliaController conn = outgoing.get(source);
-        conn.receive(msg);
     }
 
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
