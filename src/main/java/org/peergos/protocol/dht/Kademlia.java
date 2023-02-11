@@ -20,10 +20,12 @@ import java.util.stream.*;
 public class Kademlia extends StrictProtocolBinding<KademliaController> implements AddressBookConsumer {
     public static final int BOOTSTRAP_PERIOD_MILLIS = 300_000;
     private final KademliaEngine engine;
+    private final boolean localDht;
 
     public Kademlia(KademliaEngine dht, boolean localOnly) {
         super("/ipfs/" + (localOnly ? "lan/" : "") + "kad/1.0.0", new KademliaProtocol(dht));
         this.engine = dht;
+        this.localDht = localOnly;
     }
 
     public void setAddressBook(AddressBook addrs) {
@@ -184,6 +186,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
 
     private CompletableFuture<? extends KademliaController> dialPeer(PeerAddresses target, Host us) {
         Multiaddr[] multiaddrs = target.addresses.stream()
+                .filter(a -> localDht || a.isPublic(false))
                 .map(a -> Multiaddr.fromString(a.toString()))
                 .collect(Collectors.toList()).toArray(new Multiaddr[0]);
         return dial(us, PeerId.fromBase58(target.peerId.toBase58()), multiaddrs).getController();

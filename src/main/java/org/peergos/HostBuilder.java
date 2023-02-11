@@ -127,6 +127,7 @@ public class HostBuilder {
             b.getTransports().add(TcpTransport::new);
             b.getSecureChannels().add(NoiseXXSecureChannel::new);
             b.getMuxers().addAll(muxers);
+            b.getAddressBook().setImpl(new RamAddressBook());
 
             for (ProtocolBinding<?> protocol : protocols) {
                 b.getProtocols().add(protocol);

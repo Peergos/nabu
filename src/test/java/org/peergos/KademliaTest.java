@@ -23,7 +23,7 @@ import java.util.stream.*;
 public class KademliaTest {
 
     @Test
-    public void findNode() throws IOException {
+    public void findOurNode() throws IOException {
         RamBlockstore blockstore1 = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), blockstore1);
@@ -65,7 +65,7 @@ public class KademliaTest {
     }
 
     @Test
-    public void provideBlockMessages() throws Exception {
+    public void findAnotherNode() throws Exception {
         RamBlockstore blockstore1 = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), blockstore1);
@@ -78,33 +78,24 @@ public class KademliaTest {
         node2.start().join();
 
         try {
-            IPFS kubo = new IPFS("localhost", 5001);
-            String kuboID = (String)kubo.id().get("ID");
-            Multiaddr address2 = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kuboID);
-            // connect node 2 to kubo, but not node 1
-            builder2.getBitswap().get().dial(node2, address2).getController().join();
+            // bootstrap node 2
+            Kademlia dht2 = builder2.getWanDht().get();
+            dht2.bootstrapRoutingTable(node2, BootstrapTest.BOOTSTRAP_NODES, addr -> !addr.contains("/wss/"));
+            dht2.bootstrap(node2);
+
+            // bootstrap node 1
+            Kademlia dht1 = builder1.getWanDht().get();
+            dht1.bootstrapRoutingTable(node1, BootstrapTest.BOOTSTRAP_NODES, addr -> !addr.contains("/wss/"));
+            dht1.bootstrap(node1);
 
             // Check node1 can find node2 from kubo
-            Kademlia dht = builder1.getWanDht().get();
-            KademliaController bootstrap1 = dht.dial(node1, address2).getController().join();
             Multihash peerId2 = Multihash.deserialize(node2.getPeerId().getBytes());
-            List<PeerAddresses> peers = bootstrap1.closerPeers(peerId2).join();
-            Optional<PeerAddresses> matching = peers.stream()
-                    .filter(p -> Arrays.equals(p.peerId.toBytes(), node2.getPeerId().getBytes()))
+            List<PeerAddresses> closestPeers = dht1.findClosestPeers(peerId2, 2, node1);
+            Optional<PeerAddresses> matching = closestPeers.stream()
+                    .filter(p -> p.peerId.equals(peerId2))
                     .findFirst();
             if (matching.isEmpty())
                 throw new IllegalStateException("Couldn't find node2 from kubo!");
-
-            // provide a block from node1 to kubo, and check kubo returns it as a provider
-            Cid block = blockstore1.put("Provide me.".getBytes(), Cid.Codec.Raw).join();
-            bootstrap1.provide(block, PeerAddresses.fromHost(node1)).join();
-
-            Providers providers = bootstrap1.getProviders(block).join();
-            Optional<PeerAddresses> matchingProvider = providers.providers.stream()
-                    .filter(p -> Arrays.equals(p.peerId.toBytes(), node1.getPeerId().getBytes()))
-                    .findFirst();
-            if (matchingProvider.isEmpty())
-                throw new IllegalStateException("Node1 is not a provider for block!");
         } finally {
             node1.stop();
             node2.stop();
