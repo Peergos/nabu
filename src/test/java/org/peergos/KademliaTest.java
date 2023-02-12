@@ -65,6 +65,7 @@ public class KademliaTest {
     }
 
     @Test
+    @Ignore // until auto relay is done
     public void findAnotherNode() throws Exception {
         RamBlockstore blockstore1 = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
