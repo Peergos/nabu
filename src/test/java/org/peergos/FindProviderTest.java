@@ -51,7 +51,6 @@ public class FindProviderTest {
             dht.bootstrap(node1);
 
             Multihash block = Cid.decode("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
-            // retrieve our published block from kubo
             List<PeerAddresses> providers = dht.findProviders(block, node1, 10).join();
             if (providers.isEmpty())
                 throw new IllegalStateException("Couldn't find provider of block!");

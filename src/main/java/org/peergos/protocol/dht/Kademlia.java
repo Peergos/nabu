@@ -126,7 +126,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     }
 
     public CompletableFuture<List<PeerAddresses>> findProviders(Multihash block, Host us, int desiredCount) {
-        byte[] key = block.toBytes();
+        byte[] key = block.bareMultihash().toBytes();
         Id keyId = Id.create(key, 256);
         List<PeerAddresses> providers = new ArrayList<>();
 
