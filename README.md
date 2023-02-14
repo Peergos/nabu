@@ -29,6 +29,7 @@ In the future we will add:
 * file based blockstore
 * file based datastores (IPNS and peer records)
 * block HTTP API
+* TLS security provider
 * QUIC transport (and encryption and multiplexing)
 * mDNS peer discovery
 * S3 blockstores
