@@ -2,8 +2,10 @@ package org.peergos.protocol.bitswap;
 
 import com.google.protobuf.*;
 import io.ipfs.cid.*;
-import io.ipfs.multihash.*;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
+import io.libp2p.core.Stream;
+import io.libp2p.core.multiformats.*;
 import org.peergos.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.bitswap.pb.*;
@@ -13,24 +15,51 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
 import java.util.logging.*;
-import java.util.stream.*;
 
 public class BitswapEngine {
 
     private final Blockstore store;
     private final ConcurrentHashMap<Cid, CompletableFuture<byte[]>> localWants = new ConcurrentHashMap<>();
-    private final Map<PeerId, BitswapController> conns = new ConcurrentHashMap<>();
+    private final Set<PeerId> connections = new HashSet<>();
+    private AddressBook addressBook;
 
     public BitswapEngine(Blockstore store) {
         this.store = store;
     }
 
-    public void addConnection(PeerId peer, BitswapController controller) {
-        if (conns.containsKey(peer))
-            System.out.println("WARNING overwriting peer connection value");
-        conns.put(peer, controller);
+    public void setAddressBook(AddressBook addrs) {
+        this.addressBook = addrs;
     }
 
+    public synchronized void addConnection(PeerId peer, Multiaddr addr) {
+        connections.add(peer);
+        addressBook.addAddrs(peer, 0, addr);
+    }
+
+    public CompletableFuture<byte[]> getWant(Cid hash) {
+        CompletableFuture<byte[]> existing = localWants.get(hash);
+        if (existing != null)
+            return existing;
+        CompletableFuture<byte[]> res = new CompletableFuture<>();
+        localWants.put(hash, res);
+        return res;
+    }
+
+    public boolean hasWants() {
+        return ! localWants.isEmpty();
+    }
+
+    public Set<PeerId> getConnected() {
+        Set<PeerId> connected = new HashSet<>();
+        synchronized (connections) {
+            connected.addAll(connections);
+        }
+        return connected;
+    }
+
+    public Set<Cid> getWants() {
+        return localWants.keySet();
+    }
 
     private static byte[] prefixBytes(Cid c) {
         ByteArrayOutputStream res = new ByteArrayOutputStream();
@@ -45,8 +74,7 @@ public class BitswapEngine {
         }
     }
 
-    public void receiveMessage(MessageOuterClass.Message msg, PeerId source) {
-        BitswapController conn = conns.get(source);
+    public void receiveMessage(MessageOuterClass.Message msg, Stream source) {
 
         List<MessageOuterClass.Message.BlockPresence> presences = new ArrayList<>();
         List<MessageOuterClass.Message.Block> blocks = new ArrayList<>();
@@ -68,7 +96,7 @@ public class BitswapEngine {
                                 .build();
                         int blockSize = blockP.getSerializedSize();
                         if (blockSize + messageSize > Bitswap.MAX_MESSAGE_SIZE) {
-                            buildAndSendMessages(wants, presences, blocks, conn::send);
+                            buildAndSendMessages(wants, presences, blocks, source::writeAndFlush);
                             wants = new ArrayList<>();
                             presences = new ArrayList<>();
                             blocks = new ArrayList<>();
@@ -105,6 +133,7 @@ public class BitswapEngine {
             }
         }
 
+        System.out.println("Bitswap received " + msg.getPayloadCount() + " blocks");
         for (MessageOuterClass.Message.Block block : msg.getPayloadList()) {
             byte[] cidPrefix = block.getPrefix().toByteArray();
             byte[] data = block.getData().toByteArray();
@@ -123,12 +152,18 @@ public class BitswapEngine {
                     if (waiter != null) {
                         store.put(data, codec);
                         waiter.complete(data);
-                    }
+                        localWants.remove(c);
+                    } else
+                        System.out.println();
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+        if (localWants.isEmpty())
+            System.out.println("DONE!");
+        else
+            System.out.println("Remaining: " + localWants.size());
         for (MessageOuterClass.Message.BlockPresence blockPresence : msg.getBlockPresencesList()) {
             Cid c = Cid.cast(blockPresence.getCid().toByteArray());
             boolean have = blockPresence.getType().getNumber() == 0;
@@ -143,42 +178,7 @@ public class BitswapEngine {
         if (presences.isEmpty() && blocks.isEmpty() && wants.isEmpty())
             return;
 
-        if (conn != null) {
-            buildAndSendMessages(wants, presences, blocks, conn::send);
-        }
-        else Logger.getGlobal().info("No connection to send reply bitswap message on!");
-    }
-
-    public CompletableFuture<byte[]> get(Cid hash) {
-        return get(List.of(hash)).get(0);
-    }
-
-    public List<CompletableFuture<byte[]>> get(List<Cid> hashes) {
-        List<CompletableFuture<byte[]>> results = new ArrayList<>();
-        for (Cid hash : hashes) {
-            CompletableFuture<byte[]> res = localWants.get(hash);
-            if (res != null)
-                results.add(res);
-            else {
-                res = new CompletableFuture<>();
-                localWants.put(hash, res);
-                results.add(res);
-            }
-        }
-        sendWantHaves();
-        return results;
-    }
-
-    public void sendWantHaves() {
-        List<MessageOuterClass.Message.Wantlist.Entry> wants = localWants.keySet().stream()
-                .map(cid -> MessageOuterClass.Message.Wantlist.Entry.newBuilder()
-                        .setWantType(MessageOuterClass.Message.Wantlist.WantType.Have)
-                        .setBlock(ByteString.copyFrom(cid.toBytes()))
-                        .build())
-                .collect(Collectors.toList());
-        // broadcast to all connected peers
-        buildAndSendMessages(wants, Collections.emptyList(), Collections.emptyList(),
-                msg -> conns.forEach((p, conn) -> conn.send(msg)));
+        buildAndSendMessages(wants, presences, blocks, source::writeAndFlush);
     }
 
     public void buildAndSendMessages(List<MessageOuterClass.Message.Wantlist.Entry> wants,

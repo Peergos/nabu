@@ -30,7 +30,7 @@ public class BitswapTest {
             Cid hash = blockstore2.put(blockData, Cid.Codec.Raw).join();
             Bitswap bitswap1 = builder1.getBitswap().get();
             BitswapController bc1 = bitswap1.dial(node1, address2).getController().join();
-            byte[] receivedBlock = bitswap1.getEngine().get(hash).join();
+            byte[] receivedBlock = bitswap1.get(hash, node1).join();
             if (! Arrays.equals(receivedBlock, blockData))
                 throw new IllegalStateException("Incorrect block returned!");
         } finally {
