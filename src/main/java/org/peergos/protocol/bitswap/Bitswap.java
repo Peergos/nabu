@@ -57,9 +57,10 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
     }
 
     public void sendWants(Host us) {
-        LOG.info("Broadcast wants");
+        Set<Cid> wants = engine.getWants();
+        LOG.info("Broadcast wants: " + wants.size());
         Map<Cid, PeerId> haves = engine.getHaves();
-        List<MessageOuterClass.Message.Wantlist.Entry> wants = engine.getWants().stream()
+        List<MessageOuterClass.Message.Wantlist.Entry> wantsProto = wants.stream()
                 .map(cid -> MessageOuterClass.Message.Wantlist.Entry.newBuilder()
                         .setWantType(haves.containsKey(cid) ?
                                 MessageOuterClass.Message.Wantlist.WantType.Block :
@@ -69,7 +70,7 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
                 .collect(Collectors.toList());
         // broadcast to all connected peers
         Set<PeerId> connected = engine.getConnected();
-        engine.buildAndSendMessages(wants, Collections.emptyList(), Collections.emptyList(),
+        engine.buildAndSendMessages(wantsProto, Collections.emptyList(), Collections.emptyList(),
                 msg -> connected.forEach(peer -> dialPeer(us, peer, c -> {
                     c.send(msg);
                     c.close();
