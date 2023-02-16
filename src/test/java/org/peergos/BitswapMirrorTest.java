@@ -18,7 +18,7 @@ import java.util.stream.*;
 public class BitswapMirrorTest {
 
     @Test
-    @Ignore // Local testing only for now - run this prior: ./ipfs pin add zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg
+    //@Ignore // Local testing only for now - run this prior: ./ipfs pin add zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg
     public void mirrorTree() throws IOException {
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), new RamBlockstore());
