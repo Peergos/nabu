@@ -12,9 +12,11 @@ import org.peergos.protocol.bitswap.pb.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
+import java.util.logging.*;
 import java.util.stream.*;
 
 public class Bitswap extends StrictProtocolBinding<BitswapController> implements AddressBookConsumer {
+    private static final Logger LOG = Logger.getLogger(Bitswap.class.getName());
     public static int MAX_MESSAGE_SIZE = 2*1024*1024;
 
     private final BitswapEngine engine;
@@ -44,21 +46,24 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
             CompletableFuture<byte[]> res = engine.getWant(hash);
             results.add(res);
         }
-        sendWantHaves(us);
+        sendWants(us);
         ForkJoinPool.commonPool().execute(() -> {
             while (engine.hasWants()) {
                 try {Thread.sleep(5_000);} catch (InterruptedException e) {}
-                sendWantHaves(us);
+                sendWants(us);
             }
         });
         return results;
     }
 
-    public void sendWantHaves(Host us) {
-        System.out.println("Broadcast wants");
+    public void sendWants(Host us) {
+        LOG.info("Broadcast wants");
+        Map<Cid, PeerId> haves = engine.getHaves();
         List<MessageOuterClass.Message.Wantlist.Entry> wants = engine.getWants().stream()
                 .map(cid -> MessageOuterClass.Message.Wantlist.Entry.newBuilder()
-                        .setWantType(MessageOuterClass.Message.Wantlist.WantType.Have)
+                        .setWantType(haves.containsKey(cid) ?
+                                MessageOuterClass.Message.Wantlist.WantType.Block :
+                                MessageOuterClass.Message.Wantlist.WantType.Have)
                         .setBlock(ByteString.copyFrom(cid.toBytes()))
                         .build())
                 .collect(Collectors.toList());

@@ -50,7 +50,7 @@ public class BitswapMirrorTest {
                         .map(h -> (Cid)h)
                         .map(c -> c.codec == Cid.Codec.Raw ? rawToGet.add(c) : c.getType() == Multihash.Type.id || toGet.add(c))
                         .collect(Collectors.toSet());
-                System.out.println("cbor: " + toGet.size() + ", raw: " + rawToGet.size());
+                System.out.println("links cbor: " + toGet.size() + ", raw: " + rawToGet.size());
                 if (toGet.isEmpty() && rawToGet.isEmpty())
                     break;
             }
