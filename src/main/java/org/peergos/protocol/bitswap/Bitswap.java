@@ -73,7 +73,6 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
         engine.buildAndSendMessages(wantsProto, Collections.emptyList(), Collections.emptyList(),
                 msg -> connected.forEach(peer -> dialPeer(us, peer, c -> {
                     c.send(msg);
-                    c.close();
                 })));
     }
 
