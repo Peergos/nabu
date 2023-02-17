@@ -4,3 +4,5 @@ tar -xvf /tmp/kubo_linux-amd64.tar.gz
 export PATH=$PATH:$PWD/kubo/
 ipfs init
 ipfs daemon --routing=dhtserver &
+sleep 10s
+time ipfs pin add zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg

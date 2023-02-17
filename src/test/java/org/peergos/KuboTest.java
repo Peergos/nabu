@@ -25,7 +25,7 @@ public class KuboTest {
             byte[] blockData = "G'day from Java bitswap!".getBytes(StandardCharsets.UTF_8);
             Cid hash = (Cid)kubo.block.put(List.of(blockData), Optional.of("raw")).get(0).hash;
             BitswapController bc1 = bitswap1.dial(node1, address2).getController().join();
-            byte[] receivedBlock = bitswap1.getEngine().get(hash).join();
+            byte[] receivedBlock = bitswap1.get(hash, node1).join();
             if (! Arrays.equals(receivedBlock, blockData))
                 throw new IllegalStateException("Incorrect block returned!");
         } finally {
