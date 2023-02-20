@@ -100,7 +100,6 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             toQuery.removeAll(queryThisRound);
             queryThisRound.forEach(r -> queried.add(r.addresses.peerId));
             List<CompletableFuture<List<PeerAddresses>>> futures = queryThisRound.stream()
-                    .parallel()
                     .map(r -> getCloserPeers(peerIdkey, r.addresses, us))
                     .collect(Collectors.toList());
             boolean foundCloser = false;
@@ -145,8 +144,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             queryThisRound.forEach(r -> queried.add(r.addresses.peerId));
             List<CompletableFuture<Providers>> futures = queryThisRound.stream()
                     .parallel()
-                    .map(r -> dialPeer(r.addresses, us)
-                            .thenCompose(c -> c.getProviders(block).orTimeout(2, TimeUnit.SECONDS)))
+                    .map(r -> dialPeer(r.addresses, us).join().getProviders(block).orTimeout(2, TimeUnit.SECONDS))
                     .collect(Collectors.toList());
             boolean foundCloser = false;
             for (CompletableFuture<Providers> future : futures) {
@@ -175,13 +173,12 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     }
 
     private CompletableFuture<List<PeerAddresses>> getCloserPeers(Multihash peerIDKey, PeerAddresses target, Host us) {
-        return dialPeer(target, us)
-                .thenCompose(c -> c.closerPeers(peerIDKey))
-                .orTimeout(2, TimeUnit.SECONDS)
-                .exceptionally(e -> {
-                    e.printStackTrace();
-                    return Collections.emptyList();
-                });
+        try {
+            return dialPeer(target, us).orTimeout(2, TimeUnit.SECONDS).join().closerPeers(peerIDKey);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
     }
 
     private CompletableFuture<? extends KademliaController> dialPeer(PeerAddresses target, Host us) {
@@ -196,8 +193,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         List<PeerAddresses> closestPeers = findClosestPeers(block, 20, us);
         List<CompletableFuture<Boolean>> provides = closestPeers.stream()
                 .parallel()
-                .map(p -> dialPeer(p, us)
-                        .thenCompose(c -> c.provide(block, ourAddrs)))
+                .map(p -> dialPeer(p, us).join().provide(block, ourAddrs))
                 .collect(Collectors.toList());
         return CompletableFuture.allOf(provides.toArray(new CompletableFuture[0]));
     }
