@@ -41,12 +41,13 @@ public class SQLiteBlockstore implements Blockstore {
         }
     }
 
+
     @Override
     public CompletableFuture<Boolean> has(Cid c) {
         String selectSQL = "SELECT 1 FROM " + BLOCK_STORE_TABLE + " WHERE hash=?";
         try (Connection connection = getConnection();
              PreparedStatement pstmt = connection.prepareStatement(selectSQL)) {
-            pstmt.setString(1, c.toString());
+            pstmt.setString(1, hashToKey(c));
             try (ResultSet rs = pstmt.executeQuery()) {
                 return CompletableFuture.completedFuture(rs.next());
             } catch (SQLException rsEx) {
@@ -62,7 +63,7 @@ public class SQLiteBlockstore implements Blockstore {
         String selectSQL = "SELECT data FROM " + BLOCK_STORE_TABLE + " WHERE hash=?";
         try (Connection connection = getConnection();
              PreparedStatement pstmt = connection.prepareStatement(selectSQL)) {
-            pstmt.setString(1, c.toString());
+            pstmt.setString(1, hashToKey(c));
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     try (InputStream input = rs.getBinaryStream("data")) {
@@ -93,7 +94,7 @@ public class SQLiteBlockstore implements Blockstore {
                 + " (hash, data) VALUES (?, ?);";
         try (Connection connection = getConnection();
              PreparedStatement pstmt = connection.prepareStatement(updateSQL)) {
-            pstmt.setString(1, cid.toString());
+            pstmt.setString(1, hashToKey(cid));
             pstmt.setBytes(2, block);
             pstmt.executeUpdate();
             return CompletableFuture.completedFuture(cid);
