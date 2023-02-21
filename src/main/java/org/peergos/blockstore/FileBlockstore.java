@@ -1,6 +1,7 @@
 package org.peergos.blockstore;
 
 import io.ipfs.cid.Cid;
+import io.ipfs.multibase.binary.Base32;
 import io.ipfs.multihash.Multihash;
 import org.peergos.Hash;
 
@@ -34,8 +35,14 @@ public class FileBlockstore implements Blockstore {
         LOG.info("Using FileBlockStore at location: " + root);
     }
 
+    private static String hashToKey(Multihash hash) {
+        String padded = new Base32().encodeAsString(hash.toBytes());
+        int padStart = padded.indexOf("=");
+        return padStart > 0 ? padded.substring(0, padStart) : padded;
+    }
+
     private Path getFilePath(Cid cid) {
-        String name = new StringBuilder(cid.toBase58()).reverse().toString();
+        String name = hashToKey(cid);
         int folderPrefixLength = 2;
         Path path = Paths.get(name.substring(0, folderPrefixLength));
         for (int i = 0; i < folderDepth; i++)
