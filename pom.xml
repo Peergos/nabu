@@ -173,6 +173,6 @@
             <artifactId>java-ipfs-http-client</artifactId>
             <version>${version.kubo-http}</version>
             <scope>test</scope>
-    </dependency>
+        </dependency>
     </dependencies>
 </project>
