@@ -20,16 +20,16 @@ Currently implemented properties:
 * autonat
 * uPnP port forwarding
 * nat-pmp port forwarding
+* file based blockstore
 
 In the future we will add:
+* TLS security provider
 * circuit-relay
 * AutoRelay
 * dcutr (direct connection upgrade through relay)
 * persistent identities and config
-* file based blockstore
-* file based datastores (IPNS and peer records)
+* file based datastores (IPNS record store)
 * block HTTP API
-* TLS security provider
 * QUIC transport (and encryption and multiplexing)
 * mDNS peer discovery
 * S3 blockstores
