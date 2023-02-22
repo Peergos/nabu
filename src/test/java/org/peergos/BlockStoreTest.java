@@ -43,7 +43,7 @@ public class BlockStoreTest {
         String expected = "blocks/" + "SC/AFKREIA22FLID5AJ2KU7URG47MDLROZIH6YF2KALU2PWEFPVI37YLKRSCA.data";
         Assert.assertTrue("ShardFunc does not match /repo/flatfs/shard/v1/next-to-last/2", path.toString().equals(expected));
     }
-    
+
     @Test
     public void testFileStore() {
 
