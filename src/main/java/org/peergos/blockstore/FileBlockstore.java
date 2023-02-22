@@ -18,7 +18,7 @@ public class FileBlockstore implements Blockstore {
     private static final Logger LOG = Logger.getLogger(FileBlockstore.class.getName());
 
     private final Path root;
-    private final int folderDepth = 5;
+    private final String BLOCKS = "blocks";
 
     public FileBlockstore(Path root) {
         this.root = root;
@@ -34,13 +34,14 @@ public class FileBlockstore implements Blockstore {
         LOG.info("Using FileBlockStore at location: " + root);
     }
 
-    private Path getFilePath(Cid cid) {
-        String name = hashToKey(cid);
-        int folderPrefixLength = 2;
-        Path path = Paths.get(name.substring(0, folderPrefixLength));
-        for (int i = 0; i < folderDepth; i++)
-            path = path.resolve(Character.toString(name.charAt(folderPrefixLength + i)));
-        path = path.resolve(name);
+    public Path getFilePath(Cid cid) {
+        String key = hashToKey(cid);
+        String folder = key.substring(key.length() -3, key.length()-1);
+        String filename = key + ".data";
+
+        Path path = Paths.get(BLOCKS);
+        path = path.resolve(folder);
+        path = path.resolve(filename);
         return path;
     }
 
