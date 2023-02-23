@@ -22,4 +22,9 @@ public class RamRecordStore implements RecordStore {
     public Optional<IpnsRecord> get(Cid peerId) {
         return Optional.ofNullable(records.get(peerId));
     }
+
+    @Override
+    public void remove(Multihash peerId) {
+        records.remove(peerId);
+    }
 }

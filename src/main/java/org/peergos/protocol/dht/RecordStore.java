@@ -11,4 +11,6 @@ public interface RecordStore {
     void put(Multihash peerId, IpnsRecord record);
 
     Optional<IpnsRecord> get(Cid peerId);
+
+    void remove(Multihash peerId);
 }
