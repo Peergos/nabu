@@ -18,7 +18,7 @@ public class DatabaseRecordStore implements RecordStore, AutoCloseable {
     private final Connection connection;
 
     private final String RECORD_TABLE = "records";
-    private final int SIZE_OF_VAL = 1000;
+    private final int SIZE_OF_VAL = 10 * 1024; // 10KiB
     private final int SIZE_OF_PEERID = 100;
 
     /*
