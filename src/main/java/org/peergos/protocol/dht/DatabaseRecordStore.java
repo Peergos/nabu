@@ -14,7 +14,7 @@ import java.util.Optional;
 
 public class DatabaseRecordStore implements RecordStore, AutoCloseable {
 
-    private final String connectionStringPrefix = "jdbc:h2:";//./store/records
+    private final String connectionStringPrefix = "jdbc:h2:";//./store/records;AUTO_RECONNECT=TRUE
     private final Connection connection;
 
     private final String RECORD_TABLE = "records";
@@ -28,6 +28,7 @@ public class DatabaseRecordStore implements RecordStore, AutoCloseable {
     public DatabaseRecordStore(String location) {
         try {
             this.connection = getConnection(connectionStringPrefix + location);
+            this.connection.setAutoCommit(true);
             createTable();
         } catch (SQLException sqle) {
             throw new IllegalStateException(sqle);
@@ -92,7 +93,6 @@ public class DatabaseRecordStore implements RecordStore, AutoCloseable {
     }
 
     @Override
-
     public void put(Multihash peerId, IpnsRecord record) {
         String updateSQL = "MERGE INTO " + RECORD_TABLE
                 + " (peerId, raw, sequence, ttlNanos, expiryUTC, val) VALUES (?, ?, ?, ?, ?, ?);";
@@ -110,5 +110,15 @@ public class DatabaseRecordStore implements RecordStore, AutoCloseable {
         }
     }
 
+    @Override
+    public void remove(Multihash peerId) {
+        String deleteSQL = "DELETE FROM " + RECORD_TABLE + " WHERE peerId=?";
+        try (PreparedStatement pstmt = connection.prepareStatement(deleteSQL)) {
+            pstmt.setString(1, hashToKey(peerId));
+            pstmt.executeUpdate();
+        } catch (SQLException ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
 }
 

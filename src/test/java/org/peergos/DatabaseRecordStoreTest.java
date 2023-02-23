@@ -33,6 +33,11 @@ public class DatabaseRecordStoreTest {
             LocalDateTime expiry = retrievedRecord.expiry.plusNanos(record.expiry.getNano());
             Assert.assertTrue("IpnsRecord ldt match", expiry.equals(record.expiry));
             Assert.assertTrue("IpnsRecord value match", new String(retrievedRecord.value).equals(new String(record.value)));
+
+            bs.remove(peerId);
+            Optional<IpnsRecord> deleted = bs.get(peerId);
+            Assert.assertTrue("IpnsRecord not deleted", deleted.isEmpty());
+
         } catch (Exception ex) {
             throw new IllegalStateException(ex);
         }
