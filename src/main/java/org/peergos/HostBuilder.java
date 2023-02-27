@@ -110,6 +110,20 @@ public class HostBuilder {
                 dht));
     }
 
+    public static HostBuilder build(int listenPort, ProviderStore providers, RecordStore records, Blockstore blocks) {
+        HostBuilder builder = new HostBuilder().generateIdentity().listenLocalhost(listenPort);
+        Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
+        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
+        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
+        return builder.addProtocols(List.of(
+                new Ping(),
+                new AutonatProtocol.Binding(),
+                new CircuitHopProtocol.Binding(relayManager, stop),
+                new Bitswap(new BitswapEngine(blocks)),
+                dht));
+    }
+
     public static Host build(int listenPort,
                              List<ProtocolBinding> protocols) {
         return new HostBuilder()
