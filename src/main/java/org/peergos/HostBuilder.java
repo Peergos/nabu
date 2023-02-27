@@ -1,6 +1,7 @@
 package org.peergos;
 
 import identify.pb.*;
+import io.ipfs.multibase.binary.Base64;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
@@ -82,14 +83,21 @@ public class HostBuilder {
         return setPrivKey(Ed25519Kt.generateEd25519KeyPair().getFirst());
     }
 
+    public HostBuilder setIdentity(String base64PrivKey) {
+        byte[] privKey = Base64.decodeBase64(base64PrivKey);
+        return setPrivKey(Ed25519Kt.unmarshalEd25519PrivateKey(privKey));
+    }
+
+
+
     public HostBuilder setPrivKey(PrivKey privKey) {
         this.privKey = privKey;
         this.peerId = PeerId.fromPubKey(privKey.publicKey());
         return this;
     }
 
-    public static HostBuilder build(int listenPort, ProviderStore providers, RecordStore records, Blockstore blocks) {
-        HostBuilder builder = new HostBuilder().generateIdentity().listenLocalhost(listenPort);
+    public static HostBuilder build(String privKeyBase64, int listenPort, ProviderStore providers, RecordStore records, Blockstore blocks) {
+        HostBuilder builder = new HostBuilder().setIdentity(privKeyBase64).listenLocalhost(listenPort);
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
