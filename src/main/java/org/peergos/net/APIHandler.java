@@ -2,6 +2,7 @@ package org.peergos.net;
 
 import io.libp2p.core.Host;
 import io.libp2p.core.PeerId;
+import org.peergos.APIService;
 import org.peergos.blockstore.Blockstore;
 import org.peergos.util.*;
 import com.sun.net.httpserver.HttpExchange;
@@ -72,7 +73,7 @@ public class APIHandler implements HttpHandler {
                 }
                 case VERSION: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-version
                     Map res = new HashMap<>();
-                    res.put("Version", "0.4.11");
+                    res.put("Version", APIService.CURRENT_VERSION);
                     replyJson(httpExchange, JSONParser.toString(res));
                     break;
                 }
