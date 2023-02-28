@@ -21,19 +21,19 @@ Currently implemented properties:
 * uPnP port forwarding
 * nat-pmp port forwarding
 * file based blockstore
+* persistent identities and config
 
 In the future we will add:
-* TLS security provider
+* TLS security provider (with early muxer negotiation using ALPN)
 * circuit-relay
 * AutoRelay
 * dcutr (direct connection upgrade through relay)
-* persistent identities and config
 * file based datastores (IPNS record store)
 * block HTTP API
 * QUIC transport (and encryption and multiplexing)
 * mDNS peer discovery
 * S3 blockstores
-* bloom filtered blockstore
+* bloom/infinifilter filtered blockstore
 * Android compatibility
 
 ## Usage
