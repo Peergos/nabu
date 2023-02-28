@@ -33,6 +33,14 @@ public class HostBuilder {
     public HostBuilder() {
     }
 
+    public PrivKey getPrivateKey() {
+        return privKey;
+    }
+
+    public PeerId getPeerId() {
+        return peerId;
+    }
+
     public Optional<Kademlia> getWanDht() {
         return protocols.stream()
                 .filter(p -> p instanceof Kademlia && p.getProtocolDescriptor().getAnnounceProtocols().contains("/ipfs/kad/1.0.0"))

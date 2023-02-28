@@ -20,7 +20,7 @@ public class APIService {
 
     }
 
-    public boolean initAndStart(InetSocketAddress local,
+    public HttpServer initAndStart(InetSocketAddress local,
                                 Host node,
                                 Blockstore storage,
                                 int connectionBacklog,
@@ -30,6 +30,6 @@ public class APIService {
         localhostServer.createContext(Constants.API_URL, new APIHandler(storage, Constants.API_URL, node));
         localhostServer.setExecutor(Executors.newFixedThreadPool(handlerPoolSize));
         localhostServer.start();
-        return true;
+        return localhostServer;
     }
 }

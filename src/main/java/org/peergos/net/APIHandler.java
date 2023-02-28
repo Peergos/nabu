@@ -36,6 +36,21 @@ public class APIHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange httpExchange) {
+        try {
+            if (!HttpUtil.allowedQuery(httpExchange)) {
+                httpExchange.sendResponseHeaders(403, 0);
+            } else {
+                handleCallToAPI(httpExchange);
+            }
+        } catch (Exception e) {
+            Throwable t = Exceptions.getRootCause(e);
+            LOG.severe("Error handling " + httpExchange.getRequestURI());
+            LOG.log(Level.WARNING, t.getMessage(), t);
+            HttpUtil.replyError(httpExchange, t);
+        }
+    }
+    public void handleCallToAPI(HttpExchange httpExchange) {
+
         long t1 = System.currentTimeMillis();
         String path = httpExchange.getRequestURI().getPath();
         try {
