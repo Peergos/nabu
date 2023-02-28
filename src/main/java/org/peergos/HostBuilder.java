@@ -1,6 +1,7 @@
 package org.peergos;
 
 import identify.pb.*;
+import io.ipfs.multibase.binary.Base64;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
@@ -30,6 +31,14 @@ public class HostBuilder {
     private List<StreamMuxerProtocol> muxers = new ArrayList<>();
 
     public HostBuilder() {
+    }
+
+    public PrivKey getPrivateKey() {
+        return privKey;
+    }
+
+    public PeerId getPeerId() {
+        return peerId;
     }
 
     public Optional<Kademlia> getWanDht() {
@@ -81,6 +90,13 @@ public class HostBuilder {
     public HostBuilder generateIdentity() {
         return setPrivKey(Ed25519Kt.generateEd25519KeyPair().getFirst());
     }
+
+    public HostBuilder setIdentity(String base64PrivKey) {
+        byte[] privKey = Base64.decodeBase64(base64PrivKey);
+        return setPrivKey(Ed25519Kt.unmarshalEd25519PrivateKey(privKey));
+    }
+
+
 
     public HostBuilder setPrivKey(PrivKey privKey) {
         this.privKey = privKey;
