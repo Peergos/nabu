@@ -25,56 +25,63 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class Server {
 
-    public Server() {
-        try {
-            String home = System.getenv("HOME");
-            Path configPath = Path.of(home, ".ipfs");
+    private static final Logger LOG = Logger.getLogger(Server.class.getName());
 
-            Logging.init(configPath);
-            Config config = readConfig(configPath);
-            System.out.println("Starting Nabu version: " + APIService.CURRENT_VERSION);
-            String specType = config.getProperty("Datastore", "Spec", "type");
-            if (!specType.equals("mount")) {
-                throw new IllegalStateException("Unable to read mount configuration");
+    public Server() throws Exception {
+        String home = System.getenv("HOME");
+        Path configPath = Path.of(home, ".ipfs");
+
+        Logging.init(configPath);
+        Config config = readConfig(configPath);
+        System.out.println("Starting Nabu version: " + APIService.CURRENT_VERSION);
+        String specType = config.getProperty("Datastore", "Spec", "type");
+        if (!specType.equals("mount")) {
+            throw new IllegalStateException("Unable to read mount configuration");
+        }
+        List<Map> mounts = config.getPropertyList("Datastore", "Spec", "mounts");
+        Optional<Map> blockMountOpt = mounts.stream().filter(m -> m.get("mountpoint").equals("/blocks")).findFirst();
+        if (blockMountOpt.isEmpty()) {
+            throw new IllegalStateException("Unable to fine /blocks mount");
+        }
+        Config blockConfig = new Config(blockMountOpt.get());
+        String blockPath = blockConfig.getProperty("child", "path");
+        String blockShardFunc = blockConfig.getProperty("child", "shardFunc");
+        String blockType = blockConfig.getProperty("child", "type");
+        if (!(blockPath.equals("blocks") && blockShardFunc.equals("/repo/flatfs/shard/v1/next-to-last/2")
+            && blockType.equals("flatfs"))) {
+            throw new IllegalStateException("Expecting flatfs mount at /blocks");
+        }
+        Path blocksPath = Path.of(System.getenv("HOME"), ".ipfs", "blocks");
+        File blocksDirectory = blocksPath.toFile();
+        if (!blocksDirectory.exists()) {
+            if (!blocksDirectory.mkdir()) {
+                throw new IllegalStateException("Unable to make blocks directory");
             }
-            List<Map> mounts = config.getPropertyList("Datastore", "Spec", "mounts");
-            Optional<Map> blockMountOpt = mounts.stream().filter(m -> m.get("mountpoint").equals("/blocks")).findFirst();
-            if (blockMountOpt.isEmpty()) {
-                throw new IllegalStateException("Unable to fine /blocks mount");
-            }
-            Config blockConfig = new Config(blockMountOpt.get());
-            String blockPath = blockConfig.getProperty("child", "path");
-            String blockShardFunc = blockConfig.getProperty("child", "shardFunc");
-            String blockType = blockConfig.getProperty("child", "type");
-            if (!(blockPath.equals("blocks") && blockShardFunc.equals("/repo/flatfs/shard/v1/next-to-last/2")
-                && blockType.equals("flatfs"))) {
-                throw new IllegalStateException("Expecting flatfs mount at /blocks");
-            }
-            Path blocksPath = Path.of(System.getenv("HOME"), ".ipfs", "blocks");
-            File blocksDirectory = blocksPath.toFile();
-            if (!blocksDirectory.exists()) {
-                if (!blocksDirectory.mkdir()) {
-                    throw new IllegalStateException("Unable to make blocks directory");
-                }
-            } else if(blocksDirectory.isFile()) {
-                throw new IllegalStateException("Unable to create blocks directory");
-            }
-            FileBlockstore blocks = new FileBlockstore(blocksPath);
-            //todo use DatabaseRecordStore
-            RecordStore records = new RamRecordStore();
+        } else if(blocksDirectory.isFile()) {
+            throw new IllegalStateException("Unable to create blocks directory");
+        }
+        FileBlockstore blocks = new FileBlockstore(blocksPath);
+
+        int hostPort = 6001; // 6001
+        //todo get values as required from Config for Addresses, Bootstrap etc
+        // ie make sure to enable p2p proxy only if Experimental.P2pHttpProxy == true
+        // also get BloomFilterSize from Datastore.BloomFilterSize
+        // also get ProxyTarget from Addresses.ProxyTarget
+        String privKey = config.getProperty("Identity", "PrivKey");
+        HostBuilder builder = new HostBuilder().setIdentity(privKey).listenLocalhost(hostPort);
+        Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
+
+        // todo use DatabaseRecordStore
+        // Path datastorePath = Path.of(System.getenv("HOME"), ".ipfs", "datastore", "h2RecordStore");
+        RecordStore records = new RamRecordStore();
+        try { //(DatabaseRecordStore records = new DatabaseRecordStore("mem:")) {
             ProviderStore providers = new RamProviderStore();
-            int hostPort = 6001; // 6001
-            //todo get values as required from Config for Addresses, Bootstrap etc
-            // ie make sure to enable p2p proxy only if Experimental.P2pHttpProxy == true
-            // also get BloomFilterSize from Datastore.BloomFilterSize
-            // also get ProxyTarget from Addresses.ProxyTarget
-            String privKey = config.getProperty("Identity", "PrivKey");
-            HostBuilder builder = new HostBuilder().setIdentity(privKey).listenLocalhost(hostPort);
-            Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
             Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
             CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
             CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
@@ -89,8 +96,8 @@ public class Server {
             node.start().join();
             System.out.println("Node started and listening on " + node.listenAddresses());
 
-//            Multiaddr bootstrapNode = Multiaddr.fromString("/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt");
-//            KademliaController bootstrap = builder.getWanDht().get().dial(node, bootstrapNode).getController().join();
+            //            Multiaddr bootstrapNode = Multiaddr.fromString("/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt");
+            //            KademliaController bootstrap = builder.getWanDht().get().dial(node, bootstrapNode).getController().join();
 
             APIService localAPI = new APIService();
             MultiAddress apiAddress = new MultiAddress(config.getProperty("Addresses", "API"));
@@ -110,8 +117,8 @@ public class Server {
                 }
             });
             Runtime.getRuntime().addShutdownHook(shutdownHook);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        } finally {
+
         }
     }
     private Config readConfig(Path configPath) throws IOException {
@@ -213,6 +220,10 @@ public class Server {
     }
 
     public static void main(String[] args) {
-        new Server();
+        try {
+            new Server();
+        } catch (Exception e) {
+            LOG.log(Level.SEVERE, "SHUTDOWN", e);
+        }
     }
 }

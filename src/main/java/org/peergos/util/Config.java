@@ -59,6 +59,11 @@ public class Config {
         return currentMap;
     }
 
+    @Override
+    public String toString() {
+        return JSONParser.toString(configuration);
+    }
+
     public String prettyPrint() {
         String json = JSONParser.toString(configuration);
         String formatted = json.replaceAll("\\{\"", "{\n\"")

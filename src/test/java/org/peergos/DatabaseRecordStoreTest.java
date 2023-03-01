@@ -7,9 +7,6 @@ import org.junit.Test;
 import org.peergos.protocol.dht.DatabaseRecordStore;
 import org.peergos.protocol.ipns.IpnsRecord;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.Optional;
 public class DatabaseRecordStoreTest {
