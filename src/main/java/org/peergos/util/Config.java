@@ -3,6 +3,7 @@ package org.peergos.util;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
 import java.util.stream.Collectors;
 
 public class Config {
@@ -57,4 +58,64 @@ public class Config {
         }
         return currentMap;
     }
+
+    public String prettyPrint() {
+        String json = JSONParser.toString(configuration);
+        String formatted = json.replaceAll("\\{\"", "{\n\"")
+                .replaceAll("}}", "\n}\n}")
+                .replaceAll("}}", "}\n}")
+                .replaceAll("},\\{", "\n},\n\\{")
+                .replaceAll("\\[\"", "[\n\"")
+                .replaceAll("\\]\\}", "]\n}")
+                .replaceAll("\\}\\]", "\n}]")
+                .replaceAll("\"\\]", "\"\n]")
+                .replaceAll(",\"", ",\n\"");
+        StringTokenizer st = new StringTokenizer(formatted, "\n");
+        StringBuilder sb = new StringBuilder();
+        int indent = 0;
+        while(st.hasMoreTokens()) {
+            String token = st.nextToken();
+            if(token.endsWith("}") || token.endsWith("]")) {
+                indent--;
+                sb.append(padStart(indent));
+                sb.append(token + "\n");
+            } else if (token.endsWith("}],")) {
+                if (token.length() > 3) {
+                    sb.append(padStart(indent));
+                    sb.append(token.substring(0, token.length() - 3) + "\n");
+                }
+                indent--;
+                sb.append(padStart(indent));
+                sb.append(token.substring(token.length() -3));
+            } else if (token.endsWith("},") || token.endsWith("],")) {
+                if (token.length() > 2) {
+                    sb.append(padStart(indent));
+                    sb.append(token.substring(0, token.length() - 2) + "\n");
+                }
+                indent--;
+                sb.append(padStart(indent));
+                sb.append(token.substring(token.length() -2));
+            } else {
+                sb.append(padStart(indent));
+                sb.append(token);
+            }
+            if (token.endsWith("{") || token.endsWith("[")) {
+                indent++;
+                sb.append("\n");
+            } else if(token.endsWith(",") || token.endsWith("\"")) {
+                sb.append("\n");
+            }
+            System.currentTimeMillis();
+        }
+        return sb.toString();
+    }
+
+    public static String padStart(int length) {
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append("\t");
+        }
+        return sb.toString();
+    }
+
 }
