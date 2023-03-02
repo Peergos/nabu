@@ -33,11 +33,9 @@ public class Server {
     private static final Logger LOG = Logger.getLogger(Server.class.getName());
 
     public Server() throws Exception {
-        String home = System.getenv("HOME");
-        Path configPath = Path.of(home, ".ipfs");
-
-        Logging.init(configPath);
-        Config config = readConfig(configPath);
+        Path ipfsPath = getIPFSPath();
+        Logging.init(ipfsPath);
+        Config config = readConfig(ipfsPath);
         System.out.println("Starting Nabu version: " + APIService.CURRENT_VERSION);
         String specType = config.getProperty("Datastore", "Spec", "type");
         if (!specType.equals("mount")) {
@@ -56,7 +54,7 @@ public class Server {
             && blockType.equals("flatfs"))) {
             throw new IllegalStateException("Expecting flatfs mount at /blocks");
         }
-        Path blocksPath = Path.of(System.getenv("HOME"), ".ipfs", "blocks");
+        Path blocksPath = ipfsPath.resolve("blocks");
         File blocksDirectory = blocksPath.toFile();
         if (!blocksDirectory.exists()) {
             if (!blocksDirectory.mkdir()) {
@@ -75,7 +73,7 @@ public class Server {
         HostBuilder builder = new HostBuilder().setIdentity(privKey).listenLocalhost(hostPort);
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
 
-        Path datastorePath = Path.of(System.getenv("HOME"), ".ipfs", "datastore", "h2.datastore");
+        Path datastorePath = ipfsPath.resolve("datastore").resolve( "h2.datastore");
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toString());
         ProviderStore providers = new RamProviderStore();
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
@@ -114,6 +112,14 @@ public class Server {
             }
         });
         Runtime.getRuntime().addShutdownHook(shutdownHook);
+    }
+    private Path getIPFSPath() {
+        String ipfsPath = System.getenv("IPFS_PATH");
+        if (ipfsPath == null) {
+            String home = System.getenv("HOME");
+            return Path.of(home, ".ipfs");
+        }
+        return Path.of(ipfsPath);
     }
     private Config readConfig(Path configPath) throws IOException {
         Path configFilePath = configPath.resolve("config");
