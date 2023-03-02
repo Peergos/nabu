@@ -132,11 +132,10 @@ public class Server {
         Path configFilePath = configPath.resolve("config");
         File configFile = configFilePath.toFile();
         if (! configFile.exists()) {
-            System.out.println("Unable to find ./ipfs/config file. Creating default config");
+            System.out.println("Unable to find config file. Creating default config");
             Config config = new Config(defaultConfig());
-            String contents = config.prettyPrint();
-            Files.write(configFilePath, contents.getBytes(), StandardOpenOption.CREATE);
-            return new Config((Map) JSONParser.parse(contents));
+            Files.write(configFilePath, config.prettyPrint().getBytes(), StandardOpenOption.CREATE);
+            return config;
         }
         String contents = Files.readString(configFilePath);
         return new Config((Map) JSONParser.parse(contents));
