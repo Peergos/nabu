@@ -65,7 +65,14 @@ public class Server {
         }
         FileBlockstore blocks = new FileBlockstore(blocksPath);
 
-        int hostPort = 6001; // 6001
+        Optional<Object> swarm = config.getOptionalProperty("Addresses","Swarm");
+        int hostPort = 6001;
+        if (swarm.isEmpty()) {
+            throw new IllegalStateException("Swarm property not found");
+        } else {
+            List<MultiAddress> swarmAddresses = ((List<String>)swarm.get()).stream().map(s -> new MultiAddress(s)).collect(Collectors.toList());
+            hostPort = swarmAddresses.get(0).getPort();
+        }
         //Optional<Object> p2pProxyEnabled = config.getOptionalProperty("Experimental","P2pHttpProxy");
         //Optional<Object> bloomFilterSize = config.getOptionalProperty("Datastore","BloomFilterSize");
         //Optional<Object> proxyTarget = config.getOptionalProperty("Addresses","ProxyTarget");
