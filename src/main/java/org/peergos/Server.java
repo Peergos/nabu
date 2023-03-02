@@ -24,7 +24,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -69,57 +68,52 @@ public class Server {
         FileBlockstore blocks = new FileBlockstore(blocksPath);
 
         int hostPort = 6001; // 6001
-        //todo get values as required from Config for Addresses, Bootstrap etc
-        // ie make sure to enable p2p proxy only if Experimental.P2pHttpProxy == true
-        // also get BloomFilterSize from Datastore.BloomFilterSize
-        // also get ProxyTarget from Addresses.ProxyTarget
+        //Optional<Object> p2pProxyEnabled = config.getOptionalProperty("Experimental","P2pHttpProxy");
+        //Optional<Object> bloomFilterSize = config.getOptionalProperty("Datastore","BloomFilterSize");
+        //Optional<Object> proxyTarget = config.getOptionalProperty("Addresses","ProxyTarget");
         String privKey = config.getProperty("Identity", "PrivKey");
         HostBuilder builder = new HostBuilder().setIdentity(privKey).listenLocalhost(hostPort);
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
 
-        // todo use DatabaseRecordStore
-        // Path datastorePath = Path.of(System.getenv("HOME"), ".ipfs", "datastore", "h2RecordStore");
-        RecordStore records = new RamRecordStore();
-        try { //(DatabaseRecordStore records = new DatabaseRecordStore("mem:")) {
-            ProviderStore providers = new RamProviderStore();
-            Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
-            CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
-            CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
-            builder = builder.addProtocols(List.of(
-                    new Ping(),
-                    new AutonatProtocol.Binding(),
-                    new CircuitHopProtocol.Binding(relayManager, stop),
-                    new Bitswap(new BitswapEngine(blocks)),
-                    dht));
+        Path datastorePath = Path.of(System.getenv("HOME"), ".ipfs", "datastore", "h2.datastore");
+        DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toString());
+        ProviderStore providers = new RamProviderStore();
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
+        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
+        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
+        builder = builder.addProtocols(List.of(
+                new Ping(),
+                new AutonatProtocol.Binding(),
+                new CircuitHopProtocol.Binding(relayManager, stop),
+                new Bitswap(new BitswapEngine(blocks)),
+                dht));
 
-            Host node = builder.build();
-            node.start().join();
-            System.out.println("Node started and listening on " + node.listenAddresses());
+        Host node = builder.build();
+        node.start().join();
+        System.out.println("Node started and listening on " + node.listenAddresses());
 
-            //            Multiaddr bootstrapNode = Multiaddr.fromString("/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt");
-            //            KademliaController bootstrap = builder.getWanDht().get().dial(node, bootstrapNode).getController().join();
+        //            Multiaddr bootstrapNode = Multiaddr.fromString("/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt");
+        //            KademliaController bootstrap = builder.getWanDht().get().dial(node, bootstrapNode).getController().join();
 
-            APIService localAPI = new APIService();
-            MultiAddress apiAddress = new MultiAddress(config.getProperty("Addresses", "API"));
-            InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
+        APIService localAPI = new APIService();
+        MultiAddress apiAddress = new MultiAddress(config.getProperty("Addresses", "API"));
+        InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
-            int maxConnectionQueue = 500;
-            int handlerThreads = 50;
-            HttpServer apiServer = localAPI.initAndStart(localAPIAddress, node, blocks, maxConnectionQueue, handlerThreads);
+        int maxConnectionQueue = 500;
+        int handlerThreads = 50;
+        HttpServer apiServer = localAPI.initAndStart(localAPIAddress, node, blocks, maxConnectionQueue, handlerThreads);
 
-            Thread shutdownHook = new Thread(() -> {
-                System.out.println("Stopping server...");
-                try {
-                    node.stop().get();
-                    apiServer.stop(3); //wait max 3 seconds
-                } catch (InterruptedException | ExecutionException ex) {
-                    ex.printStackTrace();
-                }
-            });
-            Runtime.getRuntime().addShutdownHook(shutdownHook);
-        } finally {
-
-        }
+        Thread shutdownHook = new Thread(() -> {
+            System.out.println("Stopping server...");
+            try {
+                node.stop().get();
+                apiServer.stop(3); //wait max 3 seconds
+                records.close();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
     }
     private Config readConfig(Path configPath) throws IOException {
         Path configFilePath = configPath.resolve("config");

@@ -1,9 +1,6 @@
 package org.peergos.util;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.StringTokenizer;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Config {
@@ -24,6 +21,21 @@ public class Config {
         }
         return (String)currentMap.get(lastProperty);
     }
+
+    public Optional<Object> getOptionalProperty(String... propNames) {
+        if (!findProperty(Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()))) {
+            return Optional.empty();
+        }
+        String lastProperty = propNames[propNames.length -1];
+        Map<String, Object> currentMap = traverseProperties(Arrays.stream(propNames).limit(propNames.length -1)
+                .collect(Collectors.toList()));
+        if(! currentMap.containsKey(lastProperty)) {
+            return Optional.empty();
+        }
+        Object obj = currentMap.get(lastProperty);
+        return Optional.of(obj);
+    }
+
     public List<Map> getPropertyList(String... propNames) {
         Map<String, Object> currentMap = traverseProperties(Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
         String lastProperty = propNames[propNames.length -1];
@@ -58,13 +70,23 @@ public class Config {
         }
         return currentMap;
     }
-
+    private boolean findProperty(List<String> propNames) {
+        Map<String, Object> currentMap = configuration;
+        for (String propName : propNames) {
+            currentMap = (Map<String, Object>)currentMap.get(propName);
+            if (currentMap == null) {
+                return false;
+            }
+        }
+        return true;
+    }
     @Override
     public String toString() {
         return JSONParser.toString(configuration);
     }
 
     public String prettyPrint() {
+        //N.B. sufficient for our needs.
         String json = JSONParser.toString(configuration);
         String formatted = json.replaceAll("\\{\"", "{\n\"")
                 .replaceAll("}}", "\n}\n}")

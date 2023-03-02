@@ -1,8 +1,6 @@
 package org.peergos;
 import io.ipfs.cid.Cid;
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.peergos.protocol.dht.DatabaseRecordStore;
 import org.peergos.protocol.ipns.IpnsRecord;
