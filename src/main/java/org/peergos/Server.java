@@ -43,8 +43,8 @@ public class Server {
         if (!specType.equals("mount")) {
             throw new IllegalStateException("Unable to read mount configuration");
         }
-        List<Map> mounts = config.getPropertyList("Datastore", "Spec", "mounts");
-        Optional<Map> blockMountOpt = mounts.stream().filter(m -> m.get("mountpoint").equals("/blocks")).findFirst();
+        List<Map<String, Object>> mounts = config.getPropertyList("Datastore", "Spec", "mounts");
+        Optional<Map<String, Object>> blockMountOpt = mounts.stream().filter(m -> m.get("mountpoint").equals("/blocks")).findFirst();
         if (blockMountOpt.isEmpty()) {
             throw new IllegalStateException("Unable to fine /blocks mount");
         }
@@ -120,14 +120,15 @@ public class Server {
         File configFile = configFilePath.toFile();
         if (! configFile.exists()) {
             System.out.println("Unable to find ./ipfs/config file. Creating default config");
-            String contents = defaultConfig();
+            Config config = new Config(defaultConfig());
+            String contents = config.prettyPrint();
             Files.write(configFilePath, contents.getBytes(), StandardOpenOption.CREATE);
-            return new Config((HashMap) JSONParser.parse(contents));
+            return new Config((Map) JSONParser.parse(contents));
         }
         String contents = Files.readString(configFilePath);
-        return new Config((HashMap) JSONParser.parse(contents));
+        return new Config((Map) JSONParser.parse(contents));
     }
-    private String defaultConfig() {
+    private Map<String, Object> defaultConfig() {
         HostBuilder builder = new HostBuilder().generateIdentity();
         PrivKey privKey = builder.getPrivateKey();
         PeerId peerId = builder.getPeerId();
@@ -151,9 +152,9 @@ public class Server {
         return buildConfig(privKey, peerId, bootstrapNodes, swarmAddresses, apiAddress, gatewayAddress, proxyTargetAddress,
                 bloomFilterSize, allowTarget);
     }
-    private String buildConfig(PrivKey privKey, PeerId peerId, List<String> bootstrapNodes, List<String> swarmAddresses, String apiAddress, String gatewayAddress,
+    private Map<String, Object> buildConfig(PrivKey privKey, PeerId peerId, List<String> bootstrapNodes, List<String> swarmAddresses, String apiAddress, String gatewayAddress,
                              String proxyTargetAddress, int bloomFilterSize, Optional<String> allowTarget) {
-        Map configMap = new LinkedHashMap<>();
+        Map<String, Object> configMap = new LinkedHashMap<>();
 
         Map addressesMap = new LinkedHashMap<>();
         addressesMap.put("API", apiAddress);
@@ -167,50 +168,49 @@ public class Server {
 
         configMap.put("Bootstrap", bootstrapNodes);
 
-        Map datastoreMap = new LinkedHashMap<>();
+        Map<String, Object> datastoreMap = new LinkedHashMap<>();
         datastoreMap.put("BloomFilterSize", bloomFilterSize);
 
-        Map blockMap = new LinkedHashMap<>();
+        Map<String, Object> blockMap = new LinkedHashMap<>();
         blockMap.put("mountpoint", "/blocks");
         blockMap.put("prefix", "flatfs.datastore");
         blockMap.put("type", "measure");
-        Map blockChildMap = new LinkedHashMap<>();
+        Map<String, Object> blockChildMap = new LinkedHashMap<>();
         blockChildMap.put("path", "blocks");
         blockChildMap.put("shardFunc", "/repo/flatfs/shard/v1/next-to-last/2");
         blockChildMap.put("sync", "true");
         blockChildMap.put("type", "flatfs");
         blockMap.put("child", blockChildMap);
 
-        Map dataMap = new LinkedHashMap<>();
+        Map<String, Object> dataMap = new LinkedHashMap<>();
         dataMap.put("mountpoint", "/");
         dataMap.put("prefix", "h2.datastore");
         dataMap.put("type", "measure");
-        Map dataChildMap = new LinkedHashMap<>();
+        Map<String, Object> dataChildMap = new LinkedHashMap<>();
         dataChildMap.put("compression", "none");
         dataChildMap.put("path", "datastore");
         dataChildMap.put("type", "h2");
         dataMap.put("child", dataChildMap);
 
-        List<Map> list = List.of(blockMap, dataMap);
-        Map specMap = new LinkedHashMap<>();
+        List<Map<String, Object>> list = List.of(blockMap, dataMap);
+        Map<String, Object> specMap = new LinkedHashMap<>();
         specMap.put("mounts", list);
         specMap.put("type", "mount");
         datastoreMap.put("Spec", specMap);
         configMap.put("Datastore", datastoreMap);
 
-        Map experimentalMap = new LinkedHashMap<>();
+        Map<String, Object> experimentalMap = new LinkedHashMap<>();
         experimentalMap.put("Libp2pStreamMounting", true);
         experimentalMap.put("P2pHttpProxy", true);
         configMap.put("Experimental", experimentalMap);
 
-        Map identityMap = new LinkedHashMap<>();
+        Map<String, Object> identityMap = new LinkedHashMap<>();
         identityMap.put("PeerID", peerId.toBase58());
         String base64PrivKeyStr = Base64.getEncoder().encodeToString(privKey.bytes());
         identityMap.put("PrivKey", base64PrivKeyStr);
         configMap.put("Identity", identityMap);
 
-        Config config = new Config(configMap);
-        return config.prettyPrint();
+        return configMap;
     }
 
     public static void main(String[] args) {

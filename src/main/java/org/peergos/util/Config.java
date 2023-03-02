@@ -36,7 +36,7 @@ public class Config {
         return Optional.of(obj);
     }
 
-    public List<Map> getPropertyList(String... propNames) {
+    public List<Map<String, Object>> getPropertyList(String... propNames) {
         Map<String, Object> currentMap = traverseProperties(Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
         String lastProperty = propNames[propNames.length -1];
         if(! currentMap.containsKey(lastProperty)) {
@@ -46,7 +46,7 @@ public class Config {
         if (! (obj instanceof List)) {
             throw new IllegalStateException("Not a List property:" + lastProperty);
         }
-        return (List<Map>)currentMap.get(lastProperty);
+        return (List<Map<String, Object>>)currentMap.get(lastProperty);
     }
     public Map<String, Object> getPropertyMap(String... propNames) {
         Map<String, Object> currentMap = traverseProperties(Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
@@ -60,7 +60,7 @@ public class Config {
         }
         return (Map<String, Object>)currentMap.get(lastProperty);
     }
-    public Map traverseProperties(List<String> propNames) {
+    public Map<String, Object> traverseProperties(List<String> propNames) {
         Map<String, Object> currentMap = configuration;
         for (String propName : propNames) {
             currentMap = (Map<String, Object>)currentMap.get(propName);
