@@ -1,15 +1,10 @@
 package org.peergos;
 import io.ipfs.cid.Cid;
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.peergos.protocol.dht.DatabaseRecordStore;
 import org.peergos.protocol.ipns.IpnsRecord;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.Optional;
 public class DatabaseRecordStoreTest {
