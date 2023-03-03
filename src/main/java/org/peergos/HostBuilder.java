@@ -13,6 +13,7 @@ import io.libp2p.crypto.keys.*;
 import io.libp2p.etc.types.*;
 import io.libp2p.protocol.*;
 import io.libp2p.security.noise.*;
+import io.libp2p.security.tls.*;
 import io.libp2p.transport.tcp.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.autonat.*;
@@ -141,7 +142,8 @@ public class HostBuilder {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             b.getTransports().add(TcpTransport::new);
-            b.getSecureChannels().add(NoiseXXSecureChannel::new);
+            b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, (List<String>)m));
+            b.getSecureChannels().add((k, m) -> new NoiseXXSecureChannel(k, (List<String>)m));
             b.getMuxers().addAll(muxers);
             b.getAddressBook().setImpl(new RamAddressBook());
 

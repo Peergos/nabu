@@ -1,6 +1,7 @@
 package org.peergos.protocol.dnsaddr;
 
 import org.xbill.DNS.*;
+import org.xbill.DNS.Record;
 import org.xbill.DNS.lookup.*;
 
 import java.util.*;

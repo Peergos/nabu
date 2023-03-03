@@ -10,6 +10,7 @@ This is a WIP. You can follow our progress updates [here](https://peergos.net/pu
 Currently implemented properties:
 * TCP transport
 * Noise encryption and authentication
+* TLS security provider (with early muxer negotiation using ALPN)
 * RSA and Ed25519 peer IDs
 * yamux and mplex muxers
 * Kademlia DHT for content discovery
@@ -21,14 +22,13 @@ Currently implemented properties:
 * uPnP port forwarding
 * nat-pmp port forwarding
 * file based blockstore
+* persistent datastores (IPNS record store) using H2 DB
 * persistent identities and config
 
 In the future we will add:
-* TLS security provider (with early muxer negotiation using ALPN)
 * circuit-relay
-* AutoRelay
 * dcutr (direct connection upgrade through relay)
-* file based datastores (IPNS record store)
+* AutoRelay
 * block HTTP API
 * QUIC transport (and encryption and multiplexing)
 * mDNS peer discovery
