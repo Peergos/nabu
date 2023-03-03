@@ -6,13 +6,13 @@
 
     <groupId>com.github.peergos</groupId>
     <artifactId>nabu</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>v0.0.1-SNAPSHOT</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
-        <kotlin.version>1.5.10</kotlin.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <kotlin.version>1.6.21</kotlin.version>
         <version.junit>4.13.2</version.junit>
         <version.hamcrest>2.2</version.hamcrest>
         <version.multiaddr>v1.4.11</version.multiaddr>
@@ -118,11 +118,16 @@
         <dependency>
             <groupId>com.github.peergos</groupId>
             <artifactId>jvm-libp2p</artifactId>
-            <version>0.9.6-v2</version>
+            <version>0.9.7</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk15on</artifactId>
+            <version>1.70</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk15on</artifactId>
             <version>1.70</version>
         </dependency>
         <dependency>
