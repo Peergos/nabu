@@ -3,31 +3,49 @@ package org.peergos.util;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class Config {
-    private final Map<String, Object> configuration;
-    public Config(Map<String, Object> jsonMap) {
-        this.configuration = jsonMap;
-    }
-
-    public String getProperty(String... propNames) {
-        Map<String, Object> currentMap = traverseProperties(Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
+public class JsonHelper {
+    public static String getStringProperty(Map<String, Object> kvMap, String... propNames) {
+        Map<String, Object> currentMap = traverseProperties(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
         String lastProperty = propNames[propNames.length -1];
         if(! currentMap.containsKey(lastProperty)) {
-            throw new IllegalStateException("Property not found:" + lastProperty);
+            throw new IllegalStateException("Property not found: " + lastProperty);
         }
         Object obj = currentMap.get(lastProperty);
         if (! (obj instanceof String)) {
-            throw new IllegalStateException("Not a String property:" + lastProperty);
+            throw new IllegalStateException("Not a String property: " + lastProperty);
         }
         return (String)currentMap.get(lastProperty);
     }
-
-    public Optional<Object> getOptionalProperty(String... propNames) {
-        if (!findProperty(Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()))) {
+    public static Integer getIntProperty(Map<String, Object> kvMap, String... propNames) {
+        Map<String, Object> currentMap = traverseProperties(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
+        String lastProperty = propNames[propNames.length -1];
+        if(! currentMap.containsKey(lastProperty)) {
+            throw new IllegalStateException("Property not found: " + lastProperty);
+        }
+        Object obj = currentMap.get(lastProperty);
+        if (! (obj instanceof Integer)) {
+            throw new IllegalStateException("Not an Integer property: " + lastProperty);
+        }
+        return (Integer)currentMap.get(lastProperty);
+    }
+    public static List<Object> getPropertyList(Map<String, Object> kvMap, String... propNames) {
+        Map<String, Object> currentMap = traverseProperties(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
+        String lastProperty = propNames[propNames.length -1];
+        if(! currentMap.containsKey(lastProperty)) {
+            throw new IllegalStateException("Property not found: " + lastProperty);
+        }
+        Object obj = currentMap.get(lastProperty);
+        if (! (obj instanceof List)) {
+            throw new IllegalStateException("Not a List property: " + lastProperty);
+        }
+        return (List)currentMap.get(lastProperty);
+    }
+    public static Optional<Object> getOptionalProperty(Map<String, Object> kvMap, String... propNames) {
+        if (!findProperty(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()))) {
             return Optional.empty();
         }
         String lastProperty = propNames[propNames.length -1];
-        Map<String, Object> currentMap = traverseProperties(Arrays.stream(propNames).limit(propNames.length -1)
+        Map<String, Object> currentMap = traverseProperties(kvMap, Arrays.stream(propNames).limit(propNames.length -1)
                 .collect(Collectors.toList()));
         if(! currentMap.containsKey(lastProperty)) {
             return Optional.empty();
@@ -36,42 +54,42 @@ public class Config {
         return Optional.of(obj);
     }
 
-    public List<Map<String, Object>> getPropertyList(String... propNames) {
-        Map<String, Object> currentMap = traverseProperties(Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
+    public static List<Map<String, Object>> getPropertyObjectList(Map<String, Object> kvMap, String... propNames) {
+        Map<String, Object> currentMap = traverseProperties(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
         String lastProperty = propNames[propNames.length -1];
         if(! currentMap.containsKey(lastProperty)) {
-            throw new IllegalStateException("Property not found:" + lastProperty);
+            throw new IllegalStateException("Property not found: " + lastProperty);
         }
         Object obj = currentMap.get(lastProperty);
         if (! (obj instanceof List)) {
-            throw new IllegalStateException("Not a List property:" + lastProperty);
+            throw new IllegalStateException("Not a List property: " + lastProperty);
         }
         return (List<Map<String, Object>>)currentMap.get(lastProperty);
     }
-    public Map<String, Object> getPropertyMap(String... propNames) {
-        Map<String, Object> currentMap = traverseProperties(Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
+    public static Map<String, Object> getPropertyMap(Map<String, Object> kvMap, String... propNames) {
+        Map<String, Object> currentMap = traverseProperties(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
         String lastProperty = propNames[propNames.length -1];
         if(! currentMap.containsKey(lastProperty)) {
-            throw new IllegalStateException("Property not found:" + lastProperty);
+            throw new IllegalStateException("Property not found: " + lastProperty);
         }
         Object obj = currentMap.get(lastProperty);
         if (! (obj instanceof Map)) {
-            throw new IllegalStateException("Not a List property:" + lastProperty);
+            throw new IllegalStateException("Not a List property: " + lastProperty);
         }
         return (Map<String, Object>)currentMap.get(lastProperty);
     }
-    public Map<String, Object> traverseProperties(List<String> propNames) {
-        Map<String, Object> currentMap = configuration;
+    public static Map<String, Object> traverseProperties(Map<String, Object> kvMap, List<String> propNames) {
+        Map<String, Object> currentMap = kvMap;
         for (String propName : propNames) {
             currentMap = (Map<String, Object>)currentMap.get(propName);
             if (currentMap == null) {
-                throw new IllegalStateException("Property not found:" + propName);
+                throw new IllegalStateException("Property not found: " + propName);
             }
         }
         return currentMap;
     }
-    private boolean findProperty(List<String> propNames) {
-        Map<String, Object> currentMap = configuration;
+    private static boolean findProperty(Map<String, Object> kvMap, List<String> propNames) {
+        Map<String, Object> currentMap = kvMap;
         for (String propName : propNames) {
             currentMap = (Map<String, Object>)currentMap.get(propName);
             if (currentMap == null) {
@@ -80,14 +98,11 @@ public class Config {
         }
         return true;
     }
-    @Override
-    public String toString() {
-        return JSONParser.toString(configuration);
-    }
 
-    public String prettyPrint() {
+
+    public static String pretty(Map<String, Object> kvMap) {
         //N.B. sufficient for our needs.
-        String json = JSONParser.toString(configuration);
+        String json = JSONParser.toString(kvMap);
         String formatted = json.replaceAll("\\{\"", "{\n\"")
                 .replaceAll("}}", "\n}\n}")
                 .replaceAll("}}", "}\n}")
@@ -132,17 +147,15 @@ public class Config {
             } else if(token.endsWith(",") || token.endsWith("\"")) {
                 sb.append("\n");
             }
-            System.currentTimeMillis();
         }
         return sb.toString();
     }
 
-    public static String padStart(int length) {
+    private static String padStart(int length) {
         StringBuilder sb = new StringBuilder(length);
         for (int i = 0; i < length; i++) {
             sb.append("\t");
         }
         return sb.toString();
     }
-
 }
