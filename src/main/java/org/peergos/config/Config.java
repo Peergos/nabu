@@ -118,9 +118,9 @@ public class Config {
             throw new IllegalStateException("Expecting /blocks mount to have prefix == 'flatfs.datastore' and type == 'measure'");
         }
         Map<String, Object> blockParams = blockMount.getParams();
-        String blockPath = (String)blockParams.get("path");
-        String blockShardFunc = (String)blockParams.get("shardFunc");
-        String blockType = (String)blockParams.get("type");
+        String blockPath = (String) blockParams.get("path");
+        String blockShardFunc = (String) blockParams.get("shardFunc");
+        String blockType = (String) blockParams.get("type");
         if (!(blockPath.equals("blocks") && blockShardFunc.equals("/repo/flatfs/shard/v1/next-to-last/2")
                 && blockType.equals("flatfs"))) {
             throw new IllegalStateException("Expecting flatfs mount at /blocks");
@@ -131,9 +131,9 @@ public class Config {
             throw new IllegalStateException("Expecting / mount to have prefix == 'h2.datastore' and type == 'measure'");
         }
         Map<String, Object> rootParams = rootMount.getParams();
-        String rootPath = (String)rootParams.get("path");
-        String rootCompression = (String)rootParams.get("compression");
-        String rootType = (String)rootParams.get("type");
+        String rootPath = (String) rootParams.get("path");
+        String rootCompression = (String) rootParams.get("compression");
+        String rootType = (String) rootParams.get("type");
         if (!(rootPath.equals("datastore") && rootCompression.equals("none") && rootType.equals("h2"))) {
             throw new IllegalStateException("Expecting flatfs mount at /blocks");
         }

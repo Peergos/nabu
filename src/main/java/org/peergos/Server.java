@@ -41,12 +41,12 @@ public class Server {
             if (!blocksDirectory.mkdir()) {
                 throw new IllegalStateException("Unable to make blocks directory");
             }
-        } else if(blocksDirectory.isFile()) {
+        } else if (blocksDirectory.isFile()) {
             throw new IllegalStateException("Unable to create blocks directory");
         }
         FileBlockstore blocks = new FileBlockstore(blocksPath);
 
-        List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();;
+        List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();
         int hostPort = swarmAddresses.get(0).getPort();
         //Optional<Object> p2pProxyEnabled = config.getOptionalProperty("Experimental","P2pHttpProxy");
         //Optional<Object> bloomFilterSize = config.getOptionalProperty("Datastore","BloomFilterSize");
@@ -58,7 +58,7 @@ public class Server {
         }
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
 
-        Path datastorePath = ipfsPath.resolve("datastore").resolve( "h2.datastore");
+        Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toString());
         ProviderStore providers = new RamProviderStore();
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
@@ -98,6 +98,7 @@ public class Server {
         });
         Runtime.getRuntime().addShutdownHook(shutdownHook);
     }
+
     private Path getIPFSPath() {
         String ipfsPath = System.getenv("IPFS_PATH");
         if (ipfsPath == null) {
@@ -106,10 +107,11 @@ public class Server {
         }
         return Path.of(ipfsPath);
     }
+
     private Config readConfig(Path configPath) throws IOException {
         Path configFilePath = configPath.resolve("config");
         File configFile = configFilePath.toFile();
-        if (! configFile.exists()) {
+        if (!configFile.exists()) {
             System.out.println("Unable to find config file. Creating default config");
             Config config = new Config();
             Files.write(configFilePath, config.toString().getBytes(), StandardOpenOption.CREATE);
