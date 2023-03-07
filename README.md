@@ -28,11 +28,12 @@ Currently implemented properties:
 In the future we will add:
 * circuit-relay
 * dcutr (direct connection upgrade through relay)
+* connect bitswap to kademlia for discovery
 * AutoRelay
 * block HTTP API
 * QUIC transport (and encryption and multiplexing)
 * mDNS peer discovery
-* S3 blockstores
+* S3 blockstore
 * bloom/infinifilter filtered blockstore
 * Android compatibility
 
