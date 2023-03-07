@@ -1,7 +1,6 @@
 package org.peergos;
 
 import identify.pb.*;
-import io.ipfs.multibase.binary.Base64;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
@@ -15,12 +14,12 @@ import io.libp2p.protocol.*;
 import io.libp2p.security.noise.*;
 import io.libp2p.security.tls.*;
 import io.libp2p.transport.tcp.*;
+import io.libp2p.core.crypto.KeyKt;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
-
 import java.util.*;
 
 public class HostBuilder {
@@ -92,8 +91,8 @@ public class HostBuilder {
         return setPrivKey(Ed25519Kt.generateEd25519KeyPair().getFirst());
     }
 
-    public HostBuilder setEd25519Identity(byte[] privKey) {
-        return setPrivKey(Ed25519Kt.unmarshalEd25519PrivateKey(privKey));
+    public HostBuilder setIdentity(byte[] privKey) {
+        return setPrivKey(KeyKt.unmarshalPrivateKey(privKey));
     }
 
 

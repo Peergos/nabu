@@ -48,8 +48,8 @@ public class Server {
 
         List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();
         int hostPort = swarmAddresses.get(0).getPort();
-        HostBuilder builder = new HostBuilder().setEd25519Identity(config.identity.privKeyProtobuf).listenLocalhost(hostPort);
-        if (builder.getPeerId().equals(config.identity.peerId)) {
+        HostBuilder builder = new HostBuilder().setIdentity(config.identity.privKeyProtobuf).listenLocalhost(hostPort);
+        if (! builder.getPeerId().equals(config.identity.peerId)) {
             throw new IllegalStateException("PeerId invalid");
         }
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
