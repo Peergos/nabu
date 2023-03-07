@@ -26,6 +26,7 @@ public class IdentitySection implements Jsonable {
         configMap.put("Identity", identityMap);
         return configMap;
     }
+
     public static IdentitySection fromJson(Map<String, Object> json) {
         String base64PrivKey = JsonHelper.getStringProperty(json, "Identity", "PrivKey");
         byte[] privKey = io.ipfs.multibase.binary.Base64.decodeBase64(base64PrivKey);

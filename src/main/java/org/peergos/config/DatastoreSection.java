@@ -13,6 +13,7 @@ public class DatastoreSection {
 
     public final Mount rootMount;
     public final int bloomFilterSize;
+
     public DatastoreSection(Mount blockMount, Mount rootMount, int bloomFilterSize) {
         this.blockMount = blockMount;
         this.rootMount = rootMount;
@@ -32,6 +33,7 @@ public class DatastoreSection {
         configMap.put("Datastore", datastoreMap);
         return configMap;
     }
+
     public static DatastoreSection fromJson(Map<String, Object> json) {
         Integer size = JsonHelper.getIntProperty(json, "Datastore", "BloomFilterSize");
         String type = JsonHelper.getStringProperty(json, "Datastore", "Spec", "type");

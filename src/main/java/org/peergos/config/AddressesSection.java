@@ -13,6 +13,7 @@ public class AddressesSection implements Jsonable {
     public final MultiAddress gatewayAddress;
     public final Optional<MultiAddress> proxyTargetAddress;
     public final Optional<String> allowTarget;
+
     public AddressesSection(List<MultiAddress> swarmAddresses, MultiAddress apiAddress, MultiAddress gatewayAddress,
                             Optional<MultiAddress> proxyTargetAddress, Optional<String> allowTarget) {
         this.swarmAddresses = swarmAddresses;
@@ -25,6 +26,7 @@ public class AddressesSection implements Jsonable {
     public List<MultiAddress> getSwarmAddresses() {
         return new ArrayList<MultiAddress>(swarmAddresses);
     }
+
     public Map<String, Object> toJson() {
         Map addressesMap = new LinkedHashMap<>();
         addressesMap.put("API", apiAddress.toString());
@@ -41,18 +43,19 @@ public class AddressesSection implements Jsonable {
         configMap.put("Addresses", addressesMap);
         return configMap;
     }
+
     public static AddressesSection fromJson(Map<String, Object> json) {
         List<Object> swarm = JsonHelper.getPropertyList(json, "Addresses", "Swarm");
         List<MultiAddress> swarmAddresses = swarm.stream()
-                .map(n -> new MultiAddress((String)n)).collect(Collectors.toList());
+                .map(n -> new MultiAddress((String) n)).collect(Collectors.toList());
         MultiAddress api = new MultiAddress(JsonHelper.getStringProperty(json, "Addresses", "API"));
         MultiAddress gateway = new MultiAddress(JsonHelper.getStringProperty(json, "Addresses", "Gateway"));
         Optional<Object> proxyTarget = JsonHelper.getOptionalProperty(json, "Addresses", "ProxyTarget");
         Optional<Object> allowTarget = JsonHelper.getOptionalProperty(json, "Addresses", "AllowTarget");
 
         return new AddressesSection(swarmAddresses, api, gateway,
-                proxyTarget.isPresent() ? Optional.of(new MultiAddress((String)proxyTarget.get())) : Optional.empty(),
-                allowTarget.isPresent() ? Optional.of((String)allowTarget.get()) : Optional.empty()
+                proxyTarget.isPresent() ? Optional.of(new MultiAddress((String) proxyTarget.get())) : Optional.empty(),
+                allowTarget.isPresent() ? Optional.of((String) allowTarget.get()) : Optional.empty()
         );
     }
 }
