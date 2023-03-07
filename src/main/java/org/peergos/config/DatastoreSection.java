@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-public class DatastoreSection {
+public class DatastoreSection implements Jsonable {
     public final Mount blockMount;
 
     public final Mount rootMount;

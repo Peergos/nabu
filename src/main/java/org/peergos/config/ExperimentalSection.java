@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
-public class ExperimentalSection {
+public class ExperimentalSection implements Jsonable {
     public final boolean libp2pStreamMounting;
     public final boolean p2pHttpProxy;
 
