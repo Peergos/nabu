@@ -48,11 +48,7 @@ public class Server {
 
         List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();
         int hostPort = swarmAddresses.get(0).getPort();
-        //Optional<Object> p2pProxyEnabled = config.getOptionalProperty("Experimental","P2pHttpProxy");
-        //Optional<Object> bloomFilterSize = config.getOptionalProperty("Datastore","BloomFilterSize");
-        //Optional<Object> proxyTarget = config.getOptionalProperty("Addresses","ProxyTarget");
-        byte[] privKey = config.identity.privKey;
-        HostBuilder builder = new HostBuilder().setIdentity(privKey).listenLocalhost(hostPort);
+        HostBuilder builder = new HostBuilder().setEd25519Identity(config.identity.privKeyProtobuf).listenLocalhost(hostPort);
         if (builder.getPeerId().equals(config.identity.peerId)) {
             throw new IllegalStateException("PeerId invalid");
         }

@@ -92,7 +92,7 @@ public class HostBuilder {
         return setPrivKey(Ed25519Kt.generateEd25519KeyPair().getFirst());
     }
 
-    public HostBuilder setIdentity(byte[] privKey) {
+    public HostBuilder setEd25519Identity(byte[] privKey) {
         return setPrivKey(Ed25519Kt.unmarshalEd25519PrivateKey(privKey));
     }
 

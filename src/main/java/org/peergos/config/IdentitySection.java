@@ -9,18 +9,18 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class IdentitySection implements Jsonable {
-    public final byte[] privKey;
+    public final byte[] privKeyProtobuf;
     public final PeerId peerId;
 
-    public IdentitySection(byte[] privKey, PeerId peerId) {
-        this.privKey = privKey;
+    public IdentitySection(byte[] privKeyProtobuf, PeerId peerId) {
+        this.privKeyProtobuf = privKeyProtobuf;
         this.peerId = peerId;
     }
 
     public Map<String, Object> toJson() {
         Map<String, Object> identityMap = new LinkedHashMap<>();
         identityMap.put("PeerID", peerId.toBase58());
-        String base64PrivKeyStr = Base64.getEncoder().encodeToString(privKey);
+        String base64PrivKeyStr = Base64.getEncoder().encodeToString(privKeyProtobuf);
         identityMap.put("PrivKey", base64PrivKeyStr);
         Map<String, Object> configMap = new LinkedHashMap<>();
         configMap.put("Identity", identityMap);

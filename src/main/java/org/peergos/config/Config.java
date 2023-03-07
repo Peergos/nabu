@@ -18,7 +18,6 @@ public class Config {
     public final AddressesSection addresses;
     public final BootstrapSection bootstrap;
     public final DatastoreSection datastore;
-    public final ExperimentalSection experimental;
     public final IdentitySection identity;
 
     public Config() {
@@ -26,15 +25,13 @@ public class Config {
         this.addresses = config.addresses;
         this.bootstrap = config.bootstrap;
         this.datastore = config.datastore;
-        this.experimental = config.experimental;
         this.identity = config.identity;
     }
 
-    private Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore, ExperimentalSection experimental, IdentitySection identity) {
+    private Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore, IdentitySection identity) {
         this.addresses = addresses;
         this.bootstrap = bootstrap;
         this.datastore = datastore;
-        this.experimental = experimental;
         this.identity = identity;
         validate(this);
     }
@@ -44,9 +41,8 @@ public class Config {
         AddressesSection addressesSection = Jsonable.parse(json, p -> AddressesSection.fromJson(p));
         BootstrapSection bootstrapSection = Jsonable.parse(json, p -> BootstrapSection.fromJson(p));
         DatastoreSection datastoreSection = Jsonable.parse(json, p -> DatastoreSection.fromJson(p));
-        ExperimentalSection experimentalSection = Jsonable.parse(json, p -> ExperimentalSection.fromJson(p));
         IdentitySection identitySection = Jsonable.parse(json, p -> IdentitySection.fromJson(p));
-        return new Config(addressesSection, bootstrapSection, datastoreSection, experimentalSection, identitySection);
+        return new Config(addressesSection, bootstrapSection, datastoreSection, identitySection);
     }
 
     @Override
@@ -55,7 +51,6 @@ public class Config {
         configMap.putAll(addresses.toJson());
         configMap.putAll(bootstrap.toJson());
         configMap.putAll(datastore.toJson());
-        configMap.putAll(experimental.toJson());
         configMap.putAll(identity.toJson());
         return JsonHelper.pretty(configMap);
     }
@@ -100,9 +95,8 @@ public class Config {
         int bloomFilterSize = 0;
         DatastoreSection datastoreSection = new DatastoreSection(blockMount, rootMount, bloomFilterSize);
         BootstrapSection bootstrapSection = new BootstrapSection(bootstrapNodes);
-        ExperimentalSection experimental = new ExperimentalSection(true, true);
         IdentitySection identity = new IdentitySection(privKey.bytes(), peerId);
-        return new Config(addressesSection, bootstrapSection, datastoreSection, experimental, identity);
+        return new Config(addressesSection, bootstrapSection, datastoreSection, identity);
     }
 
     public void validate(Config config) {
