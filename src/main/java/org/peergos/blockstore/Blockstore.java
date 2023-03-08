@@ -20,4 +20,6 @@ public interface Blockstore {
     CompletableFuture<Optional<byte[]>> get(Cid c);
 
     CompletableFuture<Cid> put(byte[] block, Cid.Codec codec);
+
+    CompletableFuture<Boolean> rm(Cid c);
 }

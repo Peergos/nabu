@@ -99,4 +99,15 @@ public class FileBlockstore implements Blockstore {
             throw new RuntimeException(e.getMessage(), e);
         }
     }
+
+    @Override
+    public CompletableFuture<Boolean> rm(Cid cid) {
+        Path path = getFilePath(cid);
+        File file = root.resolve(path).toFile();
+        if (file.exists()) {
+            return CompletableFuture.completedFuture(file.delete());
+        } else {
+            return CompletableFuture.completedFuture(false);
+        }
+    }
 }

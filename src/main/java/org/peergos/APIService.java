@@ -1,4 +1,6 @@
 package org.peergos;
+import io.ipfs.cid.Cid;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.Host;
 import org.peergos.blockstore.Blockstore;
 import com.sun.net.httpserver.*;
@@ -8,28 +10,66 @@ import org.peergos.util.Version;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
 
 public class APIService {
-	private static final Logger LOG = Logging.LOG();
 
     public static final Version CURRENT_VERSION = Version.parse("0.0.1");
+    public static final String API_URL = "/api/v0/";
 
-    public APIService() {
+    private final Blockstore store;
 
+    public APIService(Blockstore store) {
+        this.store = store;
     }
 
-    public HttpServer initAndStart(InetSocketAddress local,
-                                Host node,
-                                Blockstore storage,
-                                int connectionBacklog,
-                                int handlerPoolSize) throws IOException {
-        LOG.info("Starting RPC API server at: localhost:"+local.getPort());
-        HttpServer localhostServer = HttpServer.create(local, connectionBacklog);
-        localhostServer.createContext(Constants.API_URL, new APIHandler(storage, Constants.API_URL, node));
-        localhostServer.setExecutor(Executors.newFixedThreadPool(handlerPoolSize));
-        localhostServer.start();
-        return localhostServer;
+    public CompletableFuture<Optional<byte[]>> getBlock(Cid cid) {
+        return getBlock(cid, Optional.empty());
     }
+    public CompletableFuture<Optional<byte[]>> getBlock(Cid cid, Optional<String> auth) {
+        return store.has(cid).thenCompose(has -> {
+            if (has) {
+                return store.get(cid).thenCompose(block -> {
+                    //todo get using auth
+                    return CompletableFuture.completedFuture(block);
+                });
+            } else {
+                return CompletableFuture.completedFuture(Optional.empty()); // todo get from network
+            }
+        });
+    }
+
+    public CompletableFuture<Optional<Cid>> putBlock(byte[] block, String format) {
+        Cid.Codec codec = null;
+        if (format.equals("raw")) {
+            codec = Cid.Codec.Raw;
+        } else if (format.equals("cbor")) {
+            codec = Cid.Codec.DagCbor;
+        } else {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        return store.put(block, codec).thenCompose(cid ->
+                CompletableFuture.completedFuture(Optional.of(cid))
+        );
+    }
+
+    public CompletableFuture<Boolean> rmBlock(Cid cid) {
+        return store.rm(cid);
+    }
+
+    public CompletableFuture<Boolean> hasBlock(Cid cid) {
+        return store.has(cid);
+    }
+    public CompletableFuture<List<Cid>> getRefs() {
+        return CompletableFuture.completedFuture(Collections.emptyList()); // todo
+    }
+    public CompletableFuture<Boolean> bloomAdd(Cid cid) {
+        return CompletableFuture.completedFuture(true); // todo
+    }
+
 }
