@@ -65,7 +65,6 @@ public class APIHandler implements HttpHandler {
             // N.B. URI.getQuery() decodes the query string
             Map<String, List<String>> params = HttpUtil.parseQuery(httpExchange.getRequestURI().getQuery());
             List<String> args = params.get("arg");
-            Function<String, String> last = key -> params.get(key).get(params.get(key).size() - 1);
 
             switch (path) {
                 case ID: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-id
@@ -83,7 +82,7 @@ public class APIHandler implements HttpHandler {
                 }
                 case GET: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-get
                     if (args.size() != 1) {
-                        throw new APIException("Missing arg parameter"); //todo confirm message
+                        throw new APIException("argument \"ipfs-path\" is required");
                     }
                     List<String> authz = params.get("auth");
                     Optional<String> authOpt = authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
@@ -94,10 +93,7 @@ public class APIHandler implements HttpHandler {
                             try {
                                 httpExchange.sendResponseHeaders(400, 0);
                             } catch (IOException ioe) {
-                                Throwable t = Exceptions.getRootCause(ioe);
-                                LOG.severe("Error handling " + httpExchange.getRequestURI());
-                                LOG.log(Level.WARNING, t.getMessage(), t);
-                                HttpUtil.replyError(httpExchange, t);
+                                HttpUtil.replyError(httpExchange, ioe);
                             }
                         }
                         return null;
@@ -108,7 +104,7 @@ public class APIHandler implements HttpHandler {
                     List<String> format = params.get("format");
                     Optional<String> formatOpt = format.size() == 1 ? Optional.of(format.get(0)) : Optional.empty();
                     if (formatOpt.isEmpty()) {
-                        throw new APIException(""); //todo need to discuss
+                        throw new APIException("argument \"format\" is required"); //todo need to discuss
                     }
                     String boundary = httpExchange.getRequestHeaders().get("Content-Type")
                             .stream()
@@ -118,11 +114,11 @@ public class APIHandler implements HttpHandler {
                             .get();
                     List<byte[]> data = MultipartReceiver.extractFiles(httpExchange.getRequestBody(), boundary);
                     if (data.size() != 1) {
-                        throw new APIException(""); //todo confirm message
+                        throw new APIException("Multiple input not supported");
                     }
                     byte[] block = data.get(0);
                     if (block.length >  1024 * 1024 * 2) { //todo what should the limit be?
-                        throw new APIException(""); //todo confirm message
+                        throw new APIException("Block too large");
                     }
                     service.putBlock(block, formatOpt.get()).thenApply(cidOpt -> {
                         if (cidOpt.isPresent()) {
@@ -133,10 +129,7 @@ public class APIHandler implements HttpHandler {
                             try {
                                 httpExchange.sendResponseHeaders(400, 0);
                             } catch (IOException ioe) {
-                                Throwable t = Exceptions.getRootCause(ioe);
-                                LOG.severe("Error handling " + httpExchange.getRequestURI());
-                                LOG.log(Level.WARNING, t.getMessage(), t);
-                                HttpUtil.replyError(httpExchange, t);
+                                HttpUtil.replyError(httpExchange, ioe);
                             }
                         }
                         return null;
@@ -145,7 +138,7 @@ public class APIHandler implements HttpHandler {
                 }
                 case RM: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-rm
                     if (args.size() != 1) {
-                        throw new APIException("Missing arg parameter"); //todo confirm message
+                        throw new APIException("argument \"cid\" is required\n");
                     }
                     Cid cid = Cid.decode(args.get(0));
                     service.rmBlock(cid).thenApply(deleted -> {
@@ -158,10 +151,7 @@ public class APIHandler implements HttpHandler {
                             try {
                                 httpExchange.sendResponseHeaders(400, 0);
                             } catch (IOException ioe) {
-                                Throwable t = Exceptions.getRootCause(ioe);
-                                LOG.severe("Error handling " + httpExchange.getRequestURI());
-                                LOG.log(Level.WARNING, t.getMessage(), t);
-                                HttpUtil.replyError(httpExchange, t);
+                                HttpUtil.replyError(httpExchange, ioe);
                             }
                         }
                         return null;
@@ -170,7 +160,7 @@ public class APIHandler implements HttpHandler {
                 }
                 case STAT: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-stat
                     if (args.size() != 1) {
-                        throw new APIException("Missing arg parameter"); //todo confirm message
+                        throw new APIException("argument \"cid\" is required\n");
                     }
                     List<String> authz = params.get("auth");
                     Optional<String> authOpt = authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
@@ -183,10 +173,7 @@ public class APIHandler implements HttpHandler {
                             try {
                                 httpExchange.sendResponseHeaders(400, 0);
                             } catch (IOException ioe) {
-                                Throwable t = Exceptions.getRootCause(ioe);
-                                LOG.severe("Error handling " + httpExchange.getRequestURI());
-                                LOG.log(Level.WARNING, t.getMessage(), t);
-                                HttpUtil.replyError(httpExchange, t);
+                                HttpUtil.replyError(httpExchange, ioe);
                             }
                         }
                         return null;
@@ -194,15 +181,22 @@ public class APIHandler implements HttpHandler {
                     break;
                 }
                 case REFS_LOCAL: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-refs-local
-                    service.getRefs().thenApply(blockOpt -> {
-                        // todo
+                    service.getRefs().thenApply(refs -> {
+                        List<Map<String, String>> res = new ArrayList<>();
+                        for (Cid cid : refs) {
+                            Map entry = new HashMap<>();
+                            entry.put("Ref", cid.toString());
+                            entry.put("Err", "");
+                            res.add(entry);
+                        }
+                        replyJson(httpExchange, JSONParser.toString(res));
                         return null;
                     });
                     break;
                 }
                 case HAS: {
                     if (args.size() != 1) {
-                        throw new APIException("Missing arg parameter"); //todo confirm message
+                        throw new APIException("argument \"ipfs-path\" is required");
                     }
                     service.hasBlock(Cid.decode(args.get(0))).thenApply(has -> {
                         replyBytes(httpExchange, has ? "true".getBytes() : "false".getBytes());
@@ -212,7 +206,7 @@ public class APIHandler implements HttpHandler {
                 }
                 case BLOOM_ADD: {
                     if (args.size() != 1) {
-                        throw new APIException("Missing arg parameter"); //todo confirm message
+                        throw new APIException("argument \"cid\" is required\n");
                     }
                     service.bloomAdd(Cid.decode(args.get(0))).thenApply(done -> {
                         replyBytes(httpExchange, "".getBytes());
@@ -225,10 +219,7 @@ public class APIHandler implements HttpHandler {
                 }
             }
         } catch (Exception e) {
-            Throwable t = Exceptions.getRootCause(e);
-            LOG.severe("Error handling " + httpExchange.getRequestURI());
-            LOG.log(Level.WARNING, t.getMessage(), t);
-            HttpUtil.replyError(httpExchange, t);
+            HttpUtil.replyError(httpExchange, e);
         } finally {
             httpExchange.close();
             long t2 = System.currentTimeMillis();
