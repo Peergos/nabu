@@ -11,7 +11,6 @@ import com.sun.net.httpserver.HttpHandler;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.*;
-import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -26,12 +25,12 @@ public class APIHandler implements HttpHandler {
 
     public static final String ID = "id";
     public static final String VERSION = "version";
-    public static final String GET = "/block/get";
-    public static final String PUT = "/block/put";
-    public static final String RM = "/block/rm";
-    public static final String STAT = "/block/stat";
+    public static final String GET = "block/get";
+    public static final String PUT = "block/put";
+    public static final String RM = "block/rm";
+    public static final String STAT = "block/stat";
     public static final String REFS_LOCAL = "refs/local";
-    public static final String BLOOM_ADD = "/bloom/add";
+    public static final String BLOOM_ADD = "bloom/add";
     public static final String HAS = "has"; // todo
 
     public APIHandler(APIService service, Host node) {
@@ -76,16 +75,16 @@ public class APIHandler implements HttpHandler {
                 }
                 case VERSION: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-version
                     Map res = new HashMap<>();
-                    res.put("Version", APIService.CURRENT_VERSION);
+                    res.put("Version", APIService.CURRENT_VERSION.toString());
                     replyJson(httpExchange, JSONParser.toString(res));
                     break;
                 }
                 case GET: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-get
-                    if (args.size() != 1) {
+                    if (args == null || args.size() != 1) {
                         throw new APIException("argument \"ipfs-path\" is required");
                     }
                     List<String> authz = params.get("auth");
-                    Optional<String> authOpt = authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
+                    Optional<String> authOpt = authz != null && authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
                     service.getBlock(Cid.decode(args.get(0)), authOpt).thenApply(blockOpt -> {
                         if (blockOpt.isPresent()) {
                             replyBytes(httpExchange, blockOpt.get());
@@ -102,7 +101,7 @@ public class APIHandler implements HttpHandler {
                 }
                 case PUT: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-put
                     List<String> format = params.get("format");
-                    Optional<String> formatOpt = format.size() == 1 ? Optional.of(format.get(0)) : Optional.empty();
+                    Optional<String> formatOpt = format !=null && format.size() == 1 ? Optional.of(format.get(0)) : Optional.empty();
                     if (formatOpt.isEmpty()) {
                         throw new APIException("argument \"format\" is required"); //todo need to discuss
                     }
@@ -123,7 +122,7 @@ public class APIHandler implements HttpHandler {
                     service.putBlock(block, formatOpt.get()).thenApply(cidOpt -> {
                         if (cidOpt.isPresent()) {
                             Map res = new HashMap<>();
-                            res.put("Hash", cidOpt.get());
+                            res.put("Hash", cidOpt.get().toString());
                             replyJson(httpExchange, JSONParser.toString(res));
                         } else {
                             try {
@@ -137,7 +136,7 @@ public class APIHandler implements HttpHandler {
                     break;
                 }
                 case RM: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-rm
-                    if (args.size() != 1) {
+                    if (args == null || args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
                     }
                     Cid cid = Cid.decode(args.get(0));
@@ -145,7 +144,7 @@ public class APIHandler implements HttpHandler {
                         if (deleted) {
                             Map res = new HashMap<>();
                             res.put("Error", "");
-                            res.put("Hash", cid);
+                            res.put("Hash", cid.toString());
                             replyJson(httpExchange, JSONParser.toString(res));
                         } else {
                             try {
@@ -159,11 +158,11 @@ public class APIHandler implements HttpHandler {
                     break;
                 }
                 case STAT: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-stat
-                    if (args.size() != 1) {
+                    if (args == null || args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
                     }
                     List<String> authz = params.get("auth");
-                    Optional<String> authOpt = authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
+                    Optional<String> authOpt = authz != null && authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
                     service.getBlock(Cid.decode(args.get(0)), authOpt).thenApply(blockOpt -> {
                         if (blockOpt.isPresent()) {
                             Map res = new HashMap<>();
@@ -195,7 +194,7 @@ public class APIHandler implements HttpHandler {
                     break;
                 }
                 case HAS: {
-                    if (args.size() != 1) {
+                    if (args == null || args.size() != 1) {
                         throw new APIException("argument \"ipfs-path\" is required");
                     }
                     service.hasBlock(Cid.decode(args.get(0))).thenApply(has -> {
@@ -224,7 +223,7 @@ public class APIHandler implements HttpHandler {
             httpExchange.close();
             long t2 = System.currentTimeMillis();
             if (LOGGING)
-                LOG.info("DHT Handler handled " + path + " query in: " + (t2 - t1) + " mS");
+                LOG.info("API Handler handled " + path + " query in: " + (t2 - t1) + " mS");
         }
     }
 
