@@ -121,7 +121,7 @@ public class APIHandler implements HttpHandler {
                         throw new APIException(""); //todo confirm message
                     }
                     byte[] block = data.get(0);
-                    if (block.length >  1024 * 1024) { //todo what should the limit be?
+                    if (block.length >  1024 * 1024 * 2) { //todo what should the limit be?
                         throw new APIException(""); //todo confirm message
                     }
                     service.putBlock(block, formatOpt.get()).thenApply(cidOpt -> {
