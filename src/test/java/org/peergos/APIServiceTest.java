@@ -52,16 +52,15 @@ public class APIServiceTest {
             String text = "Hello world!";
             byte[] block = text.getBytes();
 
-            Optional<Cid> cidAdded = service.putBlock(block, "raw").join();
-            Assert.assertTrue("cid set", cidAdded.isPresent());
-            Assert.assertTrue("cid added was found", service.hasBlock(cidAdded.get()).join());
+            Cid cidAdded = service.putBlock(block, "raw").join();
+            Assert.assertTrue("cid added was found", service.hasBlock(cidAdded).join());
 
-            Optional<byte[]> blockRetrieved = service.getBlock(cidAdded.get()).join();
+            Optional<byte[]> blockRetrieved = service.getBlock(cidAdded, false).join();
             Assert.assertTrue("block retrieved", blockRetrieved.isPresent());
             Assert.assertTrue("block is as expected", text.equals(new String(blockRetrieved.get())));
 
-            Assert.assertTrue("block removed", service.rmBlock(cidAdded.get()).join());
-            Assert.assertFalse("cid still found", service.hasBlock(cidAdded.get()).join());
+            Assert.assertTrue("block removed", service.rmBlock(cidAdded).join());
+            Assert.assertFalse("cid still found", service.hasBlock(cidAdded).join());
 
         }
     }

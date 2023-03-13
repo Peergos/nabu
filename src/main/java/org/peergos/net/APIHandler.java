@@ -11,6 +11,7 @@ import com.sun.net.httpserver.HttpHandler;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -85,7 +86,7 @@ public class APIHandler implements HttpHandler {
                     }
                     List<String> authz = params.get("auth");
                     Optional<String> authOpt = authz != null && authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
-                    service.getBlock(Cid.decode(args.get(0)), authOpt).thenApply(blockOpt -> {
+                    service.getBlock(Cid.decode(args.get(0)), authOpt, false).thenApply(blockOpt -> {
                         if (blockOpt.isPresent()) {
                             replyBytes(httpExchange, blockOpt.get());
                         } else {
@@ -103,7 +104,11 @@ public class APIHandler implements HttpHandler {
                     List<String> format = params.get("format");
                     Optional<String> formatOpt = format !=null && format.size() == 1 ? Optional.of(format.get(0)) : Optional.empty();
                     if (formatOpt.isEmpty()) {
-                        throw new APIException("argument \"format\" is required"); //todo need to discuss
+                        throw new APIException("argument \"format\" is required");
+                    } else {
+                        if (!(format.equals("raw") || format.equals("cbor"))) {
+                            throw new APIException("only raw and cbor \"format\" supported");
+                        }
                     }
                     String boundary = httpExchange.getRequestHeaders().get("Content-Type")
                             .stream()
@@ -119,18 +124,10 @@ public class APIHandler implements HttpHandler {
                     if (block.length >  1024 * 1024 * 2) { //todo what should the limit be?
                         throw new APIException("Block too large");
                     }
-                    service.putBlock(block, formatOpt.get()).thenApply(cidOpt -> {
-                        if (cidOpt.isPresent()) {
-                            Map res = new HashMap<>();
-                            res.put("Hash", cidOpt.get().toString());
-                            replyJson(httpExchange, JSONParser.toString(res));
-                        } else {
-                            try {
-                                httpExchange.sendResponseHeaders(400, 0);
-                            } catch (IOException ioe) {
-                                HttpUtil.replyError(httpExchange, ioe);
-                            }
-                        }
+                    service.putBlock(block, formatOpt.get()).thenApply(cid -> {
+                        Map res = new HashMap<>();
+                        res.put("Hash", cid.toString());
+                        replyJson(httpExchange, JSONParser.toString(res));
                         return null;
                     });
                     break;
