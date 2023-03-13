@@ -15,6 +15,11 @@ public interface Blockstore {
         return padStart > 0 ? padded.substring(0, padStart) : padded;
     }
 
+    default Cid keyToHash(String key) {
+        byte[] decoded = new Base32().decode(key);
+        return Cid.cast(decoded);
+    }
+
     CompletableFuture<Boolean> has(Cid c);
 
     CompletableFuture<Optional<byte[]>> get(Cid c);
@@ -22,4 +27,7 @@ public interface Blockstore {
     CompletableFuture<Cid> put(byte[] block, Cid.Codec codec);
 
     CompletableFuture<Boolean> rm(Cid c);
+
+    CompletableFuture<List<Cid>> refs();
+
 }

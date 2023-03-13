@@ -5,14 +5,15 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.peergos.blockstore.Blockstore;
 import org.peergos.blockstore.FileBlockstore;
+import org.peergos.blockstore.FilteredBlockstore;
 import org.peergos.blockstore.RamBlockstore;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 public class APIServiceTest {
@@ -45,7 +46,7 @@ public class APIServiceTest {
         Tester.runAPIServiceTest(blocks);
     }
     public class Tester {
-        public static void runAPIServiceTest(Blockstore blocks) {
+        public static void runAPIServiceTest(FilteredBlockstore blocks) {
             APIService service = new APIService(blocks);
             Cid cid = Cid.decode("zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg");
             Assert.assertFalse("cid found", service.hasBlock(cid).join());
@@ -58,6 +59,12 @@ public class APIServiceTest {
             Optional<byte[]> blockRetrieved = service.getBlock(cidAdded, false).join();
             Assert.assertTrue("block retrieved", blockRetrieved.isPresent());
             Assert.assertTrue("block is as expected", text.equals(new String(blockRetrieved.get())));
+
+            List<Cid> localRefs = service.getRefs().join();
+            for (Cid ref : localRefs) {
+                Optional<byte[]> res = service.getBlock(ref, false).join();
+                Assert.assertTrue("ref retrieved", res.isPresent());
+            }
 
             Assert.assertTrue("block removed", service.rmBlock(cidAdded).join());
             Assert.assertFalse("cid still found", service.hasBlock(cidAdded).join());

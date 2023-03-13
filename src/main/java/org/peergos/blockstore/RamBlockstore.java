@@ -7,7 +7,7 @@ import org.peergos.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class RamBlockstore implements Blockstore {
+public class RamBlockstore implements FilteredBlockstore {
 
     private final ConcurrentHashMap<Cid, byte[]> blocks = new ConcurrentHashMap<>();
 
@@ -36,5 +36,16 @@ public class RamBlockstore implements Blockstore {
         } else {
             return CompletableFuture.completedFuture(false);
         }
+    }
+
+    @Override
+    public CompletableFuture<Boolean> bloomAdd(Cid cid) {
+        //not implemented
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<Cid>> refs() {
+        return CompletableFuture.completedFuture(new ArrayList(blocks.keySet()));
     }
 }

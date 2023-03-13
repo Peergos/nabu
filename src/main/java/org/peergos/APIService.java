@@ -1,30 +1,20 @@
 package org.peergos;
 import io.ipfs.cid.Cid;
-import io.ipfs.multihash.Multihash;
-import io.libp2p.core.Host;
-import org.peergos.blockstore.Blockstore;
-import com.sun.net.httpserver.*;
-import org.peergos.net.APIHandler;
-import org.peergos.util.Logging;
+import org.peergos.blockstore.FilteredBlockstore;
 import org.peergos.util.Version;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.logging.Logger;
 
 public class APIService {
 
     public static final Version CURRENT_VERSION = Version.parse("0.0.1");
     public static final String API_URL = "/api/v0/";
 
-    private final Blockstore store;
+    private final FilteredBlockstore store;
 
-    public APIService(Blockstore store) {
+    public APIService(FilteredBlockstore store) {
         this.store = store;
     }
 
@@ -70,10 +60,10 @@ public class APIService {
         return store.has(cid);
     }
     public CompletableFuture<List<Cid>> getRefs() {
-        return CompletableFuture.completedFuture(Collections.emptyList()); // todo
+        return store.refs();
     }
     public CompletableFuture<Boolean> bloomAdd(Cid cid) {
-        return CompletableFuture.completedFuture(true); // todo
+        return store.bloomAdd(cid);
     }
 
 }
