@@ -85,18 +85,16 @@ public class APIHandler implements HttpHandler {
                     }
                     List<String> authz = params.get("auth");
                     Optional<String> authOpt = authz != null && authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
-                    service.getBlock(Cid.decode(args.get(0)), authOpt, false).thenApply(blockOpt -> {
-                        if (blockOpt.isPresent()) {
-                            replyBytes(httpExchange, blockOpt.get());
-                        } else {
-                            try {
-                                httpExchange.sendResponseHeaders(400, 0);
-                            } catch (IOException ioe) {
-                                HttpUtil.replyError(httpExchange, ioe);
-                            }
+                    Optional<byte[]> blockOpt = service.getBlock(Cid.decode(args.get(0)), authOpt, false);
+                    if (blockOpt.isPresent()) {
+                        replyBytes(httpExchange, blockOpt.get());
+                    } else {
+                        try {
+                            httpExchange.sendResponseHeaders(400, 0);
+                        } catch (IOException ioe) {
+                            HttpUtil.replyError(httpExchange, ioe);
                         }
-                        return null;
-                    });
+                    }
                     break;
                 }
                 case PUT: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-put
@@ -124,12 +122,10 @@ public class APIHandler implements HttpHandler {
                     if (block.length >  1024 * 1024 * 2) { //todo what should the limit be?
                         throw new APIException("Block too large");
                     }
-                    service.putBlock(block, formatOpt.get()).thenApply(cid -> {
-                        Map res = new HashMap<>();
-                        res.put("Hash", cid.toString());
-                        replyJson(httpExchange, JSONParser.toString(res));
-                        return null;
-                    });
+                    Cid cid = service.putBlock(block, formatOpt.get());
+                    Map res = new HashMap<>();
+                    res.put("Hash", cid.toString());
+                    replyJson(httpExchange, JSONParser.toString(res));
                     break;
                 }
                 case RM: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-rm
@@ -137,21 +133,19 @@ public class APIHandler implements HttpHandler {
                         throw new APIException("argument \"cid\" is required\n");
                     }
                     Cid cid = Cid.decode(args.get(0));
-                    service.rmBlock(cid).thenApply(deleted -> {
-                        if (deleted) {
-                            Map res = new HashMap<>();
-                            res.put("Error", "");
-                            res.put("Hash", cid.toString());
-                            replyJson(httpExchange, JSONParser.toString(res));
-                        } else {
-                            try {
-                                httpExchange.sendResponseHeaders(400, 0);
-                            } catch (IOException ioe) {
-                                HttpUtil.replyError(httpExchange, ioe);
-                            }
+                    boolean deleted = service.rmBlock(cid);
+                    if (deleted) {
+                        Map res = new HashMap<>();
+                        res.put("Error", "");
+                        res.put("Hash", cid.toString());
+                        replyJson(httpExchange, JSONParser.toString(res));
+                    } else {
+                        try {
+                            httpExchange.sendResponseHeaders(400, 0);
+                        } catch (IOException ioe) {
+                            HttpUtil.replyError(httpExchange, ioe);
                         }
-                        return null;
-                    });
+                    }
                     break;
                 }
                 case STAT: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-stat
@@ -160,54 +154,46 @@ public class APIHandler implements HttpHandler {
                     }
                     List<String> authz = params.get("auth");
                     Optional<String> authOpt = authz != null && authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
-                    service.getBlock(Cid.decode(args.get(0)), authOpt).thenApply(blockOpt -> {
-                        if (blockOpt.isPresent()) {
-                            Map res = new HashMap<>();
-                            res.put("Size", blockOpt.get().length);
-                            replyJson(httpExchange, JSONParser.toString(res));
-                        } else {
-                            try {
-                                httpExchange.sendResponseHeaders(400, 0);
-                            } catch (IOException ioe) {
-                                HttpUtil.replyError(httpExchange, ioe);
-                            }
+                    Optional<byte[]> blockOpt = service.getBlock(Cid.decode(args.get(0)), authOpt);
+                    if (blockOpt.isPresent()) {
+                        Map res = new HashMap<>();
+                        res.put("Size", blockOpt.get().length);
+                        replyJson(httpExchange, JSONParser.toString(res));
+                    } else {
+                        try {
+                            httpExchange.sendResponseHeaders(400, 0);
+                        } catch (IOException ioe) {
+                            HttpUtil.replyError(httpExchange, ioe);
                         }
-                        return null;
-                    });
+                    }
                     break;
                 }
                 case REFS_LOCAL: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-refs-local
-                    service.getRefs().thenApply(refs -> {
-                        StringBuilder sb = new StringBuilder();
-                        for (Cid cid : refs) {
-                            Map entry = new HashMap<>();
-                            entry.put("Ref", cid.toString());
-                            entry.put("Err", "");
-                            sb.append(JSONParser.toString(entry));
-                        }
-                        replyBytes(httpExchange, sb.toString().getBytes());
-                        return null;
-                    });
+                    List<Cid> refs = service.getRefs();
+                    StringBuilder sb = new StringBuilder();
+                    for (Cid cid : refs) {
+                        Map entry = new HashMap<>();
+                        entry.put("Ref", cid.toString());
+                        entry.put("Err", "");
+                        sb.append(JSONParser.toString(entry));
+                    }
+                    replyBytes(httpExchange, sb.toString().getBytes());
                     break;
                 }
                 case HAS: {
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"ipfs-path\" is required");
                     }
-                    service.hasBlock(Cid.decode(args.get(0))).thenApply(has -> {
-                        replyBytes(httpExchange, has ? "true".getBytes() : "false".getBytes());
-                        return null;
-                    });
+                    boolean has = service.hasBlock(Cid.decode(args.get(0)));
+                    replyBytes(httpExchange, has ? "true".getBytes() : "false".getBytes());
                     break;
                 }
                 case BLOOM_ADD: {
                     if (args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
                     }
-                    service.bloomAdd(Cid.decode(args.get(0))).thenApply(done -> {
-                        replyBytes(httpExchange, "".getBytes());
-                        return null;
-                    });
+                    boolean done = service.bloomAdd(Cid.decode(args.get(0)));
+                    replyBytes(httpExchange, "".getBytes());
                     break;
                 }
                 default: {

@@ -49,25 +49,25 @@ public class APIServiceTest {
         public static void runAPIServiceTest(Blockstore blocks) {
             APIService service = new APIService(blocks);
             Cid cid = Cid.decode("zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg");
-            Assert.assertFalse("cid found", service.hasBlock(cid).join());
+            Assert.assertFalse("cid found", service.hasBlock(cid));
             String text = "Hello world!";
             byte[] block = text.getBytes();
 
-            Cid cidAdded = service.putBlock(block, "raw").join();
-            Assert.assertTrue("cid added was found", service.hasBlock(cidAdded).join());
+            Cid cidAdded = service.putBlock(block, "raw");
+            Assert.assertTrue("cid added was found", service.hasBlock(cidAdded));
 
-            Optional<byte[]> blockRetrieved = service.getBlock(cidAdded, false).join();
+            Optional<byte[]> blockRetrieved = service.getBlock(cidAdded, false);
             Assert.assertTrue("block retrieved", blockRetrieved.isPresent());
             Assert.assertTrue("block is as expected", text.equals(new String(blockRetrieved.get())));
 
-            List<Cid> localRefs = service.getRefs().join();
+            List<Cid> localRefs = service.getRefs();
             for (Cid ref : localRefs) {
-                Optional<byte[]> res = service.getBlock(ref, false).join();
+                Optional<byte[]> res = service.getBlock(ref, false);
                 Assert.assertTrue("ref retrieved", res.isPresent());
             }
 
-            Assert.assertTrue("block removed", service.rmBlock(cidAdded).join());
-            Assert.assertFalse("cid still found", service.hasBlock(cidAdded).join());
+            Assert.assertTrue("block removed", service.rmBlock(cidAdded));
+            Assert.assertFalse("cid still found", service.hasBlock(cidAdded));
 
         }
     }
