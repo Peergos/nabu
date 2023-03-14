@@ -1,5 +1,6 @@
 package org.peergos;
 import io.ipfs.cid.Cid;
+import org.peergos.blockstore.Blockstore;
 import org.peergos.blockstore.FilteredBlockstore;
 import org.peergos.util.Version;
 
@@ -12,9 +13,9 @@ public class APIService {
     public static final Version CURRENT_VERSION = Version.parse("0.0.1");
     public static final String API_URL = "/api/v0/";
 
-    private final FilteredBlockstore store;
+    private final Blockstore store;
 
-    public APIService(FilteredBlockstore store) {
+    public APIService(Blockstore store) {
         this.store = store;
     }
 
@@ -63,7 +64,12 @@ public class APIService {
         return store.refs();
     }
     public CompletableFuture<Boolean> bloomAdd(Cid cid) {
-        return store.bloomAdd(cid);
+        if (store instanceof FilteredBlockstore) {
+            FilteredBlockstore fbs = (FilteredBlockstore)(store);
+            return fbs.bloomAdd(cid);
+        } else {
+            return CompletableFuture.completedFuture(false);
+        }
     }
 
 }

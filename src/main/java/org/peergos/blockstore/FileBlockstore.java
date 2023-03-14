@@ -18,7 +18,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class FileBlockstore implements FilteredBlockstore {
+public class FileBlockstore implements Blockstore {
 
     private static final Logger LOG = Logger.getLogger(FileBlockstore.class.getName());
 
@@ -115,12 +115,6 @@ public class FileBlockstore implements FilteredBlockstore {
         } else {
             return CompletableFuture.completedFuture(false);
         }
-    }
-
-    @Override
-    public CompletableFuture<Boolean> bloomAdd(Cid cid) {
-        //not implemented
-        return CompletableFuture.completedFuture(false);
     }
 
     @Override

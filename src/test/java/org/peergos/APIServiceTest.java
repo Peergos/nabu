@@ -6,7 +6,7 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.peergos.blockstore.FileBlockstore;
-import org.peergos.blockstore.FilteredBlockstore;
+import org.peergos.blockstore.Blockstore;
 import org.peergos.blockstore.RamBlockstore;
 
 import java.io.File;
@@ -46,7 +46,7 @@ public class APIServiceTest {
         Tester.runAPIServiceTest(blocks);
     }
     public class Tester {
-        public static void runAPIServiceTest(FilteredBlockstore blocks) {
+        public static void runAPIServiceTest(Blockstore blocks) {
             APIService service = new APIService(blocks);
             Cid cid = Cid.decode("zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg");
             Assert.assertFalse("cid found", service.hasBlock(cid).join());

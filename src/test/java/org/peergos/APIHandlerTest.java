@@ -23,7 +23,7 @@ public class APIHandlerTest {
     public void integrationTest() {
         HttpServer apiServer = null;
         try {
-            MultiAddress apiAddress = new MultiAddress("/ip4/127.0.0.1/tcp/8001");
+            MultiAddress apiAddress = new MultiAddress("/ip4/127.0.0.1/tcp/8123");
             InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
             apiServer = HttpServer.create(localAPIAddress, 500);
