@@ -41,7 +41,7 @@ public class RamBlockstore implements FilteredBlockstore {
     @Override
     public CompletableFuture<Boolean> bloomAdd(Cid cid) {
         //not implemented
-        return null;
+        return CompletableFuture.completedFuture(false);
     }
 
     @Override

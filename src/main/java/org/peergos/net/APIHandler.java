@@ -105,7 +105,8 @@ public class APIHandler implements HttpHandler {
                     if (formatOpt.isEmpty()) {
                         throw new APIException("argument \"format\" is required");
                     } else {
-                        if (!(format.equals("raw") || format.equals("cbor"))) {
+                        String reqFormat = formatOpt.get();
+                        if (!(reqFormat.equals("raw") || reqFormat.equals("cbor"))) {
                             throw new APIException("only raw and cbor \"format\" supported");
                         }
                     }
@@ -177,14 +178,14 @@ public class APIHandler implements HttpHandler {
                 }
                 case REFS_LOCAL: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-refs-local
                     service.getRefs().thenApply(refs -> {
-                        List<Map<String, String>> res = new ArrayList<>();
+                        StringBuilder sb = new StringBuilder();
                         for (Cid cid : refs) {
                             Map entry = new HashMap<>();
                             entry.put("Ref", cid.toString());
                             entry.put("Err", "");
-                            res.add(entry);
+                            sb.append(JSONParser.toString(entry));
                         }
-                        replyJson(httpExchange, JSONParser.toString(res));
+                        replyBytes(httpExchange, sb.toString().getBytes());
                         return null;
                     });
                     break;
