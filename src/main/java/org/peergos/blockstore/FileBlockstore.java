@@ -118,6 +118,12 @@ public class FileBlockstore implements Blockstore {
     }
 
     @Override
+    public CompletableFuture<Boolean> bloomAdd(Cid cid) {
+        //not implemented
+        return CompletableFuture.completedFuture(false);
+    }
+
+    @Override
     public CompletableFuture<List<Cid>> refs() {
         List<Path> result = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(root)) {

@@ -30,4 +30,5 @@ public interface Blockstore {
 
     CompletableFuture<List<Cid>> refs();
 
+    CompletableFuture<Boolean> bloomAdd(Cid cid);
 }

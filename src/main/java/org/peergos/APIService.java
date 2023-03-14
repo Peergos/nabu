@@ -1,7 +1,6 @@
 package org.peergos;
 import io.ipfs.cid.Cid;
 import org.peergos.blockstore.Blockstore;
-import org.peergos.blockstore.FilteredBlockstore;
 import org.peergos.util.Version;
 
 import java.util.List;
@@ -63,13 +62,8 @@ public class APIService {
     public CompletableFuture<List<Cid>> getRefs() {
         return store.refs();
     }
-    public CompletableFuture<Boolean> bloomAdd(Cid cid) {
-        if (store instanceof FilteredBlockstore) {
-            FilteredBlockstore fbs = (FilteredBlockstore)(store);
-            return fbs.bloomAdd(cid);
-        } else {
-            return CompletableFuture.completedFuture(false);
-        }
-    }
 
+    public CompletableFuture<Boolean> bloomAdd(Cid cid) {
+        return store.bloomAdd(cid);
+    }
 }

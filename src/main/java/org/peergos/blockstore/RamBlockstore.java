@@ -39,6 +39,12 @@ public class RamBlockstore implements Blockstore {
     }
 
     @Override
+    public CompletableFuture<Boolean> bloomAdd(Cid cid) {
+        //not implemented
+        return CompletableFuture.completedFuture(false);
+    }
+
+    @Override
     public CompletableFuture<List<Cid>> refs() {
         return CompletableFuture.completedFuture(new ArrayList(blocks.keySet()));
     }
