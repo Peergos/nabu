@@ -1,35 +1,65 @@
 package org.peergos;
-import io.libp2p.core.Host;
+import io.ipfs.cid.Cid;
 import org.peergos.blockstore.Blockstore;
-import com.sun.net.httpserver.*;
-import org.peergos.net.APIHandler;
-import org.peergos.util.Logging;
 import org.peergos.util.Version;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.concurrent.Executors;
-import java.util.logging.Logger;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 public class APIService {
-	private static final Logger LOG = Logging.LOG();
 
     public static final Version CURRENT_VERSION = Version.parse("0.0.1");
+    public static final String API_URL = "/api/v0/";
 
-    public APIService() {
+    private final Blockstore store;
 
+    public APIService(Blockstore store) {
+        this.store = store;
     }
 
-    public HttpServer initAndStart(InetSocketAddress local,
-                                Host node,
-                                Blockstore storage,
-                                int connectionBacklog,
-                                int handlerPoolSize) throws IOException {
-        LOG.info("Starting RPC API server at: localhost:"+local.getPort());
-        HttpServer localhostServer = HttpServer.create(local, connectionBacklog);
-        localhostServer.createContext(Constants.API_URL, new APIHandler(storage, Constants.API_URL, node));
-        localhostServer.setExecutor(Executors.newFixedThreadPool(handlerPoolSize));
-        localhostServer.start();
-        return localhostServer;
+    public Optional<byte[]> getBlock(Cid cid, boolean addToLocal) {
+        return getBlock(cid, Optional.empty(), addToLocal);
+    }
+    public Optional<byte[]> getBlock(Cid cid, Optional<String> auth) {
+        return getBlock(cid, auth, false);
+    }
+    public Optional<byte[]> getBlock(Cid cid, Optional<String> auth, boolean addToLocal) {
+        boolean has = store.has(cid).join();
+        if (has) {
+            return store.get(cid).join();
+        } else {
+            if (addToLocal) {
+                //once retrieved, add to local also
+            }
+            return Optional.empty(); // todo get from network
+        }
+    }
+
+    public Cid putBlock(byte[] block, String format) {
+        Cid.Codec codec = null;
+        if (format.equals("raw")) {
+            codec = Cid.Codec.Raw;
+        } else if (format.equals("cbor")) {
+            codec = Cid.Codec.DagCbor;
+        } else {
+            throw new IllegalArgumentException("only raw and cbor format supported");
+        }
+        return store.put(block, codec).join();
+    }
+
+    public Boolean rmBlock(Cid cid) {
+        return store.rm(cid).join();
+    }
+
+    public Boolean hasBlock(Cid cid) {
+        return store.has(cid).join();
+    }
+    public List<Cid> getRefs() {
+        return store.refs().join();
+    }
+
+    public Boolean bloomAdd(Cid cid) {
+        return store.bloomAdd(cid).join();
     }
 }

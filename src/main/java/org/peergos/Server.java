@@ -7,6 +7,7 @@ import io.libp2p.core.*;
 import io.libp2p.protocol.Ping;
 import org.peergos.blockstore.*;
 import org.peergos.config.*;
+import org.peergos.net.APIHandler;
 import org.peergos.protocol.autonat.AutonatProtocol;
 import org.peergos.protocol.bitswap.Bitswap;
 import org.peergos.protocol.bitswap.BitswapEngine;
@@ -22,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
+import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -74,13 +76,17 @@ public class Server {
         //            Multiaddr bootstrapNode = Multiaddr.fromString("/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt");
         //            KademliaController bootstrap = builder.getWanDht().get().dial(node, bootstrapNode).getController().join();
 
-        APIService localAPI = new APIService();
         MultiAddress apiAddress = config.addresses.apiAddress;
         InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
         int maxConnectionQueue = 500;
         int handlerThreads = 50;
-        HttpServer apiServer = localAPI.initAndStart(localAPIAddress, node, blocks, maxConnectionQueue, handlerThreads);
+        LOG.info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
+        HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
+        APIService service = new APIService(blocks);
+        apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
+        apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
+        apiServer.start();
 
         Thread shutdownHook = new Thread(() -> {
             System.out.println("Stopping server...");

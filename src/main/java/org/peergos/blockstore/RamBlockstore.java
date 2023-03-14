@@ -27,4 +27,25 @@ public class RamBlockstore implements Blockstore {
         blocks.put(cid, block);
         return CompletableFuture.completedFuture(cid);
     }
+
+    @Override
+    public CompletableFuture<Boolean> rm(Cid c) {
+        if (blocks.containsKey(c)) {
+            blocks.remove(c);
+            return CompletableFuture.completedFuture(true);
+        } else {
+            return CompletableFuture.completedFuture(false);
+        }
+    }
+
+    @Override
+    public CompletableFuture<Boolean> bloomAdd(Cid cid) {
+        //not implemented
+        return CompletableFuture.completedFuture(false);
+    }
+
+    @Override
+    public CompletableFuture<List<Cid>> refs() {
+        return CompletableFuture.completedFuture(new ArrayList(blocks.keySet()));
+    }
 }

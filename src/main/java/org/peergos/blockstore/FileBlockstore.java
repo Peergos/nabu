@@ -9,9 +9,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class FileBlockstore implements Blockstore {
 
@@ -19,6 +24,7 @@ public class FileBlockstore implements Blockstore {
 
     private final Path root;
     private final String BLOCKS = "blocks";
+    private final String BLOCK_FILE_SUFFIX = ".data";
 
     public FileBlockstore(Path root) {
         this.root = root;
@@ -37,7 +43,7 @@ public class FileBlockstore implements Blockstore {
     public Path getFilePath(Cid cid) {
         String key = hashToKey(cid);
         String folder = key.substring(key.length() -3, key.length()-1);
-        String filename = key + ".data";
+        String filename = key + BLOCK_FILE_SUFFIX;
 
         Path path = Paths.get(BLOCKS);
         path = path.resolve(folder);
@@ -98,5 +104,38 @@ public class FileBlockstore implements Blockstore {
         } catch (IOException e) {
             throw new RuntimeException(e.getMessage(), e);
         }
+    }
+
+    @Override
+    public CompletableFuture<Boolean> rm(Cid cid) {
+        Path path = getFilePath(cid);
+        File file = root.resolve(path).toFile();
+        if (file.exists()) {
+            return CompletableFuture.completedFuture(file.delete());
+        } else {
+            return CompletableFuture.completedFuture(false);
+        }
+    }
+
+    @Override
+    public CompletableFuture<Boolean> bloomAdd(Cid cid) {
+        //not implemented
+        return CompletableFuture.completedFuture(false);
+    }
+
+    @Override
+    public CompletableFuture<List<Cid>> refs() {
+        List<Path> result = new ArrayList<>();
+        try (Stream<Path> walk = Files.walk(root)) {
+            result = walk.filter(Files::isRegularFile)
+                    .collect(Collectors.toList());
+        } catch (IOException ioe) {
+            LOG.log(Level.WARNING, "Unable to retrieve local refs: " + ioe);
+        }
+        List<Cid> cidList = result.stream().map(p -> {
+            String filename = p.getFileName().toString();
+            return keyToHash(filename.substring(0, filename.length() - BLOCK_FILE_SUFFIX.length()));
+        }).collect(Collectors.toList());
+        return CompletableFuture.completedFuture(cidList);
     }
 }
