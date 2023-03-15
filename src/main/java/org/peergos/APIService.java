@@ -3,8 +3,7 @@ import io.ipfs.cid.Cid;
 import org.peergos.blockstore.Blockstore;
 import org.peergos.util.Version;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 public class APIService {
@@ -36,6 +35,17 @@ public class APIService {
         }
     }
 
+    public Map<Cid, byte[]> getBlocks(List<Want> wantedBlocks, boolean addToLocal) {
+        Map<Cid, byte[]> blocksFound = new HashMap<>();
+        for(Want want : wantedBlocks) {
+            Optional<byte[]> blockOpt = getBlock(want.cid, Optional.of(want.auth), addToLocal);
+            if (blockOpt.isPresent()) {
+                blocksFound.put(want.cid, blockOpt.get());
+            }
+        }
+        return blocksFound;
+    }
+    
     public Cid putBlock(byte[] block, String format) {
         Cid.Codec codec = null;
         if (format.equals("raw")) {
