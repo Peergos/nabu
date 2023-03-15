@@ -13,11 +13,7 @@ public class BloomTest {
     public void bloom() {
         RamBlockstore bs = new RamBlockstore();
         int nBlocks = 100_000;
-        for (int i = 0; i < nBlocks; i++) {
-            byte[] block = new byte[10];
-            r.nextBytes(block);
-            bs.put(block, Cid.Codec.Raw);
-        }
+        addRandomBlocks(nBlocks, bs);
 
         CidBloomFilter bloom = CidBloomFilter.build(bs);
         List<Cid> refs = bs.refs().join();
@@ -25,6 +21,24 @@ public class BloomTest {
             Assert.assertTrue(bloom.has(ref));
         }
 
+        checkFalsePositiveRate(bloom, 1.1);
+
+        // double the blockstore size and check the false positive rate
+        FilteredBlockstore filtered = new FilteredBlockstore(bs, bloom);
+        addRandomBlocks(nBlocks, filtered);
+
+        checkFalsePositiveRate(bloom, 14);
+    }
+
+    private static void addRandomBlocks(int nBlocks, Blockstore b) {
+        for (int i = 0; i < nBlocks; i++) {
+            byte[] block = new byte[10];
+            r.nextBytes(block);
+            b.put(block, Cid.Codec.Raw);
+        }
+    }
+
+    private static void checkFalsePositiveRate(CidBloomFilter bloom, double tolerance) {
         int in = 0;
         int total = 100_000;
         for (int i = 0; i < total; i++) {
@@ -35,6 +49,6 @@ public class BloomTest {
                 in++;
         }
         double falsePositiveRate = 0.01;
-        Assert.assertTrue(in < total * falsePositiveRate * 1.10);
+        Assert.assertTrue(in < total * falsePositiveRate * tolerance);
     }
 }
