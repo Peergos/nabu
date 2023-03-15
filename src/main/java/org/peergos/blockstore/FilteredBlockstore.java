@@ -50,4 +50,8 @@ public class FilteredBlockstore implements Blockstore {
     public CompletableFuture<List<Cid>> refs() {
         return blocks.refs();
     }
+
+    public static FilteredBlockstore bloomBased(Blockstore source) {
+        return new FilteredBlockstore(source, CidBloomFilter.build(source));
+    }
 }
