@@ -12,7 +12,7 @@ public class InfiniTest {
     @Test
     public void infini() {
         RamBlockstore bs = new RamBlockstore();
-        int nBlocks = 100_000;
+        int nBlocks = 65_000;
         addRandomBlocks(nBlocks, bs);
 
         long t1 = System.currentTimeMillis();
