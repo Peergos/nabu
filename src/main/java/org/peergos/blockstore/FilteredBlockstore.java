@@ -9,28 +9,36 @@ import java.util.concurrent.CompletableFuture;
 public class FilteredBlockstore implements Blockstore {
 
     private final Blockstore blocks;
-    public FilteredBlockstore(Blockstore blocks) {
+    private final Filter filter;
+
+    public FilteredBlockstore(Blockstore blocks, Filter filter) {
         this.blocks = blocks;
+        this.filter = filter;
     }
 
     public CompletableFuture<Boolean> bloomAdd(Cid cid) {
-        //not implemented
-        return CompletableFuture.completedFuture(false);
+        filter.add(cid);
+        return CompletableFuture.completedFuture(true);
     }
 
     @Override
     public CompletableFuture<Boolean> has(Cid c) {
-        return blocks.has(c);
+        if (filter.has(c))
+            return blocks.has(c);
+        return CompletableFuture.completedFuture(false);
     }
 
     @Override
     public CompletableFuture<Optional<byte[]>> get(Cid c) {
-        return blocks.get(c);
+        if (filter.has(c))
+            return blocks.get(c);
+        return CompletableFuture.completedFuture(Optional.empty());
     }
 
     @Override
     public CompletableFuture<Cid> put(byte[] block, Cid.Codec codec) {
-        return blocks.put(block, codec);
+        return blocks.put(block, codec)
+                .thenApply(filter::add);
     }
 
     @Override
@@ -41,5 +49,9 @@ public class FilteredBlockstore implements Blockstore {
     @Override
     public CompletableFuture<List<Cid>> refs() {
         return blocks.refs();
+    }
+
+    public static FilteredBlockstore bloomBased(Blockstore source) {
+        return new FilteredBlockstore(source, CidBloomFilter.build(source));
     }
 }

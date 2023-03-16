@@ -25,6 +25,7 @@ Currently implemented properties:
 * persistent datastores (IPNS record store) using H2 DB
 * persistent identities and config
 * basic HTTP API (block.{get, put, rm, has, stat}, id, getRefs, bloomAdd) compatible with matching kubo api calls
+* bloom filtered blockstore
 
 In the future we will add:
 * connect bitswap to kademlia for discovery
@@ -33,7 +34,7 @@ In the future we will add:
 * dcutr (direct connection upgrade through relay)
 * AutoRelay
 * S3 blockstore
-* bloom/infinifilter filtered blockstore
+* infinifilter filtered blockstore
 * mDNS peer discovery
 * Android compatibility
 
