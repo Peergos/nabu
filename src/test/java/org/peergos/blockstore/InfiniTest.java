@@ -6,34 +6,34 @@ import org.junit.*;
 
 import java.util.*;
 
-public class BloomTest {
+public class InfiniTest {
     private static Random r = new Random(42);
 
     @Test
-    public void bloom() {
+    public void infini() {
         RamBlockstore bs = new RamBlockstore();
         int nBlocks = 100_000;
         addRandomBlocks(nBlocks, bs);
 
         long t1 = System.currentTimeMillis();
-        CidBloomFilter bloom = CidBloomFilter.build(bs);
+        CidInfiniFilter infini = CidInfiniFilter.build(bs);
         long t2 = System.currentTimeMillis();
         System.out.println("Building filter took: " + (t2-t1)+ "ms");
         List<Cid> refs = bs.refs().join();
         for (Cid ref : refs) {
-            Assert.assertTrue(bloom.has(ref));
+            Assert.assertTrue(infini.has(ref));
         }
 
-        checkFalsePositiveRate(bloom, 1.1);
+        checkFalsePositiveRate(infini, 1.1);
 
         // double the blockstore size and check the false positive rate
-        FilteredBlockstore filtered = new FilteredBlockstore(bs, bloom);
+        FilteredBlockstore filtered = new FilteredBlockstore(bs, infini);
         long t3 = System.currentTimeMillis();
         addRandomBlocks(nBlocks, filtered);
         long t4 = System.currentTimeMillis();
         System.out.println("Doubling filter size took: " + (t4-t3)+ "ms");
 
-        checkFalsePositiveRate(bloom, 14);
+        checkFalsePositiveRate(infini, 1.1);
     }
 
     private static void addRandomBlocks(int nBlocks, Blockstore b) {
@@ -44,9 +44,9 @@ public class BloomTest {
         }
     }
 
-    private static void checkFalsePositiveRate(CidBloomFilter bloom, double tolerance) {
+    private static void checkFalsePositiveRate(CidInfiniFilter bloom, double tolerance) {
         int in = 0;
-        int total = 100_000;
+        int total = 10_000;
         for (int i = 0; i < total; i++) {
             byte[] hash = new byte[32];
             r.nextBytes(hash);
