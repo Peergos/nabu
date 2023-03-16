@@ -26,8 +26,11 @@ public class CidInfiniFilter implements Filter {
 
     public static CidInfiniFilter build(Blockstore bs) {
         List<Cid> refs = bs.refs().join();
-        int nextPowerOfTwo = Math.max(17, (int) (1 + Math.log(refs.size()) / Math.log(2)));
-        ChainedInfiniFilter infini = new ChainedInfiniFilter(nextPowerOfTwo, 32);
+        int nBlocks = refs.size();
+        int nextPowerOfTwo = Math.max(17, (int) (1 + Math.log(nBlocks) / Math.log(2)));
+        double falsePositiveRate = 0.01;
+        int bitsPerEntry = (int)(1 - Math.log(falsePositiveRate /(1 + Math.log(nBlocks)/Math.log(2)))/Math.log(2));
+        ChainedInfiniFilter infini = new ChainedInfiniFilter(nextPowerOfTwo, bitsPerEntry);
         refs.forEach(c -> infini.insert(c.toBytes(), true));
         return new CidInfiniFilter(infini);
     }
