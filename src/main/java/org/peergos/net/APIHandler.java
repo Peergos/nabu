@@ -31,7 +31,7 @@ public class APIHandler implements HttpHandler {
     public static final String STAT = "block/stat";
     public static final String REFS_LOCAL = "refs/local";
     public static final String BLOOM_ADD = "bloom/add";
-    public static final String HAS = "has"; // todo
+    public static final String HAS = "block/has";
 
     public APIHandler(APIService service, Host node) {
         this.service = service;

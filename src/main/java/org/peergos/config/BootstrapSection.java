@@ -2,7 +2,6 @@ package org.peergos.config;
 
 
 import io.ipfs.multiaddr.MultiAddress;
-import io.libp2p.core.PeerId;
 import org.peergos.util.JsonHelper;
 
 import java.util.*;

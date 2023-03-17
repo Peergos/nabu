@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public class Mount implements Jsonable{
+public class Mount implements Jsonable {
     public final String mountPoint;
     public final String prefix;
     public final String type;

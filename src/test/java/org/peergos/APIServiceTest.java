@@ -12,9 +12,7 @@ import org.peergos.blockstore.RamBlockstore;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 public class APIServiceTest {
 
@@ -45,6 +43,19 @@ public class APIServiceTest {
         FileBlockstore blocks = new FileBlockstore(TMP_DATA_FOLDER.toPath());
         Tester.runAPIServiceTest(blocks);
     }
+
+    @Test
+    public void bulkGetTest() {
+        APIService service = new APIService(new RamBlockstore());
+        Cid cid1 = service.putBlock("Hello".getBytes(), "raw");
+        Cid cid2= service.putBlock("world!".getBytes(), "raw");
+        List<Want> wants = new ArrayList<>();
+        wants.add(new Want(cid1, "auth"));
+        wants.add(new Want(cid2, "auth"));
+        Map<Cid, byte[]> blocks = service.getBlocks(wants, false);
+        Assert.assertTrue("blocks retrieved", blocks.size() == 2);
+    }
+
     public class Tester {
         public static void runAPIServiceTest(Blockstore blocks) {
             APIService service = new APIService(blocks);
