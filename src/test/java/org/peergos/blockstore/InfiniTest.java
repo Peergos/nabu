@@ -12,7 +12,7 @@ public class InfiniTest {
     @Test
     public void infini() {
         RamBlockstore bs = new RamBlockstore();
-        int nBlocks = 65_000;
+        int nBlocks = 1_000_000;
         addRandomBlocks(nBlocks, bs);
 
         long t1 = System.currentTimeMillis();
@@ -46,7 +46,7 @@ public class InfiniTest {
 
     private static void checkFalsePositiveRate(CidInfiniFilter bloom, double tolerance) {
         int in = 0;
-        int total = 10_000;
+        int total = 100_000;
         for (int i = 0; i < total; i++) {
             byte[] hash = new byte[32];
             r.nextBytes(hash);

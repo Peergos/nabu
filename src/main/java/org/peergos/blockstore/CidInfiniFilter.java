@@ -29,8 +29,10 @@ public class CidInfiniFilter implements Filter {
         int nBlocks = refs.size();
         int nextPowerOfTwo = Math.max(17, (int) (1 + Math.log(nBlocks) / Math.log(2)));
         double falsePositiveRate = 0.01;
-        int bitsPerEntry = (int)(1 - Math.log(falsePositiveRate /(1 + Math.log(nBlocks)/Math.log(2)))/Math.log(2));
+        double expansionAlpha = 0.8;
+        int bitsPerEntry = (int)(4 - Math.log(falsePositiveRate / expansionAlpha) / Math.log(2) + 1);
         ChainedInfiniFilter infini = new ChainedInfiniFilter(nextPowerOfTwo, bitsPerEntry);
+        infini.set_expand_autonomously(true);
         refs.forEach(c -> infini.insert(c.toBytes(), true));
         return new CidInfiniFilter(infini);
     }
