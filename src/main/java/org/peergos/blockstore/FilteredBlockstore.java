@@ -54,4 +54,8 @@ public class FilteredBlockstore implements Blockstore {
     public static FilteredBlockstore bloomBased(Blockstore source) {
         return new FilteredBlockstore(source, CidBloomFilter.build(source));
     }
+
+    public static FilteredBlockstore infiniBased(Blockstore source) {
+        return new FilteredBlockstore(source, CidInfiniFilter.build(source));
+    }
 }
