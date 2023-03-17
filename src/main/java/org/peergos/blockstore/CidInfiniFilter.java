@@ -9,7 +9,7 @@ public class CidInfiniFilter implements Filter {
 
     private final ChainedInfiniFilter filter;
 
-    public CidInfiniFilter(ChainedInfiniFilter filter) {
+    private CidInfiniFilter(ChainedInfiniFilter filter) {
         this.filter = filter;
     }
 
