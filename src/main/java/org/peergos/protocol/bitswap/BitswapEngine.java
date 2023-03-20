@@ -147,7 +147,8 @@ public class BitswapEngine {
             }
         }
 
-        LOG.info("Bitswap received " + msg.getWantlist().getEntriesCount() + " wants, " + msg.getPayloadCount() + " blocks and " + msg.getBlockPresencesCount() + " presences");
+        LOG.info("Bitswap received " + msg.getWantlist().getEntriesCount() + " wants, " + msg.getPayloadCount() +
+                " blocks and " + msg.getBlockPresencesCount() + " presences from " + sourcePeerId);
         for (MessageOuterClass.Message.Block block : msg.getPayloadList()) {
             byte[] cidPrefix = block.getPrefix().toByteArray();
             Optional<String> auth = block.getAuth().isEmpty() ?
