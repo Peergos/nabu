@@ -24,8 +24,8 @@ public class KuboTest {
             Multiaddr address2 = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kubo.id().get("ID"));
             byte[] blockData = "G'day from Java bitswap!".getBytes(StandardCharsets.UTF_8);
             Cid hash = (Cid)kubo.block.put(List.of(blockData), Optional.of("raw")).get(0).hash;
-            BitswapController bc1 = bitswap1.dial(node1, address2).getController().join();
-            byte[] receivedBlock = bitswap1.get(hash, node1).join();
+            node1.getAddressBook().setAddrs(address2.getPeerId(), 0, address2).join();
+            byte[] receivedBlock = bitswap1.get(hash, node1, Set.of(address2.getPeerId())).join();
             if (! Arrays.equals(receivedBlock, blockData))
                 throw new IllegalStateException("Incorrect block returned!");
         } finally {

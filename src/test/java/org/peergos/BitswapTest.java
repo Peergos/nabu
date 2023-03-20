@@ -29,8 +29,8 @@ public class BitswapTest {
             byte[] blockData = "G'day from Java bitswap!".getBytes(StandardCharsets.UTF_8);
             Cid hash = blockstore2.put(blockData, Cid.Codec.Raw).join();
             Bitswap bitswap1 = builder1.getBitswap().get();
-            BitswapController bc1 = bitswap1.dial(node1, address2).getController().join();
-            byte[] receivedBlock = bitswap1.get(hash, node1).join();
+            node1.getAddressBook().addAddrs(address2.getPeerId(), 0, address2).join();
+            byte[] receivedBlock = bitswap1.get(hash, node1, Set.of(address2.getPeerId())).join();
             if (! Arrays.equals(receivedBlock, blockData))
                 throw new IllegalStateException("Incorrect block returned!");
         } finally {

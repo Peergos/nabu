@@ -32,11 +32,11 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
         this.addrs = addrs;
     }
 
-    public CompletableFuture<byte[]> get(Cid hash, Host us) {
-        return get(List.of(hash), us).get(0);
+    public CompletableFuture<byte[]> get(Cid hash, Host us, Set<PeerId> peers) {
+        return get(List.of(hash), us, peers).get(0);
     }
 
-    public List<CompletableFuture<byte[]>> get(List<Cid> hashes, Host us) {
+    public List<CompletableFuture<byte[]>> get(List<Cid> hashes, Host us, Set<PeerId> peers) {
         if (hashes.isEmpty())
             return Collections.emptyList();
         List<CompletableFuture<byte[]>> results = new ArrayList<>();
@@ -46,17 +46,17 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
             CompletableFuture<byte[]> res = engine.getWant(hash);
             results.add(res);
         }
-        sendWants(us);
+        sendWants(us, peers);
         ForkJoinPool.commonPool().execute(() -> {
             while (engine.hasWants()) {
                 try {Thread.sleep(5_000);} catch (InterruptedException e) {}
-                sendWants(us);
+                sendWants(us, peers);
             }
         });
         return results;
     }
 
-    public void sendWants(Host us) {
+    public void sendWants(Host us, Set<PeerId> peers) {
         Set<Cid> wants = engine.getWants();
         LOG.info("Broadcast wants: " + wants.size());
         Map<Cid, PeerId> haves = engine.getHaves();
@@ -68,8 +68,8 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
                         .setBlock(ByteString.copyFrom(cid.toBytes()))
                         .build())
                 .collect(Collectors.toList());
-        // broadcast to all connected peers
-        Set<PeerId> connected = engine.getConnected();
+        // broadcast to all connected peers if none are supplied
+        Set<PeerId> connected = peers.isEmpty() ? engine.getConnected() : peers;
         engine.buildAndSendMessages(wantsProto, Collections.emptyList(), Collections.emptyList(),
                 msg -> connected.forEach(peer -> dialPeer(us, peer, c -> {
                     c.send(msg);
