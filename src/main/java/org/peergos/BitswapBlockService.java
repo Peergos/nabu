@@ -18,8 +18,8 @@ public class BitswapBlockService implements BlockService {
     }
 
     @Override
-    public List<byte[]> get(List<Cid> hashes, Set<PeerId> peers) {
-        return bitswap.get(hashes, us, peers)
+    public List<HashedBlock> get(List<Want> hashes, Set<PeerId> peers, boolean addToBlockstore) {
+        return bitswap.get(hashes, us, peers, addToBlockstore)
                 .stream()
                 .map(f -> f.join())
                 .collect(Collectors.toList());

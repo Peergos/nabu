@@ -9,6 +9,7 @@ import org.peergos.blockstore.*;
 import org.peergos.protocol.dht.*;
 
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.function.*;
 import java.util.stream.*;
 
@@ -19,7 +20,7 @@ public class FindProviderTest {
     public void findBlockProvider() {
         RamBlockstore blockstore = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), blockstore);
+                new RamProviderStore(), new RamRecordStore(), blockstore, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
 

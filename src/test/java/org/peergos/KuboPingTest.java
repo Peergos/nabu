@@ -11,6 +11,7 @@ import org.peergos.protocol.bitswap.*;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class KuboPingTest {
 
@@ -19,7 +20,7 @@ public class KuboPingTest {
         Host node1 = new HostBuilder()
                 .generateIdentity()
                 .listenLocalhost(11001)
-                .addProtocols(List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore()))))
+                .addProtocols(List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true)))))
                 .addMuxers(List.of(StreamMuxerProtocol.getYamux()))
                 .build();
         node1.start().join();

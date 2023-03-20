@@ -10,17 +10,19 @@ import org.peergos.protocol.dht.*;
 
 import java.nio.charset.*;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.*;
 
 public class BitswapTest {
 
     @Test
     public void getBlock() {
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore());
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         RamBlockstore blockstore2 = new RamBlockstore();
         HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), blockstore2);
+                new RamProviderStore(), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node2 = builder2.build();
         node1.start().join();
         node2.start().join();
@@ -30,8 +32,11 @@ public class BitswapTest {
             Cid hash = blockstore2.put(blockData, Cid.Codec.Raw).join();
             Bitswap bitswap1 = builder1.getBitswap().get();
             node1.getAddressBook().addAddrs(address2.getPeerId(), 0, address2).join();
-            byte[] receivedBlock = bitswap1.get(hash, node1, Set.of(address2.getPeerId())).join();
-            if (! Arrays.equals(receivedBlock, blockData))
+            List<HashedBlock> receivedBlock = bitswap1.get(List.of(new Want(hash)), node1, Set.of(address2.getPeerId()), false)
+                    .stream()
+                    .map(f -> f.join())
+                    .collect(Collectors.toList());
+            if (! Arrays.equals(receivedBlock.get(0).block, blockData))
                 throw new IllegalStateException("Incorrect block returned!");
         } finally {
             node1.stop();

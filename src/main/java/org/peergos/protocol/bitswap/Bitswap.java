@@ -32,18 +32,24 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
         this.addrs = addrs;
     }
 
-    public CompletableFuture<byte[]> get(Cid hash, Host us, Set<PeerId> peers) {
-        return get(List.of(hash), us, peers).get(0);
+    public CompletableFuture<HashedBlock> get(Want hash,
+                                              Host us,
+                                              Set<PeerId> peers,
+                                              boolean addToBlockstore) {
+        return get(List.of(hash), us, peers, addToBlockstore).get(0);
     }
 
-    public List<CompletableFuture<byte[]>> get(List<Cid> hashes, Host us, Set<PeerId> peers) {
-        if (hashes.isEmpty())
+    public List<CompletableFuture<HashedBlock>> get(List<Want> wants,
+                                                    Host us,
+                                                    Set<PeerId> peers,
+                                                    boolean addToBlockstore) {
+        if (wants.isEmpty())
             return Collections.emptyList();
-        List<CompletableFuture<byte[]>> results = new ArrayList<>();
-        for (Cid hash : hashes) {
-            if (hash.getType() == Multihash.Type.id)
+        List<CompletableFuture<HashedBlock>> results = new ArrayList<>();
+        for (Want w : wants) {
+            if (w.cid.getType() == Multihash.Type.id)
                 continue;
-            CompletableFuture<byte[]> res = engine.getWant(hash);
+            CompletableFuture<HashedBlock> res = engine.getWant(w, addToBlockstore);
             results.add(res);
         }
         sendWants(us, peers);
@@ -57,15 +63,16 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
     }
 
     public void sendWants(Host us, Set<PeerId> peers) {
-        Set<Cid> wants = engine.getWants();
+        Set<Want> wants = engine.getWants();
         LOG.info("Broadcast wants: " + wants.size());
-        Map<Cid, PeerId> haves = engine.getHaves();
+        Map<Want, PeerId> haves = engine.getHaves();
         List<MessageOuterClass.Message.Wantlist.Entry> wantsProto = wants.stream()
-                .map(cid -> MessageOuterClass.Message.Wantlist.Entry.newBuilder()
-                        .setWantType(haves.containsKey(cid) ?
+                .map(want -> MessageOuterClass.Message.Wantlist.Entry.newBuilder()
+                        .setWantType(haves.containsKey(want) ?
                                 MessageOuterClass.Message.Wantlist.WantType.Block :
                                 MessageOuterClass.Message.Wantlist.WantType.Have)
-                        .setBlock(ByteString.copyFrom(cid.toBytes()))
+                        .setBlock(ByteString.copyFrom(want.cid.toBytes()))
+                        .setAuth(ByteString.copyFrom(want.auth.orElse("").getBytes()))
                         .build())
                 .collect(Collectors.toList());
         // broadcast to all connected peers if none are supplied
@@ -78,6 +85,8 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
 
     private void dialPeer(Host us, PeerId peer, Consumer<BitswapController> action) {
         Multiaddr[] addr = addrs.get(peer).join().toArray(new Multiaddr[0]);
+        if (addr.length == 0)
+            throw new IllegalStateException("No addresses known for peer " + peer);
         BitswapController controller = dial(us, peer, addr).getController().join();
         action.accept(controller);
     }

@@ -3,7 +3,7 @@ package org.peergos.net;
 import io.ipfs.cid.Cid;
 import io.libp2p.core.Host;
 import io.libp2p.core.PeerId;
-import org.peergos.APIService;
+import org.peergos.*;
 import org.peergos.util.*;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.*;
 
 
 public class APIHandler implements HttpHandler {
@@ -83,11 +84,16 @@ public class APIHandler implements HttpHandler {
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"ipfs-path\" is required");
                     }
-                    List<String> authz = params.get("auth");
-                    Optional<String> authOpt = authz != null && authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
-                    Optional<byte[]> blockOpt = service.getBlock(Cid.decode(args.get(0)), authOpt, false);
-                    if (blockOpt.isPresent()) {
-                        replyBytes(httpExchange, blockOpt.get());
+                    Optional<String> auth = Optional.ofNullable(params.get("auth")).map(a -> a.get(0));
+                    Set<PeerId> peers = Optional.ofNullable(params.get("peers"))
+                            .map(p -> p.stream().map(PeerId::fromBase58).collect(Collectors.toSet()))
+                            .orElse(Collections.emptySet());
+                    boolean addToBlockstore = Optional.ofNullable(params.get("persist"))
+                            .map(a -> Boolean.parseBoolean(a.get(0)))
+                            .orElse(true);
+                    List<HashedBlock> block = service.getBlocks(List.of(new Want(Cid.decode(args.get(0)), auth)), peers, addToBlockstore);
+                    if (! block.isEmpty()) {
+                        replyBytes(httpExchange, block.get(0).block);
                     } else {
                         try {
                             httpExchange.sendResponseHeaders(400, 0);
@@ -152,12 +158,11 @@ public class APIHandler implements HttpHandler {
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
                     }
-                    List<String> authz = params.get("auth");
-                    Optional<String> authOpt = authz != null && authz.size() == 1 ? Optional.of(authz.get(0)) : Optional.empty();
-                    Optional<byte[]> blockOpt = service.getBlock(Cid.decode(args.get(0)), authOpt);
-                    if (blockOpt.isPresent()) {
+                    Optional<String> auth = Optional.ofNullable(params.get("auth")).map(a -> a.get(0));
+                    List<HashedBlock> block = service.getBlocks(List.of(new Want(Cid.decode(args.get(0)), auth)), Collections.emptySet(), false);
+                    if (! block.isEmpty()) {
                         Map res = new HashMap<>();
-                        res.put("Size", blockOpt.get().length);
+                        res.put("Size", block.get(0).block.length);
                         replyJson(httpExchange, JSONParser.toString(res));
                     } else {
                         try {

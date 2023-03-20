@@ -20,13 +20,16 @@ public class BitswapEngine {
     private static final Logger LOG = Logger.getLogger(BitswapEngine.class.getName());
 
     private final Blockstore store;
-    private final ConcurrentHashMap<Cid, CompletableFuture<byte[]>> localWants = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Cid, PeerId> blockHaves = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Want, CompletableFuture<HashedBlock>> localWants = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Want, Boolean> persistBlocks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Want, PeerId> blockHaves = new ConcurrentHashMap<>();
     private final Set<PeerId> connections = new HashSet<>();
+    private final BlockRequestAuthoriser authoriser;
     private AddressBook addressBook;
 
-    public BitswapEngine(Blockstore store) {
+    public BitswapEngine(Blockstore store, BlockRequestAuthoriser authoriser) {
         this.store = store;
+        this.authoriser = authoriser;
     }
 
     public void setAddressBook(AddressBook addrs) {
@@ -38,12 +41,14 @@ public class BitswapEngine {
         addressBook.addAddrs(peer, 0, addr);
     }
 
-    public CompletableFuture<byte[]> getWant(Cid hash) {
-        CompletableFuture<byte[]> existing = localWants.get(hash);
+    public CompletableFuture<HashedBlock> getWant(Want w, boolean addToBlockstore) {
+        CompletableFuture<HashedBlock> existing = localWants.get(w);
         if (existing != null)
             return existing;
-        CompletableFuture<byte[]> res = new CompletableFuture<>();
-        localWants.put(hash, res);
+        CompletableFuture<HashedBlock> res = new CompletableFuture<>();
+        if (addToBlockstore)
+            persistBlocks.put(w, true);
+        localWants.put(w, res);
         return res;
     }
 
@@ -59,11 +64,11 @@ public class BitswapEngine {
         return connected;
     }
 
-    public Set<Cid> getWants() {
+    public Set<Want> getWants() {
         return localWants.keySet();
     }
 
-    public Map<Cid, PeerId> getHaves() {
+    public Map<Want, PeerId> getHaves() {
         return blockHaves;
     }
 
@@ -87,15 +92,18 @@ public class BitswapEngine {
         List<MessageOuterClass.Message.Wantlist.Entry> wants = new ArrayList<>();
 
         int messageSize = 0;
+        Multihash peerM = Multihash.deserialize(source.remotePeerId().getBytes());
+        Cid sourcePeerId = new Cid(1, Cid.Codec.Libp2pKey, peerM.getType(), peerM.getHash());
         if (msg.hasWantlist()) {
             for (MessageOuterClass.Message.Wantlist.Entry e : msg.getWantlist().getEntriesList()) {
                 Cid c = Cid.cast(e.getBlock().toByteArray());
+                Optional<String> auth = e.getAuth().isEmpty() ? Optional.empty() : Optional.of(e.getAuth().toStringUtf8());
                 boolean isCancel = e.getCancel();
                 boolean sendDontHave = e.getSendDontHave();
                 boolean wantBlock = e.getWantType().getNumber() == 0;
                 if (wantBlock) {
                     Optional<byte[]> block = store.get(c).join();
-                    if (block.isPresent()) {
+                    if (block.isPresent() && authoriser.allowRead(c, block.get(), sourcePeerId, auth.orElse("")).join()) {
                         MessageOuterClass.Message.Block blockP = MessageOuterClass.Message.Block.newBuilder()
                                 .setPrefix(ByteString.copyFrom(prefixBytes(c)))
                                 .setData(ByteString.copyFrom(block.get()))
@@ -139,9 +147,12 @@ public class BitswapEngine {
             }
         }
 
-        LOG.info("Bitswap received " + msg.getPayloadCount() + " blocks and " + msg.getBlockPresencesCount() + " presences");
+        LOG.info("Bitswap received " + msg.getWantlist().getEntriesCount() + " wants, " + msg.getPayloadCount() + " blocks and " + msg.getBlockPresencesCount() + " presences");
         for (MessageOuterClass.Message.Block block : msg.getPayloadList()) {
             byte[] cidPrefix = block.getPrefix().toByteArray();
+            Optional<String> auth = block.getAuth().isEmpty() ?
+                    Optional.empty() :
+                    Optional.of(block.getAuth().toStringUtf8());
             byte[] data = block.getData().toByteArray();
             ByteArrayInputStream bin = new ByteArrayInputStream(cidPrefix);
             try {
@@ -154,11 +165,15 @@ public class BitswapEngine {
                 } else {
                     byte[] hash = Hash.sha256(data);
                     Cid c = new Cid(version, codec, type, hash);
-                    CompletableFuture<byte[]> waiter = localWants.get(c);
+                    Want w = new Want(c, auth);
+                    CompletableFuture<HashedBlock> waiter = localWants.get(w);
                     if (waiter != null) {
-                        store.put(data, codec);
-                        waiter.complete(data);
-                        localWants.remove(c);
+                        if (persistBlocks.containsKey(w)) {
+                            store.put(data, codec);
+                            persistBlocks.remove(w);
+                        }
+                        waiter.complete(new HashedBlock(c, data));
+                        localWants.remove(w);
                     } else
                         LOG.info("Received block we don't want: " + c);
                 }
@@ -170,9 +185,11 @@ public class BitswapEngine {
             LOG.info("Remaining: " + localWants.size());
         for (MessageOuterClass.Message.BlockPresence blockPresence : msg.getBlockPresencesList()) {
             Cid c = Cid.cast(blockPresence.getCid().toByteArray());
+            Optional<String> auth = blockPresence.getAuth().isEmpty() ? Optional.empty() : Optional.of(blockPresence.getAuth().toStringUtf8());
+            Want w = new Want(c, auth);
             boolean have = blockPresence.getType().getNumber() == 0;
-            if (have && localWants.containsKey(c)) {
-                blockHaves.put(c, source.remotePeerId());
+            if (have && localWants.containsKey(w)) {
+                blockHaves.put(w, source.remotePeerId());
             }
         }
 

@@ -46,19 +46,19 @@ public class APIServiceTest {
 
     @Test
     public void bulkGetTest() {
-        APIService service = new APIService(new RamBlockstore());
+        APIService service = new APIService(new RamBlockstore(), new BitswapBlockService(null, null));
         Cid cid1 = service.putBlock("Hello".getBytes(), "raw");
         Cid cid2= service.putBlock("world!".getBytes(), "raw");
         List<Want> wants = new ArrayList<>();
-        wants.add(new Want(cid1, "auth"));
-        wants.add(new Want(cid2, "auth"));
-        Map<Cid, byte[]> blocks = service.getBlocks(wants, false);
+        wants.add(new Want(cid1, Optional.of("auth")));
+        wants.add(new Want(cid2, Optional.of("auth")));
+        List<HashedBlock> blocks = service.getBlocks(wants, Collections.emptySet(), false);
         Assert.assertTrue("blocks retrieved", blocks.size() == 2);
     }
 
     public class Tester {
         public static void runAPIServiceTest(Blockstore blocks) {
-            APIService service = new APIService(blocks);
+            APIService service = new APIService(blocks, new BitswapBlockService(null, null));
             Cid cid = Cid.decode("zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg");
             Assert.assertFalse("cid found", service.hasBlock(cid));
             String text = "Hello world!";
@@ -67,14 +67,14 @@ public class APIServiceTest {
             Cid cidAdded = service.putBlock(block, "raw");
             Assert.assertTrue("cid added was found", service.hasBlock(cidAdded));
 
-            Optional<byte[]> blockRetrieved = service.getBlock(cidAdded, false);
-            Assert.assertTrue("block retrieved", blockRetrieved.isPresent());
-            Assert.assertTrue("block is as expected", text.equals(new String(blockRetrieved.get())));
+            List<HashedBlock> blockRetrieved = service.getBlocks(List.of(new Want(cidAdded)), Collections.emptySet(), false);
+            Assert.assertTrue("block retrieved", blockRetrieved.size() == 1);
+            Assert.assertTrue("block is as expected", text.equals(new String(blockRetrieved.get(0).block)));
 
             List<Cid> localRefs = service.getRefs();
             for (Cid ref : localRefs) {
-                Optional<byte[]> res = service.getBlock(ref, false);
-                Assert.assertTrue("ref retrieved", res.isPresent());
+                List<HashedBlock> res = service.getBlocks(List.of(new Want(ref)), Collections.emptySet(), false);
+                Assert.assertTrue("ref retrieved", res.size() == 1);
             }
 
             Assert.assertTrue("block removed", service.rmBlock(cidAdded));

@@ -27,7 +27,7 @@ public class APIHandlerTest {
             InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
             apiServer = HttpServer.create(localAPIAddress, 500);
-            APIService service = new APIService(new RamBlockstore());
+            APIService service = new APIService(new RamBlockstore(), new BitswapBlockService(null, null));
             apiServer.createContext(APIService.API_URL, new APIHandler(service, null));
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();

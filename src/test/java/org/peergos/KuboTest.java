@@ -11,12 +11,13 @@ import org.peergos.blockstore.*;
 import java.io.*;
 import java.nio.charset.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class KuboTest {
 
     @Test
     public void getBlock() throws IOException {
-        Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore()));
+        Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true)));
         Host node1 = HostBuilder.build(10000 + new Random().nextInt(50000), List.of(bitswap1));
         node1.start().join();
         try {
@@ -25,8 +26,8 @@ public class KuboTest {
             byte[] blockData = "G'day from Java bitswap!".getBytes(StandardCharsets.UTF_8);
             Cid hash = (Cid)kubo.block.put(List.of(blockData), Optional.of("raw")).get(0).hash;
             node1.getAddressBook().setAddrs(address2.getPeerId(), 0, address2).join();
-            byte[] receivedBlock = bitswap1.get(hash, node1, Set.of(address2.getPeerId())).join();
-            if (! Arrays.equals(receivedBlock, blockData))
+            HashedBlock receivedBlock = bitswap1.get(new Want(hash), node1, Set.of(address2.getPeerId()), false).join();
+            if (! Arrays.equals(receivedBlock.block, blockData))
                 throw new IllegalStateException("Incorrect block returned!");
         } finally {
             node1.stop();

@@ -8,6 +8,7 @@ import org.peergos.blockstore.*;
 import org.peergos.protocol.dht.*;
 
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.function.*;
 import java.util.stream.*;
 
@@ -35,7 +36,7 @@ public class BootstrapTest {
     @Test
     public void bootstrap() {
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore());
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
         Multihash node1Id = Multihash.deserialize(node1.getPeerId().getBytes());
