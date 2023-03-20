@@ -23,7 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -62,11 +62,12 @@ public class Server {
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
+        BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
         builder = builder.addProtocols(List.of(
                 new Ping(),
                 new AutonatProtocol.Binding(),
                 new CircuitHopProtocol.Binding(relayManager, stop),
-                new Bitswap(new BitswapEngine(blocks)),
+                new Bitswap(new BitswapEngine(blocks, authoriser)),
                 dht));
 
         Host node = builder.build();
@@ -83,7 +84,7 @@ public class Server {
         int handlerThreads = 50;
         LOG.info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
         HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
-        APIService service = new APIService(blocks);
+        APIService service = new APIService(blocks, new BitswapBlockService(node, builder.getBitswap().get()));
         apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();

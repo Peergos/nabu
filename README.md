@@ -14,7 +14,7 @@ Currently implemented properties:
 * RSA and Ed25519 peer IDs
 * yamux and mplex muxers
 * Kademlia DHT for content discovery
-* Bitswap 1.2.0
+* Bitswap 1.2.0 + auth extension
 * IPNS publishing on Kademlia
 * p2p http proxy
 * dnsaddr multiaddr resolution during bootstrap

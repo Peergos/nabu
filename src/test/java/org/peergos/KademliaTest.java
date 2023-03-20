@@ -7,6 +7,7 @@ import org.peergos.blockstore.*;
 import org.peergos.protocol.dht.*;
 
 import java.util.*;
+import java.util.concurrent.*;
 
 public class KademliaTest {
 
@@ -15,12 +16,12 @@ public class KademliaTest {
     public void findRelayedNode() throws Exception {
         RamBlockstore blockstore1 = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), blockstore1);
+                new RamProviderStore(), new RamRecordStore(), blockstore1, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
 
         HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore());
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node2 = builder2.build();
         node2.start().join();
 

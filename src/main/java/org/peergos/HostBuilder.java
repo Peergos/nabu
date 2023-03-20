@@ -103,7 +103,11 @@ public class HostBuilder {
         return this;
     }
 
-    public static HostBuilder build(int listenPort, ProviderStore providers, RecordStore records, Blockstore blocks) {
+    public static HostBuilder build(int listenPort,
+                                    ProviderStore providers,
+                                    RecordStore records,
+                                    Blockstore blocks,
+                                    BlockRequestAuthoriser authoriser) {
         HostBuilder builder = new HostBuilder().generateIdentity().listenLocalhost(listenPort);
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
@@ -113,7 +117,7 @@ public class HostBuilder {
                 new Ping(),
                 new AutonatProtocol.Binding(),
                 new CircuitHopProtocol.Binding(relayManager, stop),
-                new Bitswap(new BitswapEngine(blocks)),
+                new Bitswap(new BitswapEngine(blocks, authoriser)),
                 dht));
     }
 
