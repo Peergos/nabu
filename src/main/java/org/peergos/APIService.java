@@ -5,6 +5,7 @@ import org.peergos.blockstore.Blockstore;
 import org.peergos.util.Version;
 
 import java.util.*;
+import java.util.stream.*;
 
 public class APIService {
 
@@ -34,7 +35,12 @@ public class APIService {
         local.stream()
                 .map(w -> new HashedBlock(w.cid, store.get(w.cid).join().get()))
                 .forEach(blocksFound::add);
-        return remoteBlocks.get(remote, peers, addToLocal);
+        if (remote.isEmpty())
+            return blocksFound;
+        return java.util.stream.Stream.concat(
+                        blocksFound.stream(),
+                        remoteBlocks.get(remote, peers, addToLocal).stream())
+                .collect(Collectors.toList());
     }
     
     public Cid putBlock(byte[] block, String format) {
