@@ -12,8 +12,7 @@ import java.util.concurrent.*;
 public class KademliaTest {
 
     @Test
-    @Ignore // until auto relay is done
-    public void findRelayedNode() throws Exception {
+    public void findOtherNode() throws Exception {
         RamBlockstore blockstore1 = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), blockstore1, (c, b, p, a) -> CompletableFuture.completedFuture(true));
