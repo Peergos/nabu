@@ -23,10 +23,14 @@ public class CidBloomFilter implements Filter {
         return c;
     }
 
-    public static CidBloomFilter build(Blockstore bs) {
+    public static CidBloomFilter build(Blockstore bs, double falsePositiveRate) {
         List<Cid> refs = bs.refs().join();
-        BloomFilter<Cid> bloom = new BloomFilter<>(0.01, refs.size());
+        BloomFilter<Cid> bloom = new BloomFilter<>(falsePositiveRate, refs.size());
         refs.forEach(bloom::add);
         return new CidBloomFilter(bloom);
+    }
+
+    public static CidBloomFilter build(Blockstore bs) {
+        return build(bs, 0.01);
     }
 }

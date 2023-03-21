@@ -92,8 +92,8 @@ public class Config {
 
         AddressesSection addressesSection = new AddressesSection(swarmAddresses, apiAddress, gatewayAddress,
                 proxyTargetAddress, allowTarget);
-        int bloomFilterSize = 0;
-        DatastoreSection datastoreSection = new DatastoreSection(blockMount, rootMount, bloomFilterSize);
+        Filter filter = new Filter(FilterType.INFINI, 0.01);
+        DatastoreSection datastoreSection = new DatastoreSection(blockMount, rootMount, filter);
         BootstrapSection bootstrapSection = new BootstrapSection(bootstrapNodes);
         IdentitySection identity = new IdentitySection(privKey.bytes(), peerId);
         return new Config(addressesSection, bootstrapSection, datastoreSection, identity);
