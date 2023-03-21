@@ -144,8 +144,8 @@ public class HostBuilder {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             b.getTransports().add(TcpTransport::new);
-            b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, (List<String>)m));
             b.getSecureChannels().add((k, m) -> new NoiseXXSecureChannel(k, (List<String>)m));
+            b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, (List<String>)m));
             b.getMuxers().addAll(muxers);
             b.getAddressBook().setImpl(new RamAddressBook());
 
