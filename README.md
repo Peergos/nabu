@@ -26,9 +26,9 @@ Currently implemented properties:
 * persistent identities and config
 * basic HTTP API (block.{get, put, rm, has, stat}, id, getRefs, bloomAdd) compatible with matching kubo api calls
 * bloom/infini filtered blockstore
+* connect bitswap to kademlia for discovery, with a faster version with supplied peerids
 
 In the future we will add:
-* connect bitswap to kademlia for discovery
 * QUIC transport (and encryption and multiplexing)
 * circuit-relay
 * dcutr (direct connection upgrade through relay)
