@@ -25,7 +25,7 @@ Currently implemented properties:
 * persistent datastores (IPNS record store) using H2 DB
 * persistent identities and config
 * basic HTTP API (block.{get, put, rm, has, stat}, id, getRefs, bloomAdd) compatible with matching kubo api calls
-* bloom/infini filtered blockstore
+* bloom/[infini filtered](https://www.rasmuspagh.net/papers/infinifilter.pdf) blockstore
 * connect bitswap to kademlia for discovery, with a faster version with supplied peerids
 
 In the future we will add:
