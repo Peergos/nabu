@@ -47,7 +47,16 @@ public class Server {
             throw new IllegalStateException("Unable to create blocks directory");
         }
         FileBlockstore blocks = new FileBlockstore(blocksPath);
-
+        Blockstore blockStore = null;
+        if (config.datastore.filter.type == FilterType.BLOOM) {
+            blockStore = FilteredBlockstore.bloomBased(blocks, config.datastore.filter.falsePositiveRate);
+        } else if(config.datastore.filter.type == FilterType.INFINI) {
+            blockStore = FilteredBlockstore.infiniBased(blocks, config.datastore.filter.falsePositiveRate);
+        } else if(config.datastore.filter.type == FilterType.NONE) {
+            blockStore = blocks;
+        } else {
+            throw new IllegalStateException("Unhandled filter type: " + config.datastore.filter.type);
+        }
         List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();
         int hostPort = swarmAddresses.get(0).getPort();
         HostBuilder builder = new HostBuilder().setIdentity(config.identity.privKeyProtobuf).listenLocalhost(hostPort);
@@ -67,7 +76,7 @@ public class Server {
                 new Ping(),
                 new AutonatProtocol.Binding(),
                 new CircuitHopProtocol.Binding(relayManager, stop),
-                new Bitswap(new BitswapEngine(blocks, authoriser)),
+                new Bitswap(new BitswapEngine(blockStore, authoriser)),
                 dht));
 
         Host node = builder.build();
@@ -84,7 +93,7 @@ public class Server {
         int handlerThreads = 50;
         LOG.info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
         HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
-        APIService service = new APIService(blocks, new BitswapBlockService(node, builder.getBitswap().get()));
+        APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()));
         apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();
