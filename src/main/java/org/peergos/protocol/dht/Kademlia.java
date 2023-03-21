@@ -26,6 +26,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     public static final int BOOTSTRAP_PERIOD_MILLIS = 300_000;
     private final KademliaEngine engine;
     private final boolean localDht;
+    private AddressBook addressBook;
 
     public Kademlia(KademliaEngine dht, boolean localOnly) {
         super("/ipfs/" + (localOnly ? "lan/" : "") + "kad/1.0.0", new KademliaProtocol(dht));
@@ -35,6 +36,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
 
     public void setAddressBook(AddressBook addrs) {
         engine.setAddressBook(addrs);
+        this.addressBook = addrs;
     }
 
     public int bootstrapRoutingTable(Host host, List<MultiAddress> addrs, Predicate<String> filter) {
@@ -121,7 +123,16 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         Id keyId = Id.create(Hash.sha256(key), 256);
         SortedSet<RoutingEntry> closest = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
         SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
-        closest.addAll(engine.getKClosestPeers(key).stream()
+        List<PeerAddresses> localClosest = engine.getKClosestPeers(key);
+        if (maxCount == 1) {
+            Collection<Multiaddr> existing = addressBook.get(PeerId.fromBase58(peerIdkey.toBase58())).join();
+            if (! existing.isEmpty())
+                return Collections.singletonList(new PeerAddresses(peerIdkey, existing.stream().map(a -> a.toString()).map(MultiAddress::new).collect(Collectors.toList())));
+            Optional<PeerAddresses> match = localClosest.stream().filter(p -> p.peerId.equals(peerIdkey)).findFirst();
+            if (match.isPresent())
+                return Collections.singletonList(match.get());
+        }
+        closest.addAll(localClosest.stream()
                 .map(p -> new RoutingEntry(Id.create(Hash.sha256(p.peerId.toBytes()), 256), p))
                 .collect(Collectors.toList()));
         toQuery.addAll(closest);
