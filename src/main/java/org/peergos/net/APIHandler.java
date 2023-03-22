@@ -128,7 +128,8 @@ public class APIHandler implements HttpHandler {
                     if (block.length >  1024 * 1024 * 2) { //todo what should the limit be?
                         throw new APIException("Block too large");
                     }
-                    Cid cid = service.putBlock(block, formatOpt.get());
+                    Cid.Codec codec = formatOpt.get().equals("raw") ? Cid.Codec.Raw : Cid.Codec.DagCbor;
+                    Cid cid = service.putBlock(block, codec);
                     Map res = new HashMap<>();
                     res.put("Hash", cid.toString());
                     replyJson(httpExchange, JSONParser.toString(res));
