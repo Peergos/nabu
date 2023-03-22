@@ -14,7 +14,7 @@ Currently implemented properties:
 * RSA and Ed25519 peer IDs
 * yamux and mplex muxers
 * Kademlia DHT for peer routing, IPNS publishing and fallback content discovery
-* Bitswap 1.2.0 + auth extension
+* Bitswap 1.2.0 + auth extension as [used in Peergos](https://peergos.org/posts/bats)
 * p2p http proxy
 * dnsaddr multiaddr resolution during bootstrap
 * autonat
