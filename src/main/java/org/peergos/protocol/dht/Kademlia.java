@@ -7,6 +7,8 @@ import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
+import io.libp2p.etc.types.*;
+import io.libp2p.protocol.*;
 import org.peergos.*;
 import org.peergos.protocol.dnsaddr.*;
 import org.peergos.protocol.ipns.*;
@@ -15,12 +17,16 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
+import java.util.logging.*;
 import java.util.stream.*;
 
 public class Kademlia extends StrictProtocolBinding<KademliaController> implements AddressBookConsumer {
+
+    private static final Logger LOG = Logger.getLogger(Kademlia.class.getName());
     public static final int BOOTSTRAP_PERIOD_MILLIS = 300_000;
     private final KademliaEngine engine;
     private final boolean localDht;
+    private AddressBook addressBook;
 
     public Kademlia(KademliaEngine dht, boolean localOnly) {
         super("/ipfs/" + (localOnly ? "lan/" : "") + "kad/1.0.0", new KademliaProtocol(dht));
@@ -30,6 +36,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
 
     public void setAddressBook(AddressBook addrs) {
         engine.setAddressBook(addrs);
+        this.addressBook = addrs;
     }
 
     public int bootstrapRoutingTable(Host host, List<MultiAddress> addrs, Predicate<String> filter) {
@@ -64,14 +71,34 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         }, "Kademlia bootstrap").start();
     }
 
+    private boolean connectTo(Host us, PeerAddresses peer) {
+        try {
+            new Identify().dial(us, PeerId.fromBase58(peer.peerId.toBase58()), getPublic(peer)).getController().join().id().join();
+            return true;
+        } catch (Exception e) {
+            if (e.getCause() instanceof NothingToCompleteException)
+                LOG.info("Couldn't connect to " + peer.peerId);
+            else
+                e.printStackTrace();
+            return false;
+        }
+    }
     public void bootstrap(Host us) {
         // lookup a random peer id
         byte[] hash = new byte[32];
         new Random().nextBytes(hash);
         Multihash randomPeerId = new Multihash(Multihash.Type.sha2_256, hash);
         findClosestPeers(randomPeerId, 20, us);
-        // lookup our own peer id to keep our nearest neighbours up-to-date
-        findClosestPeers(Multihash.deserialize(us.getPeerId().getBytes()), 20, us);
+
+        // lookup our own peer id to keep our nearest neighbours up-to-date,
+        // and connect to all of them, so they know about our addresses
+        List<PeerAddresses> closestToUs = findClosestPeers(Multihash.deserialize(us.getPeerId().getBytes()), 20, us);
+        int connectedClosest = 0;
+        for (PeerAddresses peer : closestToUs) {
+            if (connectTo(us, peer))
+                connectedClosest++;
+        }
+        LOG.info("Bootstrap connected to " + connectedClosest + " nodes close to us.");
     }
 
     static class RoutingEntry {
@@ -84,12 +111,28 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         }
     }
 
+    private int compareKeys(RoutingEntry a, RoutingEntry b, Id keyId) {
+        int prefixDiff = b.key.getSharedPrefixLength(keyId) - a.key.getSharedPrefixLength(keyId);
+        if (prefixDiff != 0)
+            return prefixDiff;
+        return a.addresses.peerId.toBase58().compareTo(b.addresses.peerId.toBase58());
+    }
+
     public List<PeerAddresses> findClosestPeers(Multihash peerIdkey, int maxCount, Host us) {
         byte[] key = peerIdkey.toBytes();
-        Id keyId = Id.create(key, 256);
-        SortedSet<RoutingEntry> closest = new TreeSet<>((a, b) -> b.key.getSharedPrefixLength(keyId) - a.key.getSharedPrefixLength(keyId));
-        SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> b.key.getSharedPrefixLength(keyId) - a.key.getSharedPrefixLength(keyId));
-        closest.addAll(engine.getKClosestPeers(key).stream()
+        Id keyId = Id.create(Hash.sha256(key), 256);
+        SortedSet<RoutingEntry> closest = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
+        SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
+        List<PeerAddresses> localClosest = engine.getKClosestPeers(key);
+        if (maxCount == 1) {
+            Collection<Multiaddr> existing = addressBook.get(PeerId.fromBase58(peerIdkey.toBase58())).join();
+            if (! existing.isEmpty())
+                return Collections.singletonList(new PeerAddresses(peerIdkey, existing.stream().map(a -> a.toString()).map(MultiAddress::new).collect(Collectors.toList())));
+            Optional<PeerAddresses> match = localClosest.stream().filter(p -> p.peerId.equals(peerIdkey)).findFirst();
+            if (match.isPresent())
+                return Collections.singletonList(match.get());
+        }
+        closest.addAll(localClosest.stream()
                 .map(p -> new RoutingEntry(Id.create(Hash.sha256(p.peerId.toBytes()), 256), p))
                 .collect(Collectors.toList()));
         toQuery.addAll(closest);
@@ -107,8 +150,12 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 List<PeerAddresses> result = future.join();
                 for (PeerAddresses peer : result) {
                     if (! queried.contains(peer.peerId)) {
+                        // exit early if we are looking for the specific node
+                        if (maxCount == 1 && peer.peerId.equals(peerIdkey))
+                            return Collections.singletonList(peer);
                         queried.add(peer.peerId);
-                        RoutingEntry e = new RoutingEntry(Id.create(Hash.sha256(peer.peerId.toBytes()), 256), peer);
+                        Id peerKey = Id.create(Hash.sha256(peer.peerId.toBytes()), 256);
+                        RoutingEntry e = new RoutingEntry(peerKey, peer);
                         toQuery.add(e);
                         closest.add(e);
                         foundCloser = true;
@@ -176,16 +223,25 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         try {
             return dialPeer(target, us).orTimeout(2, TimeUnit.SECONDS).join().closerPeers(peerIDKey);
         } catch (Exception e) {
-            e.printStackTrace();
-            return CompletableFuture.completedFuture(Collections.emptyList());
+            if (e.getCause() instanceof NothingToCompleteException)
+                LOG.info("Couldn't dial " + peerIDKey + " addrs: " + target.addresses);
+            else if (e.getCause() instanceof TimeoutException)
+                LOG.info("Timeout dialing " + peerIDKey + " addrs: " + target.addresses);
+            else
+                e.printStackTrace();
         }
+        return CompletableFuture.completedFuture(Collections.emptyList());
     }
 
-    private CompletableFuture<? extends KademliaController> dialPeer(PeerAddresses target, Host us) {
-        Multiaddr[] multiaddrs = target.addresses.stream()
+    private Multiaddr[] getPublic(PeerAddresses target) {
+        return target.addresses.stream()
                 .filter(a -> localDht || a.isPublic(false))
                 .map(a -> Multiaddr.fromString(a.toString()))
                 .collect(Collectors.toList()).toArray(new Multiaddr[0]);
+    }
+
+    private CompletableFuture<? extends KademliaController> dialPeer(PeerAddresses target, Host us) {
+        Multiaddr[] multiaddrs = getPublic(target);
         return dial(us, PeerId.fromBase58(target.peerId.toBase58()), multiaddrs).getController();
     }
 

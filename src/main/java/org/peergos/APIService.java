@@ -1,10 +1,11 @@
 package org.peergos;
 import io.ipfs.cid.Cid;
+import io.libp2p.core.*;
 import org.peergos.blockstore.Blockstore;
 import org.peergos.util.Version;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.stream.*;
 
 public class APIService {
 
@@ -12,38 +13,34 @@ public class APIService {
     public static final String API_URL = "/api/v0/";
 
     private final Blockstore store;
+    private final BlockService remoteBlocks;
 
-    public APIService(Blockstore store) {
+    public APIService(Blockstore store, BlockService remoteBlocks) {
         this.store = store;
+        this.remoteBlocks = remoteBlocks;
     }
 
-    public Optional<byte[]> getBlock(Cid cid, boolean addToLocal) {
-        return getBlock(cid, Optional.empty(), addToLocal);
-    }
-    public Optional<byte[]> getBlock(Cid cid, Optional<String> auth) {
-        return getBlock(cid, auth, false);
-    }
-    public Optional<byte[]> getBlock(Cid cid, Optional<String> auth, boolean addToLocal) {
-        boolean has = store.has(cid).join();
-        if (has) {
-            return store.get(cid).join();
-        } else {
-            if (addToLocal) {
-                //once retrieved, add to local also
-            }
-            return Optional.empty(); // todo get from network
-        }
-    }
+    public List<HashedBlock> getBlocks(List<Want> wants, Set<PeerId> peers, boolean addToLocal) {
+        List<HashedBlock> blocksFound = new ArrayList<>();
 
-    public Map<Cid, byte[]> getBlocks(List<Want> wantedBlocks, boolean addToLocal) {
-        Map<Cid, byte[]> blocksFound = new HashMap<>();
-        for(Want want : wantedBlocks) {
-            Optional<byte[]> blockOpt = getBlock(want.cid, Optional.of(want.auth), addToLocal);
-            if (blockOpt.isPresent()) {
-                blocksFound.put(want.cid, blockOpt.get());
-            }
+        List<Want> local = new ArrayList<>();
+        List<Want> remote = new ArrayList<>();
+
+        for (Want w : wants) {
+            if (store.has(w.cid).join())
+                local.add(w);
+            else
+                remote.add(w);
         }
-        return blocksFound;
+        local.stream()
+                .map(w -> new HashedBlock(w.cid, store.get(w.cid).join().get()))
+                .forEach(blocksFound::add);
+        if (remote.isEmpty())
+            return blocksFound;
+        return java.util.stream.Stream.concat(
+                        blocksFound.stream(),
+                        remoteBlocks.get(remote, peers, addToLocal).stream())
+                .collect(Collectors.toList());
     }
     
     public Cid putBlock(byte[] block, String format) {

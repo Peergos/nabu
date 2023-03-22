@@ -1,6 +1,6 @@
 # Nabu
 
-A minimal Java implementation of [IPFS](https:/ipfs.io)
+A minimal Java implementation of [IPFS](https://ipfs.io)
 
 [Nabu](https://en.wikipedia.org/wiki/Nabu) is the ancient Mesopotamian patron god of literacy, the rational arts, scribes, and wisdom.
 
@@ -13,9 +13,8 @@ Currently implemented properties:
 * TLS security provider (with early muxer negotiation using ALPN)
 * RSA and Ed25519 peer IDs
 * yamux and mplex muxers
-* Kademlia DHT for content discovery
-* Bitswap 1.2.0
-* IPNS publishing on Kademlia
+* Kademlia DHT for peer routing, IPNS publishing and fallback content discovery
+* Bitswap 1.2.0 + auth extension as [used in Peergos](https://peergos.org/posts/bats)
 * p2p http proxy
 * dnsaddr multiaddr resolution during bootstrap
 * autonat
@@ -25,10 +24,10 @@ Currently implemented properties:
 * persistent datastores (IPNS record store) using H2 DB
 * persistent identities and config
 * basic HTTP API (block.{get, put, rm, has, stat}, id, getRefs, bloomAdd) compatible with matching kubo api calls
-* bloom/infini filtered blockstore
+* bloom/[infini filtered](https://www.rasmuspagh.net/papers/infinifilter.pdf) blockstore
+* connect bitswap to kademlia for discovery, with a faster version with supplied peerids
 
 In the future we will add:
-* connect bitswap to kademlia for discovery
 * QUIC transport (and encryption and multiplexing)
 * circuit-relay
 * dcutr (direct connection upgrade through relay)

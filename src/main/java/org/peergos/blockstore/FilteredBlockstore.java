@@ -51,11 +51,11 @@ public class FilteredBlockstore implements Blockstore {
         return blocks.refs();
     }
 
-    public static FilteredBlockstore bloomBased(Blockstore source) {
-        return new FilteredBlockstore(source, CidBloomFilter.build(source));
+    public static FilteredBlockstore bloomBased(Blockstore source, double falsePositiveRate) {
+        return new FilteredBlockstore(source, CidBloomFilter.build(source, falsePositiveRate));
     }
 
-    public static FilteredBlockstore infiniBased(Blockstore source) {
-        return new FilteredBlockstore(source, CidInfiniFilter.build(source));
+    public static FilteredBlockstore infiniBased(Blockstore source, double falsePositiveRate) {
+        return new FilteredBlockstore(source, CidInfiniFilter.build(source, falsePositiveRate));
     }
 }

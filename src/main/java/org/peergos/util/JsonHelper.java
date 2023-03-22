@@ -78,6 +78,18 @@ public class JsonHelper {
         }
         return (Map<String, Object>)currentMap.get(lastProperty);
     }
+    public static Optional<Map<String, Object>> getOptionalPropertyMap(Map<String, Object> kvMap, String... propNames) {
+        Map<String, Object> currentMap = traverseProperties(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
+        String lastProperty = propNames[propNames.length -1];
+        if(! currentMap.containsKey(lastProperty)) {
+            return Optional.empty();
+        }
+        Object obj = currentMap.get(lastProperty);
+        if (! (obj instanceof Map)) {
+            throw new IllegalStateException("Not a List property: " + lastProperty);
+        }
+        return Optional.of((Map<String, Object>)currentMap.get(lastProperty));
+    }
     public static Map<String, Object> traverseProperties(Map<String, Object> kvMap, List<String> propNames) {
         Map<String, Object> currentMap = kvMap;
         for (String propName : propNames) {
