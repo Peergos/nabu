@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class TypeLimitedBlockstore implements Blockstore {
 
@@ -21,12 +22,15 @@ public class TypeLimitedBlockstore implements Blockstore {
         this.allowedCodecs = allowedCodecs;
     }
 
+    public boolean accepts(Cid.Codec codec) {
+        return allowedCodecs.isEmpty() ? true : allowedCodecs.contains(codec);
+    }
+
     public CompletableFuture<Boolean> bloomAdd(Cid cid) {
         if (allowedCodecs.contains(cid.codec)) {
             return blocks.bloomAdd(cid);
         }
-        LOG.log(Level.WARNING, "Failed attempt to call bloomAdd with codec: " + cid.codec);
-        return CompletableFuture.completedFuture(false);
+        throw new IllegalArgumentException("Unsupported codec: " + cid.codec);
     }
 
     @Override

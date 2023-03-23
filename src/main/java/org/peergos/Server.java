@@ -31,6 +31,22 @@ public class Server {
 
     private static final Logger LOG = Logger.getLogger(Server.class.getName());
 
+    private Blockstore buildBlockStore(Config config, Path blocksPath) {
+        FileBlockstore blocks = new FileBlockstore(blocksPath);
+        Blockstore blockStore = null;
+        if (config.datastore.filter.type == FilterType.BLOOM) {
+            blockStore = FilteredBlockstore.bloomBased(blocks, config.datastore.filter.falsePositiveRate);
+        } else if(config.datastore.filter.type == FilterType.INFINI) {
+            blockStore = FilteredBlockstore.infiniBased(blocks, config.datastore.filter.falsePositiveRate);
+        } else if(config.datastore.filter.type == FilterType.NONE) {
+            blockStore = blocks;
+        } else {
+            throw new IllegalStateException("Unhandled filter type: " + config.datastore.filter.type);
+        }
+        return config.datastore.allowedCodecs.codecs.isEmpty() ?
+                blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
+    }
+
     public Server() throws Exception {
         Path ipfsPath = getIPFSPath();
         Logging.init(ipfsPath);
@@ -46,17 +62,8 @@ public class Server {
         } else if (blocksDirectory.isFile()) {
             throw new IllegalStateException("Unable to create blocks directory");
         }
-        FileBlockstore blocks = new FileBlockstore(blocksPath);
-        Blockstore blockStore = null;
-        if (config.datastore.filter.type == FilterType.BLOOM) {
-            blockStore = FilteredBlockstore.bloomBased(blocks, config.datastore.filter.falsePositiveRate);
-        } else if(config.datastore.filter.type == FilterType.INFINI) {
-            blockStore = FilteredBlockstore.infiniBased(blocks, config.datastore.filter.falsePositiveRate);
-        } else if(config.datastore.filter.type == FilterType.NONE) {
-            blockStore = blocks;
-        } else {
-            throw new IllegalStateException("Unhandled filter type: " + config.datastore.filter.type);
-        }
+        Blockstore blockStore = buildBlockStore(config, blocksPath);
+
         List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();
         int hostPort = swarmAddresses.get(0).getPort();
         HostBuilder builder = new HostBuilder().setIdentity(config.identity.privKeyProtobuf).listenLocalhost(hostPort);
@@ -93,9 +100,8 @@ public class Server {
         int handlerThreads = 50;
         LOG.info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
         HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
-        Blockstore apiServiceBlockstore = config.datastore.allowedCodecs.codecs.isEmpty() ?
-                blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
-        APIService service = new APIService(apiServiceBlockstore, new BitswapBlockService(node, builder.getBitswap().get()));
+
+        APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()));
         apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();
