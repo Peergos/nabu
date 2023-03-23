@@ -91,8 +91,7 @@ public class Config {
         AddressesSection addressesSection = new AddressesSection(swarmAddresses, apiAddress, gatewayAddress,
                 proxyTargetAddress, allowTarget);
         Filter filter = new Filter(FilterType.NONE, 0.0);
-        //CodecSet emptyCodecSet = CodecSet.empty();
-        CodecSet codecSet = new CodecSet(Set.of(Cid.Codec.Raw, Cid.Codec.DagCbor));
+        CodecSet codecSet = CodecSet.empty();
         DatastoreSection datastoreSection = new DatastoreSection(blockMount, rootMount, filter, codecSet);
         BootstrapSection bootstrapSection = new BootstrapSection(bootstrapNodes);
         IdentitySection identity = new IdentitySection(privKey.bytes(), peerId);
