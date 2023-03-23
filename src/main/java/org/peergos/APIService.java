@@ -17,7 +17,7 @@ public class APIService {
     private final BlockService remoteBlocks;
 
     public APIService(Blockstore store, BlockService remoteBlocks) {
-        this.store = new TypeLimitedBlockstore(store, Set.of(Cid.Codec.Raw, Cid.Codec.DagCbor));
+        this.store = store;
         this.remoteBlocks = remoteBlocks;
     }
 

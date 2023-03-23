@@ -40,6 +40,18 @@ public class JsonHelper {
         }
         return (List)currentMap.get(lastProperty);
     }
+    public static Optional<List<Object>> getOptionalPropertyList(Map<String, Object> kvMap, String... propNames) {
+        Map<String, Object> currentMap = traverseProperties(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
+        String lastProperty = propNames[propNames.length -1];
+        if(! currentMap.containsKey(lastProperty)) {
+            return Optional.empty();
+        }
+        Object obj = currentMap.get(lastProperty);
+        if (! (obj instanceof List)) {
+            throw new IllegalStateException("Not a List property: " + lastProperty);
+        }
+        return Optional.of((List)currentMap.get(lastProperty));
+    }
     public static Optional<Object> getOptionalProperty(Map<String, Object> kvMap, String... propNames) {
         if (!findProperty(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()))) {
             return Optional.empty();

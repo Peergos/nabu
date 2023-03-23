@@ -1,6 +1,7 @@
 package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
+import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
@@ -93,7 +94,9 @@ public class Server {
         int handlerThreads = 50;
         LOG.info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
         HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
-        APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()));
+        Blockstore apiServiceBlockstore = config.datastore.allowedCodecs.codecs.isEmpty() ?
+                blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
+        APIService service = new APIService(apiServiceBlockstore, new BitswapBlockService(node, builder.getBitswap().get()));
         apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();
