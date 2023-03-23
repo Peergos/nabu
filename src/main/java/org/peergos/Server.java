@@ -1,7 +1,6 @@
 package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
-import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;

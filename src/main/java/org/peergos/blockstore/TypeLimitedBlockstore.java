@@ -1,8 +1,6 @@
 package org.peergos.blockstore;
 
 import io.ipfs.cid.Cid;
-import io.ipfs.multihash.Multihash;
-import org.peergos.Hash;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,7 +34,6 @@ public class TypeLimitedBlockstore implements Blockstore {
         if (allowedCodecs.contains(cid.codec)) {
             return blocks.has(cid);
         }
-        LOG.log(Level.WARNING, "Failed attempt to call has with codec: " + cid.codec);
         return CompletableFuture.completedFuture(false);
     }
 
@@ -45,7 +42,6 @@ public class TypeLimitedBlockstore implements Blockstore {
         if (allowedCodecs.contains(cid.codec)) {
             return blocks.get(cid);
         }
-        LOG.log(Level.WARNING, "Failed attempt to call get with codec: " + cid.codec);
         return CompletableFuture.completedFuture(Optional.empty());
     }
 
@@ -54,9 +50,7 @@ public class TypeLimitedBlockstore implements Blockstore {
         if (allowedCodecs.contains(codec)) {
             return blocks.put(block, codec);
         }
-        LOG.log(Level.WARNING, "Failed attempt to call put with codec: " + codec);
-        Cid cid = new Cid(1, codec, Multihash.Type.sha2_256, Hash.sha256(block));
-        return CompletableFuture.completedFuture(cid);
+        throw new IllegalArgumentException("Unsupported codec: " + codec);
     }
 
     @Override
