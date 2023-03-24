@@ -39,7 +39,6 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         this.alpha = alpha;
     }
 
-
     public void setAddressBook(AddressBook addrs) {
         engine.setAddressBook(addrs);
         this.addressBook = addrs;
