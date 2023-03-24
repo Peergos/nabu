@@ -36,7 +36,7 @@ public class BootstrapTest {
     @Test
     public void bootstrap() {
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true), false);
         Host node1 = builder1.build();
         node1.start().join();
         Multihash node1Id = Multihash.deserialize(node1.getPeerId().getBytes());
@@ -51,7 +51,7 @@ public class BootstrapTest {
 
             // lookup ourselves in DHT to find our nearest nodes
             List<PeerAddresses> closestPeers = dht.findClosestPeers(node1Id, 20, node1);
-            if (closestPeers.size() < connections/2)
+            if (closestPeers.size() < connections / 2)
                 throw new IllegalStateException("Didn't find more close peers after bootstrap: " +
                         closestPeers.size() + " < " + connections);
         } finally {
