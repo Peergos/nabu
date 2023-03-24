@@ -20,7 +20,7 @@ public class FindProviderTest {
     public void findBlockProvider() {
         RamBlockstore blockstore = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), blockstore, (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(), new RamRecordStore(), blockstore, (c, b, p, a) -> CompletableFuture.completedFuture(true), false);
         Host node1 = builder1.build();
         node1.start().join();
 

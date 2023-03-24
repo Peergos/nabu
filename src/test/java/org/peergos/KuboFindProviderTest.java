@@ -19,7 +19,7 @@ public class KuboFindProviderTest {
     @Test
     public void findProviderOverYamux() throws IOException {
         HostBuilder builder1 = HostBuilder.build(11001 + new Random().nextInt(50_000), new RamProviderStore(),
-                        new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
+                        new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true), false)
                 .addMuxers(List.of(StreamMuxerProtocol.getYamux()));
         Host node1 = builder1
                 .build();
