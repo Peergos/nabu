@@ -22,13 +22,13 @@ public class HttpProxyTest {
     public void p2pProxyRequest() throws IOException {
         InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
+                        new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true), false)
                 .addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
         Host node1 = builder1.build();
         RamBlockstore blockstore2 = new RamBlockstore();
         InetSocketAddress proxyTarget = new InetSocketAddress("127.0.0.1", 8000);
         HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                        new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
+                        new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true), false)
                 .addProtocol(new HttpProtocol.Binding(proxyTarget));
         Host node2 = builder2.build();
         node1.start().join();
@@ -55,7 +55,7 @@ public class HttpProxyTest {
             ByteArrayOutputStream bout = new ByteArrayOutputStream();
             resp.content().readBytes(bout, resp.headers().getInt("content-length"));
             byte[] replyBody = bout.toByteArray();
-            if (! Arrays.equals(replyBody, httpReply))
+            if (!Arrays.equals(replyBody, httpReply))
                 throw new IllegalStateException("Different http response!");
         } finally {
             node1.stop();

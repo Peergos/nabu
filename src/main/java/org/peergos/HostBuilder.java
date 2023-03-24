@@ -107,10 +107,11 @@ public class HostBuilder {
                                     ProviderStore providers,
                                     RecordStore records,
                                     Blockstore blocks,
-                                    BlockRequestAuthoriser authoriser) {
+                                    BlockRequestAuthoriser authoriser,
+                                    boolean localEnabled) {
         HostBuilder builder = new HostBuilder().generateIdentity().listenLocalhost(listenPort);
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), "/ipfs/kad/1.0.0", 20, 3);
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), "/ipfs/kad/1.0.0", 20, 3, localEnabled);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
         return builder.addProtocols(List.of(

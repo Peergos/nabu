@@ -18,11 +18,11 @@ public class BitswapTest {
     @Test
     public void getBlock() {
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true), false);
         Host node1 = builder1.build();
         RamBlockstore blockstore2 = new RamBlockstore();
         HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true), false);
         Host node2 = builder2.build();
         node1.start().join();
         node2.start().join();
@@ -36,7 +36,7 @@ public class BitswapTest {
                     .stream()
                     .map(f -> f.join())
                     .collect(Collectors.toList());
-            if (! Arrays.equals(receivedBlock.get(0).block, blockData))
+            if (!Arrays.equals(receivedBlock.get(0).block, blockData))
                 throw new IllegalStateException("Incorrect block returned!");
         } finally {
             node1.stop();

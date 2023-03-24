@@ -31,10 +31,10 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     private final Integer replication;
     private final Integer alpha;
 
-    public Kademlia(KademliaEngine dht, String protocolId, Integer replication, Integer alpha) {
+    public Kademlia(KademliaEngine dht, String protocolId, Integer replication, Integer alpha, boolean localDht) {
         super(protocolId, new KademliaProtocol(dht));
         this.engine = dht;
-        this.localDht = false;
+        this.localDht = localDht;
         this.replication = replication;
         this.alpha = alpha;
     }
@@ -58,7 +58,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             try {
                 future.orTimeout(5, TimeUnit.SECONDS).join();
                 successes++;
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
         }
         return successes;
     }
@@ -88,6 +89,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             return false;
         }
     }
+
     public void bootstrap(Host us) {
         // lookup a random peer id
         byte[] hash = new byte[32];
@@ -155,7 +157,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 // If successful the response will contain the k closest nodes the peer knows to the key
                 List<PeerAddresses> result = future.join();
                 for (PeerAddresses peer : result) {
-                    if (! queried.contains(peer.peerId)) {
+                    if (!queried.contains(peer.peerId)) {
                         // exit early if we are looking for the specific node
                         if (maxCount == 1 && peer.peerId.equals(peerIdkey))
                             return Collections.singletonList(peer);
@@ -170,7 +172,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             }
 
             // if no new peers in top k were returned we are done
-            if (! foundCloser)
+            if (!foundCloser)
                 break;
         }
         return closest.stream()
@@ -214,12 +216,12 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                         }
                     }
                 } catch (Exception e) {
-                    if (! (e.getCause() instanceof TimeoutException))
+                    if (!(e.getCause() instanceof TimeoutException))
                         e.printStackTrace();
                 }
             }
             // if no new peers in top k were returned we are done
-            if (! foundCloser)
+            if (!foundCloser)
                 break;
         }
 
