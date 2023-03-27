@@ -67,6 +67,10 @@ public class HostBuilder {
         return this;
     }
 
+    public List<ProtocolBinding> getProtocols() {
+        return this.protocols;
+    }
+
     public HostBuilder addProtocols(List<ProtocolBinding> protocols) {
         this.protocols.addAll(protocols);
         return this;
