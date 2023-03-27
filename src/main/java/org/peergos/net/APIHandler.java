@@ -106,14 +106,10 @@ public class APIHandler implements HttpHandler {
                 case PUT: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-put
                     List<String> format = params.get("format");
                     Optional<String> formatOpt = format !=null && format.size() == 1 ? Optional.of(format.get(0)) : Optional.empty();
-                    if (formatOpt.isEmpty() || formatOpt.get().length() < 2) {
+                    if (formatOpt.isEmpty()) {
                         throw new APIException("argument \"format\" is required");
                     }
-                    String reqFormat = formatOpt.get().substring(0, 1).toUpperCase()
-                            + formatOpt.get().substring(1);
-                    if (!this.service.accepts(Cid.Codec.valueOf(reqFormat))) {
-                        throw new APIException("\"format\" not supported");
-                    }
+                    String reqFormat = formatOpt.get().toLowerCase();
                     String boundary = httpExchange.getRequestHeaders().get("Content-Type")
                             .stream()
                             .filter(s -> s.contains("boundary="))
@@ -128,7 +124,7 @@ public class APIHandler implements HttpHandler {
                     if (block.length >  1024 * 1024 * 2) { //todo what should the limit be?
                         throw new APIException("Block too large");
                     }
-                    Cid cid = service.putBlock(block, Cid.Codec.valueOf(reqFormat));
+                    Cid cid = service.putBlock(block, Cid.Codec.lookupIPLDName(reqFormat));
                     Map res = new HashMap<>();
                     res.put("Hash", cid.toString());
                     replyJson(httpExchange, JSONParser.toString(res));
@@ -214,7 +210,7 @@ public class APIHandler implements HttpHandler {
                 LOG.info("API Handler handled " + path + " query in: " + (t2 - t1) + " mS");
         }
     }
-    
+
     private static void replyJson(HttpExchange exchange, String json) {
         try {
             byte[] raw = json.getBytes();

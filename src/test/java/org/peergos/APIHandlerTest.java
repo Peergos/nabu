@@ -48,7 +48,7 @@ public class APIHandlerTest {
                 tmp.put("data", new CborObject.CborString("testing"));
                 CborObject original = CborObject.CborMap.build(tmp);
                 byte[] object = original.toByteArray();
-                MerkleNode added2 = ipfs.block.put(object, Optional.of(Cid.Codec.DagCbor.toString()));
+                MerkleNode added2 = ipfs.block.put(object, Optional.of("dag-cbor"));
                 Assert.assertTrue("codec accepted", false);
             } catch (Exception e) {
                 //expected

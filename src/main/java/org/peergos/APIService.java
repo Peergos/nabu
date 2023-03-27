@@ -43,15 +43,6 @@ public class APIService {
                         remoteBlocks.get(remote, peers, addToLocal).stream())
                 .collect(Collectors.toList());
     }
-
-    public boolean accepts(Cid.Codec codec) {
-        if (store instanceof TypeLimitedBlockstore) {
-            TypeLimitedBlockstore tlbs = (TypeLimitedBlockstore) store;
-            return tlbs.accepts(codec);
-        } else {
-            return true;
-        }
-    }
     
     public Cid putBlock(byte[] block, Cid.Codec codec) {
         return store.put(block, codec).join();
