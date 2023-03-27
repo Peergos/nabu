@@ -2,6 +2,7 @@ package org.peergos;
 import io.ipfs.cid.Cid;
 import io.libp2p.core.*;
 import org.peergos.blockstore.Blockstore;
+import org.peergos.blockstore.TypeLimitedBlockstore;
 import org.peergos.util.Version;
 
 import java.util.*;
@@ -43,15 +44,7 @@ public class APIService {
                 .collect(Collectors.toList());
     }
     
-    public Cid putBlock(byte[] block, String format) {
-        Cid.Codec codec = null;
-        if (format.equals("raw")) {
-            codec = Cid.Codec.Raw;
-        } else if (format.equals("cbor")) {
-            codec = Cid.Codec.DagCbor;
-        } else {
-            throw new IllegalArgumentException("only raw and cbor format supported");
-        }
+    public Cid putBlock(byte[] block, Cid.Codec codec) {
         return store.put(block, codec).join();
     }
 

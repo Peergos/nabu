@@ -15,7 +15,7 @@
         <kotlin.version>1.6.21</kotlin.version>
         <version.junit>4.13.2</version.junit>
         <version.hamcrest>2.2</version.hamcrest>
-        <version.multiaddr>v1.4.11</version.multiaddr>
+        <version.multiaddr>v1.4.12</version.multiaddr>
         <version.kubo-http>v1.4.2</version.kubo-http>
     </properties>
 

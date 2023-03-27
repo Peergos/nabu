@@ -13,15 +13,20 @@ public class DatastoreSection implements Jsonable {
 
     public final Mount rootMount;
     public final Filter filter;
+    public final CodecSet allowedCodecs;
 
-    public DatastoreSection(Mount blockMount, Mount rootMount, Filter filter) {
+    public DatastoreSection(Mount blockMount, Mount rootMount, Filter filter, CodecSet allowedCodecs) {
         this.blockMount = blockMount;
         this.rootMount = rootMount;
         this.filter = filter;
+        this.allowedCodecs = allowedCodecs;
     }
 
     public Map<String, Object> toJson() {
         Map<String, Object> datastoreMap = new LinkedHashMap<>();
+        if (!allowedCodecs.codecs.isEmpty()) {
+            datastoreMap.putAll(allowedCodecs.toJson());
+        }
         datastoreMap.put("Filter", filter.toJson());
         List<Map<String, Object>> list = List.of(blockMount.toJson(), rootMount.toJson());
         Map<String, Object> specMap = new LinkedHashMap<>();
@@ -36,7 +41,7 @@ public class DatastoreSection implements Jsonable {
     public static DatastoreSection fromJson(Map<String, Object> json) {
         Optional<Map<String, Object>> filterJsonOpt =  JsonHelper.getOptionalPropertyMap(json, "Datastore", "Filter");
         Filter filter = filterJsonOpt.map( f -> Jsonable.parse(f, p -> Filter.fromJson(p))).orElse(Filter.none());
-
+        CodecSet allowedCodecs = Jsonable.parse(json, p -> CodecSet.fromJson(p));
         String type = JsonHelper.getStringProperty(json, "Datastore", "Spec", "type");
         List<Map<String, Object>> mounts = JsonHelper.getPropertyObjectList(json, "Datastore", "Spec", "mounts");
         List<Mount> mountList = mounts.stream().map(m -> Jsonable.parse(m, p -> Mount.fromJson(p))).collect(Collectors.toList());
@@ -48,6 +53,6 @@ public class DatastoreSection implements Jsonable {
         if (!type.equals("mount")) {
             throw new IllegalStateException("Expecting Datastore/Spec/type == 'mount'");
         }
-        return new DatastoreSection(blockMountOpt.get(), rootMountOpt.get(), filter);
+        return new DatastoreSection(blockMountOpt.get(), rootMountOpt.get(), filter, allowedCodecs);
     }
 }
