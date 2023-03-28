@@ -51,7 +51,7 @@ public class Server {
         Path ipfsPath = getIPFSPath();
         Logging.init(ipfsPath);
         Config config = readConfig(ipfsPath);
-        System.out.println("Starting Nabu version: " + APIService.CURRENT_VERSION);
+        info("Starting Nabu version: " + APIService.CURRENT_VERSION);
 
         Path blocksPath = ipfsPath.resolve("blocks");
         File blocksDirectory = blocksPath.toFile();
@@ -88,17 +88,19 @@ public class Server {
 
         Host node = builder.build();
         node.start().join();
-        System.out.println("Node started and listening on " + node.listenAddresses());
-
-        //            Multiaddr bootstrapNode = Multiaddr.fromString("/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt");
-        //            KademliaController bootstrap = builder.getWanDht().get().dial(node, bootstrapNode).getController().join();
+        info("Node started and listening on " + node.listenAddresses());
+        info("Starting bootstrap process");
+        int connections = dht.bootstrapRoutingTable(node, config.bootstrap.getBootstrapAddresses(), addr -> !addr.contains("/wss/"));
+        if (connections == 0)
+            throw new IllegalStateException("No connected peers!");
+        dht.bootstrap(node);
 
         MultiAddress apiAddress = config.addresses.apiAddress;
         InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
         int maxConnectionQueue = 500;
         int handlerThreads = 50;
-        LOG.info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
+        info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
         HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
 
         APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()));
@@ -107,7 +109,7 @@ public class Server {
         apiServer.start();
 
         Thread shutdownHook = new Thread(() -> {
-            System.out.println("Stopping server...");
+            info("Stopping server...");
             try {
                 node.stop().get();
                 apiServer.stop(3); //wait max 3 seconds
@@ -118,7 +120,10 @@ public class Server {
         });
         Runtime.getRuntime().addShutdownHook(shutdownHook);
     }
-
+    private void info(String message) {
+        LOG.info(message);
+        System.out.println(message);
+    }
     private Path getIPFSPath() {
         String ipfsPath = System.getenv("IPFS_PATH");
         if (ipfsPath == null) {
@@ -132,7 +137,7 @@ public class Server {
         Path configFilePath = configPath.resolve("config");
         File configFile = configFilePath.toFile();
         if (!configFile.exists()) {
-            System.out.println("Unable to find config file. Creating default config");
+            info("Unable to find config file. Creating default config");
             Config config = new Config();
             Files.write(configFilePath, config.toString().getBytes(), StandardOpenOption.CREATE);
             return config;
