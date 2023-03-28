@@ -19,6 +19,7 @@ import java.util.concurrent.*;
 import java.util.function.*;
 import java.util.logging.*;
 import java.util.stream.*;
+import java.util.stream.Stream;
 
 public class Kademlia extends StrictProtocolBinding<KademliaController> implements AddressBookConsumer {
 
@@ -43,11 +44,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         List<String> resolved = addrs.stream()
                 .parallel()
                 .flatMap(a -> {
-                    List<String> record = new ArrayList<>();
                     try {
-                        record = DnsAddr.resolve(a.toString());
-                    } catch (CompletionException ce) {}
-                    return record.stream();
+                        return DnsAddr.resolve(a.toString()).stream();
+                    } catch (CompletionException ce) {
+                        return Stream.empty();
+                    }
                 })
                 .filter(filter)
                 .collect(Collectors.toList());
