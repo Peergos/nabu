@@ -46,7 +46,7 @@ public class APIServiceTest {
 
     @Test
     public void bulkGetTest() {
-        APIService service = new APIService(new RamBlockstore(), new BitswapBlockService(null, null));
+        APIService service = new APIService(new RamBlockstore(), new BitswapBlockService(null, null), null);
         Cid cid1 = service.putBlock("Hello".getBytes(), Cid.Codec.Raw);
         Cid cid2= service.putBlock("world!".getBytes(), Cid.Codec.Raw);
         List<Want> wants = new ArrayList<>();
@@ -58,7 +58,7 @@ public class APIServiceTest {
 
     public class Tester {
         public static void runAPIServiceTest(Blockstore blocks) {
-            APIService service = new APIService(blocks, new BitswapBlockService(null, null));
+            APIService service = new APIService(blocks, new BitswapBlockService(null, null), null);
             Cid cid = Cid.decode("zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg");
             Assert.assertFalse("cid found", service.hasBlock(cid));
             String text = "Hello world!";
