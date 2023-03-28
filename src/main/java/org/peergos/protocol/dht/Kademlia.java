@@ -41,7 +41,14 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
 
     public int bootstrapRoutingTable(Host host, List<MultiAddress> addrs, Predicate<String> filter) {
         List<String> resolved = addrs.stream()
-                .flatMap(a -> DnsAddr.resolve(a.toString()).stream())
+                .parallel()
+                .flatMap(a -> {
+                    List<String> record = new ArrayList<>();
+                    try {
+                        record = DnsAddr.resolve(a.toString());
+                    } catch (CompletionException ce) {}
+                    return record.stream();
+                })
                 .filter(filter)
                 .collect(Collectors.toList());
         List<? extends CompletableFuture<? extends KademliaController>> futures = resolved.stream()

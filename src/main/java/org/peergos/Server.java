@@ -89,9 +89,10 @@ public class Server {
         Host node = builder.build();
         node.start().join();
         System.out.println("Node started and listening on " + node.listenAddresses());
-
-        //            Multiaddr bootstrapNode = Multiaddr.fromString("/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt");
-        //            KademliaController bootstrap = builder.getWanDht().get().dial(node, bootstrapNode).getController().join();
+        int connections = dht.bootstrapRoutingTable(node, config.bootstrap.getBootstrapAddresses(), addr -> !addr.contains("/wss/"));
+        if (connections == 0)
+            throw new IllegalStateException("No connected peers!");
+        dht.bootstrap(node);
 
         MultiAddress apiAddress = config.addresses.apiAddress;
         InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
