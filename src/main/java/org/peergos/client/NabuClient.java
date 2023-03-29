@@ -133,7 +133,6 @@ public class NabuClient {
 
 
     public class DHT {
-        @Deprecated
         public List<Map<String, Object>> findprovs(Multihash hash) throws IOException {
             return getAndParseStream("dht/findprovs?arg=" + hash).stream()
                     .map(x -> (Map<String, Object>) x)
