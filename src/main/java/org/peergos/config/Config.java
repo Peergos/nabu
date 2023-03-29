@@ -1,5 +1,6 @@
 package org.peergos.config;
 
+import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
 import io.libp2p.core.PeerId;
 import io.libp2p.core.crypto.PrivKey;
@@ -7,10 +8,7 @@ import org.peergos.HostBuilder;
 import org.peergos.util.JSONParser;
 import org.peergos.util.JsonHelper;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Config {
@@ -93,7 +91,8 @@ public class Config {
         AddressesSection addressesSection = new AddressesSection(swarmAddresses, apiAddress, gatewayAddress,
                 proxyTargetAddress, allowTarget);
         Filter filter = new Filter(FilterType.NONE, 0.0);
-        DatastoreSection datastoreSection = new DatastoreSection(blockMount, rootMount, filter);
+        CodecSet codecSet = CodecSet.empty();
+        DatastoreSection datastoreSection = new DatastoreSection(blockMount, rootMount, filter, codecSet);
         BootstrapSection bootstrapSection = new BootstrapSection(bootstrapNodes);
         IdentitySection identity = new IdentitySection(privKey.bytes(), peerId);
         return new Config(addressesSection, bootstrapSection, datastoreSection, identity);

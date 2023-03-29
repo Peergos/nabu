@@ -108,12 +108,8 @@ public class APIHandler implements HttpHandler {
                     Optional<String> formatOpt = format !=null && format.size() == 1 ? Optional.of(format.get(0)) : Optional.empty();
                     if (formatOpt.isEmpty()) {
                         throw new APIException("argument \"format\" is required");
-                    } else {
-                        String reqFormat = formatOpt.get();
-                        if (!(reqFormat.equals("raw") || reqFormat.equals("cbor"))) {
-                            throw new APIException("only raw and cbor \"format\" supported");
-                        }
                     }
+                    String reqFormat = formatOpt.get().toLowerCase();
                     String boundary = httpExchange.getRequestHeaders().get("Content-Type")
                             .stream()
                             .filter(s -> s.contains("boundary="))
@@ -128,7 +124,7 @@ public class APIHandler implements HttpHandler {
                     if (block.length >  1024 * 1024 * 2) { //todo what should the limit be?
                         throw new APIException("Block too large");
                     }
-                    Cid cid = service.putBlock(block, formatOpt.get());
+                    Cid cid = service.putBlock(block, Cid.Codec.lookupIPLDName(reqFormat));
                     Map res = new HashMap<>();
                     res.put("Hash", cid.toString());
                     replyJson(httpExchange, JSONParser.toString(res));
