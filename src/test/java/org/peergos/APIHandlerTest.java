@@ -43,20 +43,20 @@ public class APIHandlerTest {
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
-            NabuClient ipfs = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
-            String version = ipfs.version();
+            NabuClient nabu = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
+            String version = nabu.version();
             Assert.assertTrue("version", version != null);
             // node not initialised Map id = ipfs.id();
             String text = "Hello world!";
             byte[] block = text.getBytes();
-            MerkleNode added = ipfs.block.put(block, Optional.of("raw"));
+            MerkleNode added = nabu.putBlock(block, Optional.of("raw"));
             try {
                 //should fail as dag-cbor not in list of accepted codecs
                 Map<String, CborObject> tmp = new LinkedHashMap<>();
                 tmp.put("data", new CborObject.CborString("testing"));
                 CborObject original = CborObject.CborMap.build(tmp);
                 byte[] object = original.toByteArray();
-                MerkleNode added2 = ipfs.block.put(object, Optional.of("dag-cbor"));
+                MerkleNode added2 = nabu.putBlock(object, Optional.of("dag-cbor"));
                 Assert.assertTrue("codec accepted", false);
             } catch (Exception e) {
                 //expected
@@ -121,26 +121,26 @@ public class APIHandlerTest {
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
-            NabuClient ipfs = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
-            String version = ipfs.version();
+            NabuClient nabu = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
+            String version = nabu.version();
             Assert.assertTrue("version", version != null);
             // node not initialised Map id = ipfs.id();
             String text = "Hello world!";
             byte[] block = text.getBytes();
-            MerkleNode added = ipfs.block.put(block, Optional.of("raw"));
+            MerkleNode added = nabu.putBlock(block, Optional.of("raw"));
 
-            Map stat = ipfs.block.stat(added.hash);
+            Map stat = nabu.stat(added.hash);
             int size = (Integer)stat.get("Size");
             Assert.assertTrue("size as expected", size == text.length());
 
-            byte[] data = ipfs.block.get(added.hash);
+            byte[] data = nabu.getBlock(added.hash);
             Assert.assertTrue("block is as expected", text.equals(new String(data)));
 
-            List<Multihash> localRefs = ipfs.refs.local();
+            List<Multihash> localRefs = nabu.localRefs();
             Assert.assertTrue("local ref size", localRefs.size() == 1);
 
-            byte[] removed = ipfs.block.rm(added.hash);
-            List<Multihash> localRefsAfter = ipfs.refs.local();
+            byte[] removed = nabu.removeBlock(added.hash);
+            List<Multihash> localRefsAfter = nabu.localRefs();
             Assert.assertTrue("local ref size after rm", localRefsAfter.size() == 0);
         } catch (IOException ioe) {
             ioe.printStackTrace();
