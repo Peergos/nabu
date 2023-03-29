@@ -103,7 +103,7 @@ public class Server {
         info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
         HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
 
-        APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()));
+        APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()), dht);
         apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();

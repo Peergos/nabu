@@ -1,6 +1,7 @@
 package org.peergos.net;
 
 import io.ipfs.cid.Cid;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.Host;
 import io.libp2p.core.PeerId;
 import org.peergos.*;
@@ -22,6 +23,7 @@ public class APIHandler implements HttpHandler {
     private static final boolean LOGGING = true;
 
     private final APIService service;
+
     private final Host node;
 
     public static final String ID = "id";
@@ -33,6 +35,8 @@ public class APIHandler implements HttpHandler {
     public static final String REFS_LOCAL = "refs/local";
     public static final String BLOOM_ADD = "bloom/add";
     public static final String HAS = "block/has";
+
+    public static final String FIND_PROVS = "dht/findprovs";
 
     public APIHandler(APIService service, Host node) {
         this.service = service;
@@ -173,7 +177,7 @@ public class APIHandler implements HttpHandler {
                     List<Cid> refs = service.getRefs();
                     StringBuilder sb = new StringBuilder();
                     for (Cid cid : refs) {
-                        Map entry = new HashMap<>();
+                        Map<String, String> entry = new HashMap<>();
                         entry.put("Ref", cid.toString());
                         entry.put("Err", "");
                         sb.append(JSONParser.toString(entry));
@@ -190,15 +194,36 @@ public class APIHandler implements HttpHandler {
                     break;
                 }
                 case BLOOM_ADD: {
-                    if (args.size() != 1) {
+                    if (args == null || args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
                     }
                     boolean done = service.bloomAdd(Cid.decode(args.get(0)));
                     replyBytes(httpExchange, "".getBytes());
                     break;
                 }
+                case FIND_PROVS: {
+                    if (args == null || args.size() != 1) {
+                        throw new APIException("argument \"cid\" is required\n");
+                    }
+                    Optional<Integer> providersParam = Optional.ofNullable(params.get("num-providers")).map(a -> Integer.parseInt(a.get(0)));
+                    int numProviders = providersParam.isPresent() && providersParam.get() > 0 ? providersParam.get() : 20;
+                    List<PeerAddresses> providers = service.findProviders(Cid.decode(args.get(0)), node, numProviders);
+                    StringBuilder sb = new StringBuilder();
+                    Map<String, Object> entry = new HashMap<>();
+                    Map<String, Object> responses = new HashMap<>();
+                    for (PeerAddresses provider : providers) {
+                        List<String> addresses = provider.addresses.stream().map(a -> a.toString()).collect(Collectors.toList());
+                        responses.put("Addrs", addresses);
+                        responses.put("ID", provider.peerId.toBase58());
+                    }
+                    entry.put("Responses", responses);
+                    sb.append(JSONParser.toString(entry) + "\n");
+                    replyBytes(httpExchange, sb.toString().getBytes());
+                    break;
+                }
                 default: {
                     httpExchange.sendResponseHeaders(404, 0);
+                    break;
                 }
             }
         } catch (Exception e) {
