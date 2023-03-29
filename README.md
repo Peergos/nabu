@@ -41,7 +41,7 @@ You can use this as a standalone application for storing and retrieving blocks. 
 
 ### Maven, Gradle, SBT
 
-Package managers are supported through [JitPack](https://jitpack.io/#ipfs/java-ipfs-http-client/) which supports Maven, Gradle, SBT, etc.
+Package managers are supported through [JitPack](https://jitpack.io/#Peergos/nabu) which supports Maven, Gradle, SBT, etc.
 
 for Maven, add the following sections to your pom.xml (replacing $LATEST_VERSION):
 ```
