@@ -1,8 +1,6 @@
 package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
-import io.ipfs.api.IPFS;
-import io.ipfs.api.MerkleNode;
 import io.ipfs.api.cbor.CborObject;
 import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
@@ -14,6 +12,8 @@ import org.junit.Test;
 import org.peergos.blockstore.Blockstore;
 import org.peergos.blockstore.RamBlockstore;
 import org.peergos.blockstore.TypeLimitedBlockstore;
+import org.peergos.client.MerkleNode;
+import org.peergos.client.NabuClient;
 import org.peergos.net.APIHandler;
 import org.peergos.protocol.dht.Kademlia;
 import org.peergos.protocol.dht.RamProviderStore;
@@ -43,7 +43,7 @@ public class APIHandlerTest {
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
-            IPFS ipfs = new IPFS(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false, false);
+            NabuClient ipfs = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
             String version = ipfs.version();
             Assert.assertTrue("version", version != null);
             // node not initialised Map id = ipfs.id();
@@ -121,7 +121,7 @@ public class APIHandlerTest {
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
-            IPFS ipfs = new IPFS(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false, false);
+            NabuClient ipfs = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
             String version = ipfs.version();
             Assert.assertTrue("version", version != null);
             // node not initialised Map id = ipfs.id();
