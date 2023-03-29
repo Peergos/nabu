@@ -19,7 +19,6 @@ import java.util.concurrent.*;
 import java.util.function.*;
 import java.util.logging.*;
 import java.util.stream.*;
-import java.util.stream.Stream;
 
 public class Kademlia extends StrictProtocolBinding<KademliaController> implements AddressBookConsumer {
 
@@ -47,14 +46,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
 
     public int bootstrapRoutingTable(Host host, List<MultiAddress> addrs, Predicate<String> filter) {
         List<String> resolved = addrs.stream()
-                .parallel()
-                .flatMap(a -> {
-                    try {
-                        return DnsAddr.resolve(a.toString()).stream();
-                    } catch (CompletionException ce) {
-                        return Stream.empty();
-                    }
-                })
+                .flatMap(a -> DnsAddr.resolve(a.toString()).stream())
                 .filter(filter)
                 .collect(Collectors.toList());
         List<? extends CompletableFuture<? extends KademliaController>> futures = resolved.stream()

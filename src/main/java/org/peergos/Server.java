@@ -31,7 +31,21 @@ public class Server {
 
     private static final Logger LOG = Logger.getLogger(Server.class.getName());
 
-    private Blockstore buildBlockStore(Config config, Path blocksPath) {
+    public Server() throws Exception {
+        Path ipfsPath = getIPFSPath();
+        Logging.init(ipfsPath);
+        Config config = readConfig(ipfsPath);
+        System.out.println("Starting Nabu version: " + APIService.CURRENT_VERSION);
+
+        Path blocksPath = ipfsPath.resolve("blocks");
+        File blocksDirectory = blocksPath.toFile();
+        if (!blocksDirectory.exists()) {
+            if (!blocksDirectory.mkdir()) {
+                throw new IllegalStateException("Unable to make blocks directory");
+            }
+        } else if (blocksDirectory.isFile()) {
+            throw new IllegalStateException("Unable to create blocks directory");
+        }
         FileBlockstore blocks = new FileBlockstore(blocksPath);
         Blockstore blockStore = null;
         if (config.datastore.filter.type == FilterType.BLOOM) {
@@ -43,27 +57,6 @@ public class Server {
         } else {
             throw new IllegalStateException("Unhandled filter type: " + config.datastore.filter.type);
         }
-        return config.datastore.allowedCodecs.codecs.isEmpty() ?
-                blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
-    }
-
-    public Server() throws Exception {
-        Path ipfsPath = getIPFSPath();
-        Logging.init(ipfsPath);
-        Config config = readConfig(ipfsPath);
-        info("Starting Nabu version: " + APIService.CURRENT_VERSION);
-
-        Path blocksPath = ipfsPath.resolve("blocks");
-        File blocksDirectory = blocksPath.toFile();
-        if (!blocksDirectory.exists()) {
-            if (!blocksDirectory.mkdir()) {
-                throw new IllegalStateException("Unable to make blocks directory");
-            }
-        } else if (blocksDirectory.isFile()) {
-            throw new IllegalStateException("Unable to create blocks directory");
-        }
-        Blockstore blockStore = buildBlockStore(config, blocksPath);
-
         List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();
         int hostPort = swarmAddresses.get(0).getPort();
         HostBuilder builder = new HostBuilder().setIdentity(config.identity.privKeyProtobuf).listenLocalhost(hostPort);
@@ -88,28 +81,25 @@ public class Server {
 
         Host node = builder.build();
         node.start().join();
-        info("Node started and listening on " + node.listenAddresses());
-        info("Starting bootstrap process");
-        int connections = dht.bootstrapRoutingTable(node, config.bootstrap.getBootstrapAddresses(), addr -> !addr.contains("/wss/"));
-        if (connections == 0)
-            throw new IllegalStateException("No connected peers!");
-        dht.bootstrap(node);
+        System.out.println("Node started and listening on " + node.listenAddresses());
+
+        //            Multiaddr bootstrapNode = Multiaddr.fromString("/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt");
+        //            KademliaController bootstrap = builder.getWanDht().get().dial(node, bootstrapNode).getController().join();
 
         MultiAddress apiAddress = config.addresses.apiAddress;
         InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
         int maxConnectionQueue = 500;
         int handlerThreads = 50;
-        info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
+        LOG.info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
         HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
-
         APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()));
         apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();
 
         Thread shutdownHook = new Thread(() -> {
-            info("Stopping server...");
+            System.out.println("Stopping server...");
             try {
                 node.stop().get();
                 apiServer.stop(3); //wait max 3 seconds
@@ -120,10 +110,7 @@ public class Server {
         });
         Runtime.getRuntime().addShutdownHook(shutdownHook);
     }
-    private void info(String message) {
-        LOG.info(message);
-        System.out.println(message);
-    }
+
     private Path getIPFSPath() {
         String ipfsPath = System.getenv("IPFS_PATH");
         if (ipfsPath == null) {
@@ -137,7 +124,7 @@ public class Server {
         Path configFilePath = configPath.resolve("config");
         File configFile = configFilePath.toFile();
         if (!configFile.exists()) {
-            info("Unable to find config file. Creating default config");
+            System.out.println("Unable to find config file. Creating default config");
             Config config = new Config();
             Files.write(configFilePath, config.toString().getBytes(), StandardOpenOption.CREATE);
             return config;
