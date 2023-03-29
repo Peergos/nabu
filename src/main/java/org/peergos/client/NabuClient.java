@@ -31,12 +31,6 @@ public class NabuClient {
     private final int connectTimeoutMillis;
     private final int readTimeoutMillis;
 
-    public final Block block = new Block();
-
-    public final DHT dht = new DHT();
-
-    public final Refs refs = new Refs();
-
     public NabuClient(String host, int port) {
         this(host, port, "/api/v0/", false);
     }
@@ -83,61 +77,54 @@ public class NabuClient {
         return retrieveMap("id");
     }
 
-    public class Refs {
-        public List<Multihash> local() throws IOException {
-            String jsonStream = new String(retrieve("refs/local"));
-            return JSONParser.parseStream(jsonStream).stream()
-                    .map(m -> (String) (((Map) m).get("Ref")))
-                    .map(Cid::decode)
-                    .collect(Collectors.toList());
+    public List<Multihash> localRefs() throws IOException {
+        String jsonStream = new String(retrieve("refs/local"));
+        return JSONParser.parseStream(jsonStream).stream()
+                .map(m -> (String) (((Map) m).get("Ref")))
+                .map(Cid::decode)
+                .collect(Collectors.toList());
+    }
+
+    public byte[] getBlock(Multihash hash) throws IOException {
+        return retrieve("block/get?stream-channels=true&arg=" + hash);
+    }
+
+    public byte[] removeBlock(Multihash hash) throws IOException {
+        return retrieve("block/rm?stream-channels=true&arg=" + hash);
+    }
+
+    public List<MerkleNode> putBlock(List<byte[]> data) throws IOException {
+        return putBlocks(data, Optional.empty());
+    }
+
+    public List<MerkleNode> putBlocks(List<byte[]> data, Optional<String> format) throws IOException {
+        List<MerkleNode> res = new ArrayList<>();
+        for (byte[] value : data) {
+            res.add(putBlock(value, format));
+        }
+        return res;
+    }
+
+    public MerkleNode putBlock(byte[] data, Optional<String> format) throws IOException {
+        String fmt = format.map(f -> "&format=" + f).orElse("");
+        Multipart m = new Multipart(protocol +"://" + host + ":" + port + apiVersion+"block/put?stream-channels=true" + fmt, "UTF-8");
+        try {
+            m.addFilePart("file", Paths.get(""), new NamedStreamable.ByteArrayWrapper(data));
+            String res = m.finish();
+            return JSONParser.parseStream(res).stream().map(x -> MerkleNode.fromJSON((Map<String, Object>) x)).findFirst().get();
+        } catch (IOException e) {
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
-    public class Block {
-        public byte[] get(Multihash hash) throws IOException {
-            return retrieve("block/get?stream-channels=true&arg=" + hash);
-        }
-
-        public byte[] rm(Multihash hash) throws IOException {
-            return retrieve("block/rm?stream-channels=true&arg=" + hash);
-        }
-
-        public List<MerkleNode> put(List<byte[]> data) throws IOException {
-            return put(data, Optional.empty());
-        }
-
-        public List<MerkleNode> put(List<byte[]> data, Optional<String> format) throws IOException {
-            List<MerkleNode> res = new ArrayList<>();
-            for (byte[] value : data) {
-                res.add(put(value, format));
-            }
-            return res;
-        }
-
-        public MerkleNode put(byte[] data, Optional<String> format) throws IOException {
-            String fmt = format.map(f -> "&format=" + f).orElse("");
-            Multipart m = new Multipart(protocol +"://" + host + ":" + port + apiVersion+"block/put?stream-channels=true" + fmt, "UTF-8");
-            try {
-                m.addFilePart("file", Paths.get(""), new NamedStreamable.ByteArrayWrapper(data));
-                String res = m.finish();
-                return JSONParser.parseStream(res).stream().map(x -> MerkleNode.fromJSON((Map<String, Object>) x)).findFirst().get();
-            } catch (IOException e) {
-                throw new RuntimeException(e.getMessage(), e);
-            }
-        }
-
-        public Map stat(Multihash hash) throws IOException {
-            return retrieveMap("block/stat?stream-channels=true&arg=" + hash);
-        }
+    public Map stat(Multihash hash) throws IOException {
+        return retrieveMap("block/stat?stream-channels=true&arg=" + hash);
     }
 
-
-    public class DHT {
-        public List<Map<String, Object>> findprovs(Multihash hash) throws IOException {
-            return getAndParseStream("dht/findprovs?arg=" + hash).stream()
-                    .map(x -> (Map<String, Object>) x)
-                    .collect(Collectors.toList());
-        }
+    public List<Map<String, Object>> findprovs(Multihash hash) throws IOException {
+        return getAndParseStream("dht/findprovs?arg=" + hash).stream()
+                .map(x -> (Map<String, Object>) x)
+                .collect(Collectors.toList());
     }
 
     private Map retrieveMap(String path) throws IOException {
