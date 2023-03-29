@@ -36,7 +36,7 @@ public class APIHandler implements HttpHandler {
     public static final String BLOOM_ADD = "bloom/add";
     public static final String HAS = "block/has";
 
-    public static final String FIND_PROVS = "routing/findprovs";
+    public static final String FIND_PROVS = "dht/findprovs";
 
     public APIHandler(APIService service, Host node) {
         this.service = service;
@@ -201,9 +201,6 @@ public class APIHandler implements HttpHandler {
                     replyBytes(httpExchange, "".getBytes());
                     break;
                 }
-                default: {
-                    httpExchange.sendResponseHeaders(404, 0);
-                }
                 case FIND_PROVS: {
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
@@ -211,22 +208,27 @@ public class APIHandler implements HttpHandler {
                     Optional<Integer> providersParam = Optional.ofNullable(params.get("num-providers")).map(a -> Integer.parseInt(a.get(0)));
                     int numProviders = providersParam.isPresent() && providersParam.get() > 0 ? providersParam.get() : 20;
                     List<PeerAddresses> providers = service.findProviders(Cid.decode(args.get(0)), node, numProviders);
-                    List<Map<String, Object>> response = new ArrayList();
-                    Map<String, Object> entry = new HashMap<>();
-                    entry.put("Extra", "");
-                    //String ourNodeId = node.getPeerId().toBase58();
-                    String id = ""; //provider.peerId.toBase58().equals(ourNodeId) ? "" : provider.peerId.toBase58();
-                    entry.put("ID", id);
-                    Map<String, Object> responses = new HashMap<>();
-                    for (PeerAddresses provider : providers) {
-                        List<String> addresses = provider.addresses.stream().map(a -> a.toString()).collect(Collectors.toList());
-                        responses.put("Addrs", addresses);
-                        responses.put("ID", provider.peerId.toBase58());
-                    }
-                    entry.put("Responses", responses);
-                    entry.put("Type", "4"); //not sure of the logic
-                    response.add(entry);
-                    replyJson(httpExchange, JSONParser.toString(response));
+                    StringBuilder sb = new StringBuilder();
+                        Map<String, Object> entry = new HashMap<>();
+                        entry.put("Extra", "");
+                        //String ourNodeId = node.getPeerId().toBase58();
+                        String id = ""; //provider.peerId.toBase58().equals(ourNodeId) ? "" : provider.peerId.toBase58();
+                        entry.put("ID", id);
+                        Map<String, Object> responses = new HashMap<>();
+                        for (PeerAddresses provider : providers) {
+                            List<String> addresses = provider.addresses.stream().map(a -> a.toString()).collect(Collectors.toList());
+                            responses.put("Addrs", addresses);
+                            responses.put("ID", provider.peerId.toBase58());
+                        }
+                        entry.put("Responses", responses);
+                        entry.put("Type", "4"); //not sure of the logic
+                    sb.append(JSONParser.toString(entry) + "\n");
+                    replyBytes(httpExchange, sb.toString().getBytes());
+                    break;
+                }
+                default: {
+                    httpExchange.sendResponseHeaders(404, 0);
+                    break;
                 }
             }
         } catch (Exception e) {

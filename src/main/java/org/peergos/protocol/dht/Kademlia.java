@@ -199,7 +199,15 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             queryThisRound.forEach(r -> queried.add(r.addresses.peerId));
             List<CompletableFuture<Providers>> futures = queryThisRound.stream()
                     .parallel()
-                    .map(r -> dialPeer(r.addresses, us).join().getProviders(block).orTimeout(2, TimeUnit.SECONDS))
+                    .map(r -> {
+                        KademliaController res = null;
+                        try {
+                            res = dialPeer(r.addresses, us).join();
+                            return res.getProviders(block).orTimeout(2, TimeUnit.SECONDS);
+                        }catch (Exception e) {
+                            return null;
+                        }
+                    }).filter(prov -> prov != null)
                     .collect(Collectors.toList());
             boolean foundCloser = false;
             for (CompletableFuture<Providers> future : futures) {

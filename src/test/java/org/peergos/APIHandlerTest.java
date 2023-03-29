@@ -117,7 +117,7 @@ public class APIHandlerTest {
 
             IPFS ipfs = new IPFS(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false, false);
             Cid cid = Cid.decode("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
-            List<Map<String, Object>>  providers = ipfs.dht.findprovs(cid);
+            List<Map<String, Object>> providers = ipfs.dht.findprovs(cid);
             if (providers.isEmpty())
                 throw new IllegalStateException("Couldn't find provider of block!");
         } finally {
