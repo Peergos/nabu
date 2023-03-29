@@ -36,9 +36,9 @@ public class Server {
         Blockstore blockStore = null;
         if (config.datastore.filter.type == FilterType.BLOOM) {
             blockStore = FilteredBlockstore.bloomBased(blocks, config.datastore.filter.falsePositiveRate);
-        } else if(config.datastore.filter.type == FilterType.INFINI) {
+        } else if (config.datastore.filter.type == FilterType.INFINI) {
             blockStore = FilteredBlockstore.infiniBased(blocks, config.datastore.filter.falsePositiveRate);
-        } else if(config.datastore.filter.type == FilterType.NONE) {
+        } else if (config.datastore.filter.type == FilterType.NONE) {
             blockStore = blocks;
         } else {
             throw new IllegalStateException("Unhandled filter type: " + config.datastore.filter.type);
@@ -67,7 +67,7 @@ public class Server {
         List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();
         int hostPort = swarmAddresses.get(0).getPort();
         HostBuilder builder = new HostBuilder().setIdentity(config.identity.privKeyProtobuf).listenLocalhost(hostPort);
-        if (! builder.getPeerId().equals(config.identity.peerId)) {
+        if (!builder.getPeerId().equals(config.identity.peerId)) {
             throw new IllegalStateException("PeerId invalid");
         }
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
@@ -75,7 +75,7 @@ public class Server {
         Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toString());
         ProviderStore providers = new RamProviderStore();
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), "/ipfs/kad/1.0.0", 20, 3, false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
