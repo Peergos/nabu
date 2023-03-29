@@ -209,19 +209,14 @@ public class APIHandler implements HttpHandler {
                     int numProviders = providersParam.isPresent() && providersParam.get() > 0 ? providersParam.get() : 20;
                     List<PeerAddresses> providers = service.findProviders(Cid.decode(args.get(0)), node, numProviders);
                     StringBuilder sb = new StringBuilder();
-                        Map<String, Object> entry = new HashMap<>();
-                        entry.put("Extra", "");
-                        //String ourNodeId = node.getPeerId().toBase58();
-                        String id = ""; //provider.peerId.toBase58().equals(ourNodeId) ? "" : provider.peerId.toBase58();
-                        entry.put("ID", id);
-                        Map<String, Object> responses = new HashMap<>();
-                        for (PeerAddresses provider : providers) {
-                            List<String> addresses = provider.addresses.stream().map(a -> a.toString()).collect(Collectors.toList());
-                            responses.put("Addrs", addresses);
-                            responses.put("ID", provider.peerId.toBase58());
-                        }
-                        entry.put("Responses", responses);
-                        entry.put("Type", "4"); //not sure of the logic
+                    Map<String, Object> entry = new HashMap<>();
+                    Map<String, Object> responses = new HashMap<>();
+                    for (PeerAddresses provider : providers) {
+                        List<String> addresses = provider.addresses.stream().map(a -> a.toString()).collect(Collectors.toList());
+                        responses.put("Addrs", addresses);
+                        responses.put("ID", provider.peerId.toBase58());
+                    }
+                    entry.put("Responses", responses);
                     sb.append(JSONParser.toString(entry) + "\n");
                     replyBytes(httpExchange, sb.toString().getBytes());
                     break;
