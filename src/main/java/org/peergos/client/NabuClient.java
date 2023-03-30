@@ -77,7 +77,7 @@ public class NabuClient {
         return retrieveMap("id");
     }
 
-    public List<Multihash> getRefs() throws IOException {
+    public List<Multihash> listBlockstore() throws IOException {
         String jsonStream = new String(retrieve("refs/local"));
         return JSONParser.parseStream(jsonStream).stream()
                 .map(m -> (String) (((Map) m).get("Ref")))
@@ -99,8 +99,8 @@ public class NabuClient {
         return retrieve("block/get?arg=" + hash + authArg);
     }
 
-    public byte[] removeBlock(Multihash hash) throws IOException {
-        return retrieve("block/rm?arg=" + hash);
+    public void removeBlock(Multihash hash) throws IOException {
+        retrieve("block/rm?arg=" + hash);
     }
 
     public List<MerkleNode> putBlock(List<byte[]> data) throws IOException {

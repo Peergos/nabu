@@ -142,11 +142,11 @@ public class APIHandlerTest {
             byte[] data = nabu.getBlock(added.hash, Optional.empty());
             Assert.assertTrue("block is as expected", text.equals(new String(data)));
 
-            List<Multihash> localRefs = nabu.getRefs();
+            List<Multihash> localRefs = nabu.listBlockstore();
             Assert.assertTrue("local ref size", localRefs.size() == 1);
 
-            byte[] removed = nabu.removeBlock(added.hash);
-            List<Multihash> localRefsAfter = nabu.getRefs();
+            nabu.removeBlock(added.hash);
+            List<Multihash> localRefsAfter = nabu.listBlockstore();
             Assert.assertTrue("local ref size after rm", localRefsAfter.size() == 0);
 
             boolean have = nabu.hasBlock(added.hash, Optional.empty());
