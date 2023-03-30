@@ -133,15 +133,24 @@ public class APIHandlerTest {
             int size = (Integer)stat.get("Size");
             Assert.assertTrue("size as expected", size == text.length());
 
-            byte[] data = nabu.getBlock(added.hash);
+            boolean has = nabu.hasBlock(added.hash, Optional.empty());
+            Assert.assertTrue("has block as expected", has);
+
+            boolean bloomAdd = nabu.bloomAdd(added.hash);
+            Assert.assertTrue("added to bloom filter", !bloomAdd); //RamBlockstore does not filter
+
+            byte[] data = nabu.getBlock(added.hash, Optional.empty());
             Assert.assertTrue("block is as expected", text.equals(new String(data)));
 
-            List<Multihash> localRefs = nabu.localRefs();
+            List<Multihash> localRefs = nabu.getRefs();
             Assert.assertTrue("local ref size", localRefs.size() == 1);
 
             byte[] removed = nabu.removeBlock(added.hash);
-            List<Multihash> localRefsAfter = nabu.localRefs();
+            List<Multihash> localRefsAfter = nabu.getRefs();
             Assert.assertTrue("local ref size after rm", localRefsAfter.size() == 0);
+
+            boolean have = nabu.hasBlock(added.hash, Optional.empty());
+            Assert.assertTrue("does not have block as expected", !have);
         } catch (IOException ioe) {
             ioe.printStackTrace();
             Assert.assertTrue("IOException", false);

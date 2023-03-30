@@ -77,7 +77,7 @@ public class NabuClient {
         return retrieveMap("id");
     }
 
-    public List<Multihash> localRefs() throws IOException {
+    public List<Multihash> getRefs() throws IOException {
         String jsonStream = new String(retrieve("refs/local"));
         return JSONParser.parseStream(jsonStream).stream()
                 .map(m -> (String) (((Map) m).get("Ref")))
@@ -85,12 +85,22 @@ public class NabuClient {
                 .collect(Collectors.toList());
     }
 
-    public byte[] getBlock(Multihash hash) throws IOException {
-        return retrieve("block/get?stream-channels=true&arg=" + hash);
+    public boolean hasBlock(Multihash hash, Optional<String> auth) throws IOException {
+        String authArg = auth.isPresent() ? "&auth=" + auth.get() : "";
+        return "true".equals(new String(retrieve("block/has?arg=" + hash + authArg)));
+    }
+
+    public boolean bloomAdd(Multihash hash) throws IOException {
+        return "true".equals(new String(retrieve("bloom/add?arg=" + hash)));
+    }
+
+    public byte[] getBlock(Multihash hash, Optional<String> auth) throws IOException {
+        String authArg = auth.isPresent() ? "&auth=" + auth.get() : "";
+        return retrieve("block/get?arg=" + hash + authArg);
     }
 
     public byte[] removeBlock(Multihash hash) throws IOException {
-        return retrieve("block/rm?stream-channels=true&arg=" + hash);
+        return retrieve("block/rm?arg=" + hash);
     }
 
     public List<MerkleNode> putBlock(List<byte[]> data) throws IOException {
@@ -118,10 +128,10 @@ public class NabuClient {
     }
 
     public Map stat(Multihash hash) throws IOException {
-        return retrieveMap("block/stat?stream-channels=true&arg=" + hash);
+        return retrieveMap("block/stat?arg=" + hash);
     }
 
-    public List<Map<String, Object>> findprovs(Multihash hash) throws IOException {
+    public List<Map<String, Object>> findProviders(Multihash hash) throws IOException {
         return getAndParseStream("dht/findprovs?arg=" + hash).stream()
                 .map(x -> (Map<String, Object>) x)
                 .collect(Collectors.toList());
