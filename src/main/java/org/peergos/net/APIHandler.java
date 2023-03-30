@@ -193,8 +193,8 @@ public class APIHandler implements HttpHandler {
                     if (args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
                     }
-                    boolean done = service.bloomAdd(Cid.decode(args.get(0)));
-                    replyBytes(httpExchange, "".getBytes());
+                    Boolean added = service.bloomAdd(Cid.decode(args.get(0)));
+                    replyBytes(httpExchange, added.toString().getBytes());
                     break;
                 }
                 default: {
