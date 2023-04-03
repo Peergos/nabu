@@ -67,6 +67,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 future.orTimeout(5, TimeUnit.SECONDS).join();
                 successes++;
             } catch (Exception e) {
+                e.printStackTrace();
             }
         }
         return successes;
