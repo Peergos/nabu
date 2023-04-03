@@ -52,6 +52,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     try {
                         return DnsAddr.resolve(a.toString()).stream();
                     } catch (CompletionException ce) {
+                        ce.printStackTrace();
                         return Stream.empty();
                     }
                 })
