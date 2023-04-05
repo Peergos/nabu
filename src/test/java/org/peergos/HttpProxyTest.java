@@ -25,7 +25,6 @@ public class HttpProxyTest {
                 new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
                 .addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
         Host node1 = builder1.build();
-        RamBlockstore blockstore2 = new RamBlockstore();
         InetSocketAddress proxyTarget = new InetSocketAddress("127.0.0.1", 8000);
         HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
@@ -51,12 +50,18 @@ public class HttpProxyTest {
             HttpProtocol.HttpController proxier = new HttpProtocol.Binding(unusedProxyTarget).dial(node1, address2)
                     .getController().join();
             FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
-            FullHttpResponse resp = proxier.send(httpRequest).join();
-            ByteArrayOutputStream bout = new ByteArrayOutputStream();
-            resp.content().readBytes(bout, resp.headers().getInt("content-length"));
-            byte[] replyBody = bout.toByteArray();
-            if (! Arrays.equals(replyBody, httpReply))
-                throw new IllegalStateException("Different http response!");
+            for (int i=0; i < 10; i++) {
+                long t1 = System.currentTimeMillis();
+                FullHttpResponse resp = proxier.send(httpRequest).join();
+                long t2 = System.currentTimeMillis();
+                System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
+
+                ByteArrayOutputStream bout = new ByteArrayOutputStream();
+                resp.content().readBytes(bout, resp.headers().getInt("content-length"));
+                byte[] replyBody = bout.toByteArray();
+                if (!Arrays.equals(replyBody, httpReply))
+                    throw new IllegalStateException("Different http response!");
+            }
         } finally {
             node1.stop();
             node2.stop();

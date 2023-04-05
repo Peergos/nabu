@@ -75,12 +75,8 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
         @Override
         public void onMessage(@NotNull Stream stream, HttpRequest msg) {
-            EventLoopGroup group = new NioEventLoopGroup();
-            try {
                 Bootstrap b = new Bootstrap();
-                b.group(group)
-                        .channel(NioSocketChannel.class)
-                        .handler(new LoggingHandler(LogLevel.INFO));
+                b.group(stream.eventLoop());
 
                 Channel ch = b.connect(proxyTarget).awaitUninterruptibly().channel();
                 ch.pipeline().addLast(new LoggingHandler(LogLevel.INFO));
@@ -91,9 +87,6 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                 ch.writeAndFlush(msg);
 
                 ch.closeFuture().awaitUninterruptibly();
-            } finally {
-                group.shutdownGracefully();
-            }
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
