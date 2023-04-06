@@ -10,7 +10,6 @@ import org.junit.Test;
 import org.peergos.blockstore.Blockstore;
 import org.peergos.blockstore.RamBlockstore;
 import org.peergos.blockstore.TypeLimitedBlockstore;
-import org.peergos.client.MerkleNode;
 import org.peergos.client.NabuClient;
 import org.peergos.net.APIHandler;
 
@@ -19,7 +18,7 @@ import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.Executors;
 
-public class APIHandlerTest {
+public class HandlerTest {
 
     @Test
     public void codecTest() {
