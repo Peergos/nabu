@@ -57,14 +57,14 @@ public class HandlerTest {
             // node not initialised Map id = ipfs.id();
             String text = "Hello world!";
             byte[] block = text.getBytes();
-            Cid added = nabu.putBlocks(block, Optional.of("raw"));
+            Cid added = nabu.putBlock(block, Optional.of("raw"));
             try {
                 //should fail as dag-cbor not in list of accepted codecs
                 Map<String, CborObject> tmp = new LinkedHashMap<>();
                 tmp.put("data", new CborObject.CborString("testing"));
                 CborObject original = CborObject.CborMap.build(tmp);
                 byte[] object = original.toByteArray();
-                Cid added2 = nabu.putBlocks(object, Optional.of("dag-cbor"));
+                Cid added2 = nabu.putBlock(object, Optional.of("dag-cbor"));
                 Assert.assertTrue("codec accepted", false);
             } catch (Exception e) {
                 //expected
@@ -135,7 +135,7 @@ public class HandlerTest {
             // node not initialised Map id = ipfs.id();
             String text = "Hello world!";
             byte[] block = text.getBytes();
-            Cid addedHash = nabu.putBlocks(block, Optional.of("raw"));
+            Cid addedHash = nabu.putBlock(block, Optional.of("raw"));
 
             int size  = nabu.stat(addedHash);
             Assert.assertTrue("size as expected", size == text.length());

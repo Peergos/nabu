@@ -113,12 +113,12 @@ public class NabuClient {
     public List<Cid> putBlocks(List<byte[]> data, Optional<String> format) throws IOException {
         List<Cid> res = new ArrayList<>();
         for (byte[] value : data) {
-            res.add(putBlocks(value, format));
+            res.add(putBlock(value, format));
         }
         return res;
     }
 
-    public Cid putBlocks(byte[] data, Optional<String> format) throws IOException {
+    public Cid putBlock(byte[] data, Optional<String> format) throws IOException {
         String fmt = format.map(f -> "&format=" + f).orElse("");
         Multipart m = new Multipart(protocol +"://" + host + ":" + port + apiVersion+"block/put?stream-channels=true" + fmt, "UTF-8");
         try {
