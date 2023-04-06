@@ -12,7 +12,6 @@ import org.junit.Test;
 import org.peergos.blockstore.Blockstore;
 import org.peergos.blockstore.RamBlockstore;
 import org.peergos.blockstore.TypeLimitedBlockstore;
-import org.peergos.client.MerkleNode;
 import org.peergos.client.NabuClient;
 import org.peergos.net.APIHandler;
 import org.peergos.protocol.dht.Kademlia;
@@ -27,7 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-public class APIHandlerTest {
+public class HandlerTest {
 
     @Test
     public void codecTest() {
