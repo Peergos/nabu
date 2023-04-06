@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
 
 public class NabuClient {
@@ -103,25 +104,26 @@ public class NabuClient {
         retrieve("block/rm?arg=" + hash);
     }
 
-    public List<MerkleNode> putBlock(List<byte[]> data) throws IOException {
+    public List<Cid> putBlock(List<byte[]> data) throws IOException {
         return putBlocks(data, Optional.empty());
     }
 
-    public List<MerkleNode> putBlocks(List<byte[]> data, Optional<String> format) throws IOException {
-        List<MerkleNode> res = new ArrayList<>();
+    public List<Cid> putBlocks(List<byte[]> data, Optional<String> format) throws IOException {
+        List<Cid> res = new ArrayList<>();
         for (byte[] value : data) {
             res.add(putBlock(value, format));
         }
         return res;
     }
 
-    public MerkleNode putBlock(byte[] data, Optional<String> format) throws IOException {
+    public Cid putBlock(byte[] data, Optional<String> format) throws IOException {
         String fmt = format.map(f -> "&format=" + f).orElse("");
         Multipart m = new Multipart(protocol +"://" + host + ":" + port + apiVersion+"block/put?stream-channels=true" + fmt, "UTF-8");
         try {
             m.addFilePart("file", Paths.get(""), new NamedStreamable.ByteArrayWrapper(data));
             String res = m.finish();
-            return JSONParser.parseStream(res).stream().map(x -> MerkleNode.fromJSON((Map<String, Object>) x)).findFirst().get();
+            LinkedHashMap<String, String> obj = (LinkedHashMap<String, String>)JSONParser.parse(res);
+            return Cid.decode(obj.get("Hash"));
         } catch (IOException e) {
             throw new RuntimeException(e.getMessage(), e);
         }
