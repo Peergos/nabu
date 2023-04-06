@@ -3,6 +3,7 @@ package org.peergos.client;
 import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
 import io.ipfs.multihash.Multihash;
+import io.libp2p.core.PeerId;
 import org.peergos.util.JSONParser;
 
 import java.io.ByteArrayOutputStream;
@@ -74,11 +75,12 @@ public class NabuClient {
         return (String)m.get("Version");
     }
 
-    public Map id() throws IOException {
-        return retrieveMap("id");
+    public PeerId id() throws IOException {
+        Map<String, String> res = retrieveMap("id");
+        return PeerId.fromBase58(res.get("ID"));
     }
 
-    public List<Multihash> listBlockstore() throws IOException {
+    public List<Cid> listBlockstore() throws IOException {
         String jsonStream = new String(retrieve("refs/local"));
         return JSONParser.parseStream(jsonStream).stream()
                 .map(m -> (String) (((Map) m).get("Ref")))
@@ -104,19 +106,19 @@ public class NabuClient {
         retrieve("block/rm?arg=" + hash);
     }
 
-    public List<Cid> putBlock(List<byte[]> data) throws IOException {
+    public List<Cid> putBlocks(List<byte[]> data) throws IOException {
         return putBlocks(data, Optional.empty());
     }
 
     public List<Cid> putBlocks(List<byte[]> data, Optional<String> format) throws IOException {
         List<Cid> res = new ArrayList<>();
         for (byte[] value : data) {
-            res.add(putBlock(value, format));
+            res.add(putBlocks(value, format));
         }
         return res;
     }
 
-    public Cid putBlock(byte[] data, Optional<String> format) throws IOException {
+    public Cid putBlocks(byte[] data, Optional<String> format) throws IOException {
         String fmt = format.map(f -> "&format=" + f).orElse("");
         Multipart m = new Multipart(protocol +"://" + host + ":" + port + apiVersion+"block/put?stream-channels=true" + fmt, "UTF-8");
         try {
@@ -129,8 +131,9 @@ public class NabuClient {
         }
     }
 
-    public Map stat(Multihash hash) throws IOException {
-        return retrieveMap("block/stat?arg=" + hash);
+    public int stat(Multihash hash) throws IOException {
+        Map<String, Integer> res = retrieveMap("block/stat?arg=" + hash);
+        return res.get("Size");
     }
 
     public List<Map<String, Object>> findProviders(Multihash hash) throws IOException {

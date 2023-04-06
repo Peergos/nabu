@@ -4,8 +4,8 @@ import com.sun.net.httpserver.HttpServer;
 import io.ipfs.api.cbor.CborObject;
 import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
-import io.ipfs.multihash.Multihash;
 import io.libp2p.core.Host;
+import io.libp2p.core.PeerId;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -29,6 +29,15 @@ import java.util.stream.Collectors;
 public class HandlerTest {
 
     @Test
+    @Ignore //requires real Server to be running
+    public void serverTest() throws IOException {
+        MultiAddress address = new MultiAddress("/ip4/127.0.0.1/tcp/5001");
+        NabuClient nabu = new NabuClient(address.getHost(), address.getPort(), "/api/v0/", false);
+        String ver = nabu.version();
+        PeerId id = nabu.id();
+    }
+
+    @Test
     public void codecTest() {
         HttpServer apiServer = null;
         try {
@@ -48,14 +57,14 @@ public class HandlerTest {
             // node not initialised Map id = ipfs.id();
             String text = "Hello world!";
             byte[] block = text.getBytes();
-            Cid added = nabu.putBlock(block, Optional.of("raw"));
+            Cid added = nabu.putBlocks(block, Optional.of("raw"));
             try {
                 //should fail as dag-cbor not in list of accepted codecs
                 Map<String, CborObject> tmp = new LinkedHashMap<>();
                 tmp.put("data", new CborObject.CborString("testing"));
                 CborObject original = CborObject.CborMap.build(tmp);
                 byte[] object = original.toByteArray();
-                Cid added2 = nabu.putBlock(object, Optional.of("dag-cbor"));
+                Cid added2 = nabu.putBlocks(object, Optional.of("dag-cbor"));
                 Assert.assertTrue("codec accepted", false);
             } catch (Exception e) {
                 //expected
@@ -95,9 +104,9 @@ public class HandlerTest {
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
-            IPFS ipfs = new IPFS(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false, false);
+            NabuClient ipfs = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
             Cid cid = Cid.decode("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
-            List<Map<String, Object>> providers = ipfs.dht.findprovs(cid);
+            List<Map<String, Object>> providers = ipfs.findProviders(cid);
             if (providers.isEmpty())
                 throw new IllegalStateException("Couldn't find provider of block!");
         } finally {
@@ -126,10 +135,9 @@ public class HandlerTest {
             // node not initialised Map id = ipfs.id();
             String text = "Hello world!";
             byte[] block = text.getBytes();
-            Cid addedHash = nabu.putBlock(block, Optional.of("raw"));
+            Cid addedHash = nabu.putBlocks(block, Optional.of("raw"));
 
-            Map stat = nabu.stat(addedHash);
-            int size = (Integer)stat.get("Size");
+            int size  = nabu.stat(addedHash);
             Assert.assertTrue("size as expected", size == text.length());
 
             boolean has = nabu.hasBlock(addedHash, Optional.empty());
@@ -141,11 +149,11 @@ public class HandlerTest {
             byte[] data = nabu.getBlock(addedHash, Optional.empty());
             Assert.assertTrue("block is as expected", text.equals(new String(data)));
 
-            List<Multihash> localRefs = nabu.listBlockstore();
+            List<Cid> localRefs = nabu.listBlockstore();
             Assert.assertTrue("local ref size", localRefs.size() == 1);
 
             nabu.removeBlock(addedHash);
-            List<Multihash> localRefsAfter = nabu.listBlockstore();
+            List<Cid> localRefsAfter = nabu.listBlockstore();
             Assert.assertTrue("local ref size after rm", localRefsAfter.size() == 0);
 
             boolean have = nabu.hasBlock(addedHash, Optional.empty());
