@@ -27,37 +27,6 @@ public interface NamedStreamable
         return bout.toByteArray();
     }
 
-    class FileWrapper implements NamedStreamable {
-        private final File source;
-
-        public FileWrapper(File source) {
-            if (! source.exists())
-                throw new IllegalStateException("File does not exist: " + source);
-            this.source = source;
-        }
-
-        public InputStream getInputStream() throws IOException {
-            return new FileInputStream(source);
-        }
-
-        public boolean isDirectory() {
-            return source.isDirectory();
-        }
-
-        @Override
-        public List<NamedStreamable> getChildren() {
-            return isDirectory() ?
-                    Stream.of(source.listFiles())
-                            .map(FileWrapper::new)
-                            .collect(Collectors.toList()) :
-                    Collections.emptyList();
-        }
-
-        public Optional<String> getName() {
-            return Optional.of(source.getName());
-        }
-    }
-
     class InputStreamWrapper implements NamedStreamable {
         private final Optional<String> name;
         private final InputStream data;
@@ -125,37 +94,6 @@ public interface NamedStreamable
 
         public Optional<String> getName() {
             return name;
-        }
-    }
-
-    class DirWrapper implements NamedStreamable {
-
-        private final String name;
-        private final List<NamedStreamable> children;
-
-        public DirWrapper(String name, List<NamedStreamable> children) {
-            this.name = name;
-            this.children = children;
-        }
-
-        @Override
-        public InputStream getInputStream() throws IOException {
-            throw new IllegalStateException("Cannot get an input stream for a directory!");
-        }
-
-        @Override
-        public Optional<String> getName() {
-            return Optional.of(name);
-        }
-
-        @Override
-        public List<NamedStreamable> getChildren() {
-            return children;
-        }
-
-        @Override
-        public boolean isDirectory() {
-            return true;
         }
     }
 }

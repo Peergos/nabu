@@ -2,7 +2,6 @@ package org.peergos;
 import io.ipfs.cid.Cid;
 import io.libp2p.core.*;
 import org.peergos.blockstore.Blockstore;
-import org.peergos.blockstore.TypeLimitedBlockstore;
 import org.peergos.util.Version;
 
 import java.util.*;
