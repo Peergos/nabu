@@ -53,7 +53,7 @@ public class HttpProxyTest {
             FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
             for (int i=0; i < 10; i++) {
                 long t1 = System.currentTimeMillis();
-                FullHttpResponse resp = proxier.send(httpRequest).join();
+                FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
                 long t2 = System.currentTimeMillis();
                 System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
 
