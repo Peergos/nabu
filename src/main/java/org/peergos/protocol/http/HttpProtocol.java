@@ -57,6 +57,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
         @Override
         protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) throws Exception {
+            System.out.println("ResponseWriter: " + reply);
             if (reply instanceof HttpContent)
                 stream.writeAndFlush(((HttpContent) reply).copy());
             else
@@ -75,18 +76,21 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
         @Override
         public void onMessage(@NotNull Stream stream, HttpRequest msg) {
-                Bootstrap b = new Bootstrap();
-                b.group(stream.eventLoop());
+            System.out.println("Receiver got message");
+            Bootstrap b = new Bootstrap();
+            b.group(stream.eventLoop())
+                    .channel(NioSocketChannel.class)
+                    .handler(new LoggingHandler(LogLevel.INFO));
 
-                Channel ch = b.connect(proxyTarget).awaitUninterruptibly().channel();
-                ch.pipeline().addLast(new LoggingHandler(LogLevel.INFO));
-                ch.pipeline().addLast(new HttpRequestEncoder());
-                ch.pipeline().addLast(new HttpResponseDecoder());
-                ch.pipeline().addLast(new ResponseWriter(p2pstream));
+            ChannelFuture fut = b.connect(proxyTarget);
+            Channel ch = fut.channel();
+            ch.pipeline().addLast(new LoggingHandler(LogLevel.INFO));
+            ch.pipeline().addLast(new HttpRequestEncoder());
+            ch.pipeline().addLast(new HttpResponseDecoder());
+            ch.pipeline().addLast(new ResponseWriter(p2pstream));
 
-                ch.writeAndFlush(msg);
-
-                ch.closeFuture().awaitUninterruptibly();
+            ch.writeAndFlush(msg);
+            System.out.println("Receiver forwarded message");
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {

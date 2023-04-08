@@ -40,6 +40,7 @@ public class HttpProxyTest {
             ex.sendResponseHeaders(200, httpReply.length);
             ex.getResponseBody().write(httpReply);
             ex.getResponseBody().close();
+            System.out.println("Target http server responded");
         });
         localhostServer.setExecutor(Executors.newSingleThreadExecutor());
         localhostServer.start();
