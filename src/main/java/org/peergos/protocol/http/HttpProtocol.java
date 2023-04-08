@@ -57,7 +57,6 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
         @Override
         protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) throws Exception {
-            System.out.println("ResponseWriter: " + reply);
             if (reply instanceof HttpContent)
                 stream.writeAndFlush(((HttpContent) reply).copy());
             else
@@ -76,7 +75,6 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
         @Override
         public void onMessage(@NotNull Stream stream, HttpRequest msg) {
-            System.out.println("Receiver got message");
             Bootstrap b = new Bootstrap();
             b.group(stream.eventLoop())
                     .channel(NioSocketChannel.class)
@@ -89,8 +87,9 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             ch.pipeline().addLast(new HttpResponseDecoder());
             ch.pipeline().addLast(new ResponseWriter(p2pstream));
 
-            ch.writeAndFlush(msg);
-            System.out.println("Receiver forwarded message");
+            fut.addListener(x -> {
+                ch.writeAndFlush(msg);
+            });
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
