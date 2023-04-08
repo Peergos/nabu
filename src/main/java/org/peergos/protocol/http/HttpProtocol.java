@@ -78,7 +78,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             Bootstrap b = new Bootstrap();
             b.group(stream.eventLoop())
                     .channel(NioSocketChannel.class)
-                    .handler(new LoggingHandler(LogLevel.INFO));
+                    .handler(new LoggingHandler(LogLevel.TRACE));
 
             ChannelFuture fut = b.connect(proxyTarget);
             Channel ch = fut.channel();
