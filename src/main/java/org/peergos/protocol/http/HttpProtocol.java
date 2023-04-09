@@ -22,6 +22,10 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         public Binding(SocketAddress proxyTarget) {
             super("/http", new HttpProtocol(proxyTarget));
         }
+
+        public Binding(HttpRequestProcessor handler) {
+            super("/http", new HttpProtocol(handler));
+        }
     }
 
     public interface HttpController {
@@ -109,11 +113,15 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     }
 
     private static final int TRAFFIC_LIMIT = 2*1024*1024;
-    private final SocketAddress proxyTarget;
+    private final HttpRequestProcessor handler;
+
+    public HttpProtocol(HttpRequestProcessor handler) {
+        super(TRAFFIC_LIMIT, TRAFFIC_LIMIT);
+        this.handler = handler;
+    }
 
     public HttpProtocol(SocketAddress proxyTarget) {
-        super(TRAFFIC_LIMIT, TRAFFIC_LIMIT);
-        this.proxyTarget = proxyTarget;
+        this((s, req, replyHandler) -> proxyRequest(s, req, proxyTarget, replyHandler));
     }
 
     @NotNull
@@ -130,7 +138,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     @NotNull
     @Override
     protected CompletableFuture<HttpController> onStartResponder(@NotNull Stream stream) {
-        Receiver proxier = new Receiver((s, req, replyHandler) -> proxyRequest(s, req, proxyTarget, replyHandler));
+        Receiver proxier = new Receiver(handler);
         stream.pushHandler(new HttpRequestDecoder());
         stream.pushHandler(proxier);
         stream.pushHandler(new HttpResponseEncoder());
