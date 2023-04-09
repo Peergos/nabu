@@ -20,6 +20,7 @@ public class P2pHttpChatTest {
         HttpProtocol.Binding node1Http = new HttpProtocol.Binding((s, req, h) -> {
             System.out.println("Node 1 received: " + req);
             h.accept(replyOk.retain());
+            h.accept(new DefaultLastHttpContent());
         });
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
@@ -28,6 +29,7 @@ public class P2pHttpChatTest {
         HttpProtocol.Binding node2Http = new HttpProtocol.Binding((s, req, h) -> {
             System.out.println("Node 2 received: " + req);
             h.accept(replyOk.retain());
+            h.accept(new DefaultLastHttpContent());
         });
         HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
@@ -40,7 +42,7 @@ public class P2pHttpChatTest {
             Multiaddr address1 = node1.listenAddresses().get(0);
             Multiaddr address2 = node2.listenAddresses().get(0);
             // send p2p http requests
-            HttpProtocol.HttpController proxier = node1Http.dial(node1, address2)
+            HttpProtocol.HttpController proxier1 = node1Http.dial(node1, address2)
                     .getController().join();
             HttpProtocol.HttpController proxier2 = node2Http.dial(node2, address1)
                     .getController().join();
@@ -49,7 +51,7 @@ public class P2pHttpChatTest {
                 byte[] msg1 = "G'day from node1!".getBytes();
                 FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.copiedBuffer(msg1));
                 long t1 = System.currentTimeMillis();
-                proxier.send(httpRequest.retain()).join();
+                proxier1.send(httpRequest.retain()).join();
                 long t2 = System.currentTimeMillis();
                 System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
 
