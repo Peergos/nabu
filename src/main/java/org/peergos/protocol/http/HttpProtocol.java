@@ -14,6 +14,7 @@ import org.jetbrains.annotations.*;
 
 import java.net.*;
 import java.util.concurrent.*;
+import java.util.function.*;
 
 public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
@@ -49,28 +50,30 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     }
 
     public static class ResponseWriter extends SimpleChannelInboundHandler<HttpObject> {
-        private final Stream stream;
+        private final Consumer<HttpObject> replyProcessor;
 
-        public ResponseWriter(Stream stream) {
-            this.stream = stream;
+        public ResponseWriter(Consumer<HttpObject> replyProcessor) {
+            this.replyProcessor = replyProcessor;
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) throws Exception {
-            if (reply instanceof HttpContent)
-                stream.writeAndFlush(((HttpContent) reply).retain());
-            else
-                stream.writeAndFlush(reply);
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) {
+            replyProcessor.accept(reply);
         }
     }
 
     public static class Receiver implements ProtocolMessageHandler<HttpRequest>, HttpController {
         private final SocketAddress proxyTarget;
-        private final Stream p2pstream;
 
-        public Receiver(SocketAddress proxyTarget, Stream p2pstream) {
+        public Receiver(SocketAddress proxyTarget) {
             this.proxyTarget = proxyTarget;
-            this.p2pstream = p2pstream;
+        }
+
+        private void sendReply(HttpObject reply, Stream p2pstream) {
+            if (reply instanceof HttpContent)
+                p2pstream.writeAndFlush(((HttpContent) reply).retain());
+            else
+                p2pstream.writeAndFlush(reply);
         }
 
         @Override
@@ -84,11 +87,9 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             Channel ch = fut.channel();
             ch.pipeline().addLast(new HttpRequestEncoder());
             ch.pipeline().addLast(new HttpResponseDecoder());
-            ch.pipeline().addLast(new ResponseWriter(p2pstream));
+            ch.pipeline().addLast(new ResponseWriter(reply -> sendReply(reply, stream)));
 
-            fut.addListener(x -> {
-                ch.writeAndFlush(msg);
-            });
+            fut.addListener(x -> ch.writeAndFlush(msg));
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
@@ -118,7 +119,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     @NotNull
     @Override
     protected CompletableFuture<HttpController> onStartResponder(@NotNull Stream stream) {
-        Receiver proxier = new Receiver(proxyTarget, stream);
+        Receiver proxier = new Receiver(proxyTarget);
         stream.pushHandler(new HttpRequestDecoder());
         stream.pushHandler(proxier);
         stream.pushHandler(new HttpResponseEncoder());
