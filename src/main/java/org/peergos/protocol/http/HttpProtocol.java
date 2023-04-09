@@ -58,7 +58,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         @Override
         protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) throws Exception {
             if (reply instanceof HttpContent)
-                stream.writeAndFlush(((HttpContent) reply).copy());
+                stream.writeAndFlush(((HttpContent) reply).retain());
             else
                 stream.writeAndFlush(reply);
         }
@@ -75,25 +75,20 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
         @Override
         public void onMessage(@NotNull Stream stream, HttpRequest msg) {
-            EventLoopGroup group = new NioEventLoopGroup();
-            try {
-                Bootstrap b = new Bootstrap();
-                b.group(group)
-                        .channel(NioSocketChannel.class)
-                        .handler(new LoggingHandler(LogLevel.INFO));
+            Bootstrap b = new Bootstrap();
+            b.group(stream.eventLoop())
+                    .channel(NioSocketChannel.class)
+                    .handler(new LoggingHandler(LogLevel.TRACE));
 
-                Channel ch = b.connect(proxyTarget).awaitUninterruptibly().channel();
-                ch.pipeline().addLast(new LoggingHandler(LogLevel.INFO));
-                ch.pipeline().addLast(new HttpRequestEncoder());
-                ch.pipeline().addLast(new HttpResponseDecoder());
-                ch.pipeline().addLast(new ResponseWriter(p2pstream));
+            ChannelFuture fut = b.connect(proxyTarget);
+            Channel ch = fut.channel();
+            ch.pipeline().addLast(new HttpRequestEncoder());
+            ch.pipeline().addLast(new HttpResponseDecoder());
+            ch.pipeline().addLast(new ResponseWriter(p2pstream));
 
+            fut.addListener(x -> {
                 ch.writeAndFlush(msg);
-
-                ch.closeFuture().awaitUninterruptibly();
-            } finally {
-                group.shutdownGracefully();
-            }
+            });
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
