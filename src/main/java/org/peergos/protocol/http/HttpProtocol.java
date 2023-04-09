@@ -62,11 +62,15 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
     }
 
-    public static class Receiver implements ProtocolMessageHandler<HttpRequest>, HttpController {
-        private final SocketAddress proxyTarget;
+    public interface HttpRequestProcessor {
+        void handle(Stream stream, HttpRequest msg, Consumer<HttpObject> replyHandler);
+    }
 
-        public Receiver(SocketAddress proxyTarget) {
-            this.proxyTarget = proxyTarget;
+    public static class Receiver implements ProtocolMessageHandler<HttpRequest>, HttpController {
+        private final HttpRequestProcessor requestHandler;
+
+        public Receiver(HttpRequestProcessor requestHandler) {
+            this.requestHandler = requestHandler;
         }
 
         private void sendReply(HttpObject reply, Stream p2pstream) {
@@ -78,23 +82,30 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
         @Override
         public void onMessage(@NotNull Stream stream, HttpRequest msg) {
-            Bootstrap b = new Bootstrap();
-            b.group(stream.eventLoop())
-                    .channel(NioSocketChannel.class)
-                    .handler(new LoggingHandler(LogLevel.TRACE));
-
-            ChannelFuture fut = b.connect(proxyTarget);
-            Channel ch = fut.channel();
-            ch.pipeline().addLast(new HttpRequestEncoder());
-            ch.pipeline().addLast(new HttpResponseDecoder());
-            ch.pipeline().addLast(new ResponseWriter(reply -> sendReply(reply, stream)));
-
-            fut.addListener(x -> ch.writeAndFlush(msg));
+            requestHandler.handle(stream, msg, reply -> sendReply(reply, stream));
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
             return CompletableFuture.failedFuture(new IllegalStateException("Cannot send form a receiver!"));
         }
+    }
+
+    public static void proxyRequest(Stream stream,
+                                    HttpRequest msg,
+                                    SocketAddress proxyTarget,
+                                    Consumer<HttpObject> replyHandler) {
+        Bootstrap b = new Bootstrap();
+        b.group(stream.eventLoop())
+                .channel(NioSocketChannel.class)
+                .handler(new LoggingHandler(LogLevel.TRACE));
+
+        ChannelFuture fut = b.connect(proxyTarget);
+        Channel ch = fut.channel();
+        ch.pipeline().addLast(new HttpRequestEncoder());
+        ch.pipeline().addLast(new HttpResponseDecoder());
+        ch.pipeline().addLast(new ResponseWriter(replyHandler));
+
+        fut.addListener(x -> ch.writeAndFlush(msg));
     }
 
     private static final int TRAFFIC_LIMIT = 2*1024*1024;
@@ -119,7 +130,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     @NotNull
     @Override
     protected CompletableFuture<HttpController> onStartResponder(@NotNull Stream stream) {
-        Receiver proxier = new Receiver(proxyTarget);
+        Receiver proxier = new Receiver((s, req, replyHandler) -> proxyRequest(s, req, proxyTarget, replyHandler));
         stream.pushHandler(new HttpRequestDecoder());
         stream.pushHandler(proxier);
         stream.pushHandler(new HttpResponseEncoder());

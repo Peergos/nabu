@@ -51,7 +51,7 @@ public class HttpProxyTest {
             HttpProtocol.HttpController proxier = new HttpProtocol.Binding(unusedProxyTarget).dial(node1, address2)
                     .getController().join();
             FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
-            for (int i=0; i < 10; i++) {
+            for (int i=0; i < 20; i++) {
                 long t1 = System.currentTimeMillis();
                 FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
                 long t2 = System.currentTimeMillis();
