@@ -14,12 +14,17 @@ import org.jetbrains.annotations.*;
 
 import java.net.*;
 import java.util.concurrent.*;
+import java.util.function.*;
 
 public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
     public static class Binding extends StrictProtocolBinding<HttpController> {
         public Binding(SocketAddress proxyTarget) {
             super("/http", new HttpProtocol(proxyTarget));
+        }
+
+        public Binding(HttpRequestProcessor handler) {
+            super("/http", new HttpProtocol(handler));
         }
     }
 
@@ -49,46 +54,39 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     }
 
     public static class ResponseWriter extends SimpleChannelInboundHandler<HttpObject> {
-        private final Stream stream;
+        private final Consumer<HttpObject> replyProcessor;
 
-        public ResponseWriter(Stream stream) {
-            this.stream = stream;
+        public ResponseWriter(Consumer<HttpObject> replyProcessor) {
+            this.replyProcessor = replyProcessor;
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) throws Exception {
-            if (reply instanceof HttpContent)
-                stream.writeAndFlush(((HttpContent) reply).retain());
-            else
-                stream.writeAndFlush(reply);
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) {
+            replyProcessor.accept(reply);
         }
     }
 
-    public static class Receiver implements ProtocolMessageHandler<HttpRequest>, HttpController {
-        private final SocketAddress proxyTarget;
-        private final Stream p2pstream;
+    public interface HttpRequestProcessor {
+        void handle(Stream stream, HttpRequest msg, Consumer<HttpObject> replyHandler);
+    }
 
-        public Receiver(SocketAddress proxyTarget, Stream p2pstream) {
-            this.proxyTarget = proxyTarget;
-            this.p2pstream = p2pstream;
+    public static class Receiver implements ProtocolMessageHandler<HttpRequest>, HttpController {
+        private final HttpRequestProcessor requestHandler;
+
+        public Receiver(HttpRequestProcessor requestHandler) {
+            this.requestHandler = requestHandler;
+        }
+
+        private void sendReply(HttpObject reply, Stream p2pstream) {
+            if (reply instanceof HttpContent)
+                p2pstream.writeAndFlush(((HttpContent) reply).retain());
+            else
+                p2pstream.writeAndFlush(reply);
         }
 
         @Override
         public void onMessage(@NotNull Stream stream, HttpRequest msg) {
-            Bootstrap b = new Bootstrap();
-            b.group(stream.eventLoop())
-                    .channel(NioSocketChannel.class)
-                    .handler(new LoggingHandler(LogLevel.TRACE));
-
-            ChannelFuture fut = b.connect(proxyTarget);
-            Channel ch = fut.channel();
-            ch.pipeline().addLast(new HttpRequestEncoder());
-            ch.pipeline().addLast(new HttpResponseDecoder());
-            ch.pipeline().addLast(new ResponseWriter(p2pstream));
-
-            fut.addListener(x -> {
-                ch.writeAndFlush(msg);
-            });
+            requestHandler.handle(stream, msg, reply -> sendReply(reply, stream));
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
@@ -96,12 +94,34 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
     }
 
+    public static void proxyRequest(Stream stream,
+                                    HttpRequest msg,
+                                    SocketAddress proxyTarget,
+                                    Consumer<HttpObject> replyHandler) {
+        Bootstrap b = new Bootstrap();
+        b.group(stream.eventLoop())
+                .channel(NioSocketChannel.class)
+                .handler(new LoggingHandler(LogLevel.TRACE));
+
+        ChannelFuture fut = b.connect(proxyTarget);
+        Channel ch = fut.channel();
+        ch.pipeline().addLast(new HttpRequestEncoder());
+        ch.pipeline().addLast(new HttpResponseDecoder());
+        ch.pipeline().addLast(new ResponseWriter(replyHandler));
+
+        fut.addListener(x -> ch.writeAndFlush(msg));
+    }
+
     private static final int TRAFFIC_LIMIT = 2*1024*1024;
-    private final SocketAddress proxyTarget;
+    private final HttpRequestProcessor handler;
+
+    public HttpProtocol(HttpRequestProcessor handler) {
+        super(TRAFFIC_LIMIT, TRAFFIC_LIMIT);
+        this.handler = handler;
+    }
 
     public HttpProtocol(SocketAddress proxyTarget) {
-        super(TRAFFIC_LIMIT, TRAFFIC_LIMIT);
-        this.proxyTarget = proxyTarget;
+        this((s, req, replyHandler) -> proxyRequest(s, req, proxyTarget, replyHandler));
     }
 
     @NotNull
@@ -118,7 +138,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     @NotNull
     @Override
     protected CompletableFuture<HttpController> onStartResponder(@NotNull Stream stream) {
-        Receiver proxier = new Receiver(proxyTarget, stream);
+        Receiver proxier = new Receiver(handler);
         stream.pushHandler(new HttpRequestDecoder());
         stream.pushHandler(proxier);
         stream.pushHandler(new HttpResponseEncoder());
