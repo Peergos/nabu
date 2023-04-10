@@ -1,19 +1,18 @@
 package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
-import io.ipfs.api.IPFS;
-import io.ipfs.api.MerkleNode;
 import io.ipfs.api.cbor.CborObject;
 import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
-import io.ipfs.multihash.Multihash;
 import io.libp2p.core.Host;
+import io.libp2p.core.PeerId;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.peergos.blockstore.Blockstore;
 import org.peergos.blockstore.RamBlockstore;
 import org.peergos.blockstore.TypeLimitedBlockstore;
+import org.peergos.client.NabuClient;
 import org.peergos.net.APIHandler;
 import org.peergos.protocol.dht.Kademlia;
 import org.peergos.protocol.dht.RamProviderStore;
@@ -27,13 +26,22 @@ import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-public class APIHandlerTest {
+public class HandlerTest {
+
+    @Test
+    @Ignore //requires real Server to be running
+    public void serverTest() throws IOException {
+        MultiAddress address = new MultiAddress("/ip4/127.0.0.1/tcp/5001");
+        NabuClient nabu = new NabuClient(address.getHost(), address.getPort(), "/api/v0/", false);
+        String ver = nabu.version();
+        PeerId id = nabu.id();
+    }
 
     @Test
     public void codecTest() {
         HttpServer apiServer = null;
         try {
-            MultiAddress apiAddress = new MultiAddress("/ip4/127.0.0.1/tcp/8123");
+            MultiAddress apiAddress = new MultiAddress("/ip4/127.0.0.1/tcp/8456");
             InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
             apiServer = HttpServer.create(localAPIAddress, 500);
@@ -43,20 +51,20 @@ public class APIHandlerTest {
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
-            IPFS ipfs = new IPFS(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false, false);
-            String version = ipfs.version();
+            NabuClient nabu = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
+            String version = nabu.version();
             Assert.assertTrue("version", version != null);
             // node not initialised Map id = ipfs.id();
             String text = "Hello world!";
             byte[] block = text.getBytes();
-            MerkleNode added = ipfs.block.put(block, Optional.of("raw"));
+            Cid added = nabu.putBlock(block, Optional.of("raw"));
             try {
                 //should fail as dag-cbor not in list of accepted codecs
                 Map<String, CborObject> tmp = new LinkedHashMap<>();
                 tmp.put("data", new CborObject.CborString("testing"));
                 CborObject original = CborObject.CborMap.build(tmp);
                 byte[] object = original.toByteArray();
-                MerkleNode added2 = ipfs.block.put(object, Optional.of("dag-cbor"));
+                Cid added2 = nabu.putBlock(object, Optional.of("dag-cbor"));
                 Assert.assertTrue("codec accepted", false);
             } catch (Exception e) {
                 //expected
@@ -96,9 +104,9 @@ public class APIHandlerTest {
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
-            IPFS ipfs = new IPFS(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false, false);
+            NabuClient ipfs = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
             Cid cid = Cid.decode("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
-            List<Map<String, Object>> providers = ipfs.dht.findprovs(cid);
+            List<PeerAddresses> providers = ipfs.findProviders(cid);
             if (providers.isEmpty())
                 throw new IllegalStateException("Couldn't find provider of block!");
         } finally {
@@ -121,27 +129,35 @@ public class APIHandlerTest {
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
-            IPFS ipfs = new IPFS(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false, false);
-            String version = ipfs.version();
+            NabuClient nabu = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
+            String version = nabu.version();
             Assert.assertTrue("version", version != null);
             // node not initialised Map id = ipfs.id();
             String text = "Hello world!";
             byte[] block = text.getBytes();
-            MerkleNode added = ipfs.block.put(block, Optional.of("raw"));
+            Cid addedHash = nabu.putBlock(block, Optional.of("raw"));
 
-            Map stat = ipfs.block.stat(added.hash);
-            int size = (Integer)stat.get("Size");
+            int size  = nabu.stat(addedHash);
             Assert.assertTrue("size as expected", size == text.length());
 
-            byte[] data = ipfs.block.get(added.hash);
+            boolean has = nabu.hasBlock(addedHash, Optional.empty());
+            Assert.assertTrue("has block as expected", has);
+
+            boolean bloomAdd = nabu.bloomAdd(addedHash);
+            Assert.assertTrue("added to bloom filter", !bloomAdd); //RamBlockstore does not filter
+
+            byte[] data = nabu.getBlock(addedHash, Optional.empty());
             Assert.assertTrue("block is as expected", text.equals(new String(data)));
 
-            List<Multihash> localRefs = ipfs.refs.local();
+            List<Cid> localRefs = nabu.listBlockstore();
             Assert.assertTrue("local ref size", localRefs.size() == 1);
 
-            byte[] removed = ipfs.block.rm(added.hash);
-            List<Multihash> localRefsAfter = ipfs.refs.local();
+            nabu.removeBlock(addedHash);
+            List<Cid> localRefsAfter = nabu.listBlockstore();
             Assert.assertTrue("local ref size after rm", localRefsAfter.size() == 0);
+
+            boolean have = nabu.hasBlock(addedHash, Optional.empty());
+            Assert.assertTrue("does not have block as expected", !have);
         } catch (IOException ioe) {
             ioe.printStackTrace();
             Assert.assertTrue("IOException", false);
