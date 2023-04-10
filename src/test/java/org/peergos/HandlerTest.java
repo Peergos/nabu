@@ -106,7 +106,7 @@ public class HandlerTest {
 
             NabuClient ipfs = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
             Cid cid = Cid.decode("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
-            List<Map<String, Object>> providers = ipfs.findProviders(cid);
+            List<PeerAddresses> providers = ipfs.findProviders(cid);
             if (providers.isEmpty())
                 throw new IllegalStateException("Couldn't find provider of block!");
         } finally {

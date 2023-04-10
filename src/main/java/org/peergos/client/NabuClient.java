@@ -4,6 +4,7 @@ import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.PeerId;
+import org.peergos.PeerAddresses;
 import org.peergos.util.JSONParser;
 
 import java.io.ByteArrayOutputStream;
@@ -14,11 +15,7 @@ import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.LinkedHashMap;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class NabuClient {
@@ -136,10 +133,19 @@ public class NabuClient {
         return res.get("Size");
     }
 
-    public List<Map<String, Object>> findProviders(Multihash hash) throws IOException {
-        return getAndParseStream("dht/findprovs?arg=" + hash).stream()
+    public List<PeerAddresses> findProviders(Multihash hash) throws IOException {
+        List<Map<String, Object>> results = getAndParseStream("dht/findprovs?arg=" + hash).stream()
                 .map(x -> (Map<String, Object>) x)
                 .collect(Collectors.toList());
+        List<PeerAddresses> providers = new ArrayList<>();
+        for (Map<String, Object> entry : results) {
+            Map<String, Object> responses = (Map<String, Object>)entry.get("Responses");
+            Multihash peerId = Multihash.fromBase58((String) responses.get("ID"));
+            ArrayList<String> addrs = (ArrayList<String>)responses.get("Addrs");
+            List<MultiAddress> peerAddresses = addrs.stream().map(a -> new MultiAddress(a)).collect(Collectors.toList());
+            providers.add(new PeerAddresses(peerId, peerAddresses));
+        }
+        return providers;
     }
 
     private Map retrieveMap(String path) throws IOException {
