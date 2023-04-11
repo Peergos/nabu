@@ -41,6 +41,10 @@ public class HostBuilder {
         return peerId;
     }
 
+    public List<ProtocolBinding> getProtocols() {
+        return this.protocols;
+    }
+
     public Optional<Kademlia> getWanDht() {
         return protocols.stream()
                 .filter(p -> p instanceof Kademlia && p.getProtocolDescriptor().getAnnounceProtocols().contains("/ipfs/kad/1.0.0"))
