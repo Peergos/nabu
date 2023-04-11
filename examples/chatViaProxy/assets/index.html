@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style type="text/css">
+.chat-container{max-width:1170px; margin:auto;}
+.chat-border {
+  border: 1px solid #c4c4c4;
+  clear: both;
+  overflow: hidden;
+}
+.received-message-container {
+  display: inline-block;
+  padding: 0 0 0 10px;
+  vertical-align: top;
+  width: 92%;
+ }
+.received-message { width: 57%;}
+.received-message p {
+  background: #ebebeb none repeat scroll 0 0;
+  border-radius: 3px;
+  color: #646464;
+  font-size: 24px;
+  margin: 0;
+  padding: 5px 10px 5px 12px;
+  width: 100%;
+}
+.chat-message-info {
+  color: #747474;
+  display: block;
+  font-size: 22px;
+  margin: 8px 0 0;
+}
+.chat-messages {
+  float: left;
+  padding: 30px 15px 0 25px;
+  width: 100%;
+}
+.sent-message {
+  float: right;
+  width: 50%;
+}
+.sent-message p {
+  background: #05728f none repeat scroll 0 0;
+  border-radius: 3px;
+  font-size: 24px;
+  margin: 0; color:#fff;
+  padding: 5px 10px 5px 12px;
+  width:100%;
+}
+.sent-message-container{ overflow:hidden; margin:26px 0 26px;}
+.new-message input {
+  background: rgba(0, 0, 0, 0) none repeat scroll 0 0;
+  border: medium none;
+  color: #4c4c4c;
+  font-size: 15px;
+  min-height: 48px;
+  width: 100%;
+}
+.new-message-container {border-top: 1px solid #c4c4c4;position: relative;}
+.chat-messaging { padding: 0 0 50px 0;}
+.chat-messages-container {
+  height: 516px;
+  overflow-y: auto;
+}
+.modalDialog {
+    position: fixed;
+    font-family: Arial, Helvetica, sans-serif;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: rgba(0,0,0,0.8);
+    z-index:99999;
+    opacity: 0;
+    -webkit-transition: opacity 400ms ease-in;
+    -moz-transition: opacity 400ms ease-in;
+    transition: opacity 400ms ease-in;
+    pointer-events: none;
+}
+.modalDialog:target{
+    opacity: 1;
+    pointer-events: auto;
+}
+.modalDialog > div {
+    width: 400px;
+    position: relative;
+    margin: 10% auto;
+    padding: 5px 20px 13px 20px;
+    border-radius: 10px;
+    background: #fff;
+}
+</style>
+</head>
+<body>
+<div>
+    <a style="display: none" id="setupLink" href="#openModal">Setup</a>
+    <div id="openModal" class="modalDialog">
+        <div><a id="closeModal" href="#" style="display: none"></a>
+            <div>
+                <h3>Who are you?</h3>
+                <div style="margin: 10px">
+                    <form id="username-form">
+                        <input id="nameId" type="text" placeholder="enter username" size="30" style="font-size: 20px; min-height: 32px; width: 100%;">
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="chat-container">
+<div class="chat-messaging">
+      <div class="chat-border">
+        <div class="chat-messages">
+          <div id="chatMessagesId" class="chat-messages-container">
+          </div>
+          <div id="message-panel" style="display: none" class="new-message-container">
+              <form id="new-message-form">
+                <div class="new-message">
+                    <input id="newMsgId" type="text" placeholder="Type here">
+                </div>
+              </form>
+          </div>
+        </div>
+      </div>
+</div>
+</div>
+<script>
+function addMessage(message) {
+	if (document.getElementById(message.id) != null) {
+	    return;
+	}
+    let isSender = ChatState.username == message.author;
+	let container = document.getElementById('chatMessagesId');
+
+    var div = document.createElement("div");
+    div.id = message.id;
+    let style1 = isSender ? "sent-message-container" : 'received-message-container';
+    div.classList.add(style1);
+
+    var div2 = document.createElement("div");
+    let style2 = isSender ? "sent-message" : 'received-message';
+    div2.classList.add(style2);
+	div.appendChild(div2);
+            
+    var p = document.createElement("p");
+    p.innerText = message.text;
+	div2.appendChild(p);
+
+    var span = document.createElement("span");
+    span.classList.add("chat-message-info");
+    span.innerText = message.author + ' | ' + fromUTCtoLocal(message.timestamp);
+	div2.appendChild(span);
+                
+	container.appendChild(div);
+}
+let ChatState = {
+	messagesRead : 0,
+	username : ''
+};
+document.getElementById('setupLink').click();
+document.getElementById("nameId").focus();
+let form = document.getElementById('username-form');
+form.addEventListener('submit', function(e){return start(e);});
+function start(e) {
+    e.preventDefault();
+	let name = document.getElementById('nameId');
+	//todo validate etc
+    ChatState.username = name.value.length == 0 ? "unknown" : name.value;
+    document.getElementById('closeModal').click();
+
+    let form = document.getElementById('new-message-form');
+    form.addEventListener('submit', function(e){return sendMessage(e);});
+    mainLoop();
+}
+function mainLoop() {
+	console.log('looping...');
+	getMessages((messages) => {
+		messages.forEach(message => addMessage(message));
+    	document.getElementById('message-panel').style.display = '';			
+		setTimeout(() => mainLoop(), 5000);
+	});	
+}
+function fromUTCtoLocal(dateTime) {
+    let date = new Date(dateTime + "+00:00");//adding UTC TZ in ISO_OFFSET_DATE_TIME ie 2021-12-03T10:25:30+00:00
+    let formatted = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate()
+        + ' ' + (date.getHours() < 10 ? '0' : '') + date.getHours()
+        + ':' + (date.getMinutes() < 10 ? '0' : '') + date.getMinutes()
+        + ':' + (date.getSeconds() < 10 ? '0' : '') + date.getSeconds();
+    return formatted;
+}
+function sendMessage(e) {
+    e.preventDefault();
+	let messageInput = document.getElementById('newMsgId');
+	let messageText = messageInput.value;
+	if (messageText.length > 0) {
+		postMessage(messageText, (msg) => {
+		    addMessage(msg);
+			messageInput.value = '';
+		});
+	}
+}
+function getMessages(callback) {
+	let params = '?from=' + ChatState.messagesRead; 
+	fetch('messages' + params, { method: 'GET' })
+    .then(function(response) {
+      	if (response.status === 200) {
+			response.arrayBuffer().then(function(buffer) {
+  				let items = JSON.parse(new TextDecoder().decode(buffer));
+  				ChatState.messagesRead = ChatState.messagesRead + items.length;
+  				callback(items);
+    		});
+      	} else {
+      		console.log('call to get messages failed!');
+      	}
+	});	
+}
+function postMessage(text, callback) {
+    let message = {author: ChatState.username, text: text};
+    let encoder = new TextEncoder();
+    let data = encoder.encode(JSON.stringify(message));
+  	fetch('sendMessage', { method: 'POST', headers: {}, body: data })
+    	.then(function(response) {
+      		if (response.status === 201) {
+                response.arrayBuffer().then(function(buffer) {
+      				callback(JSON.parse(new TextDecoder().decode(buffer)));
+    		    });
+      		} else {
+      			console.log('message send failed!');
+      		}
+    	});
+}
+</script>
+</body>
+</html>
+
+
