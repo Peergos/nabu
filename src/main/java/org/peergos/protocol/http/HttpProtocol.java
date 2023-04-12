@@ -117,11 +117,16 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
     public HttpProtocol(HttpRequestProcessor handler) {
         super(TRAFFIC_LIMIT, TRAFFIC_LIMIT);
-        this.handler = handler;
+        this.handler = (s, req, replyHandler) -> handler.handle(s, setHost(req, s), replyHandler);
+    }
+
+    public static HttpRequest setHost(HttpRequest req, Stream source) {
+        req.headers().set(HttpHeaderNames.HOST,source.remotePeerId().toBase58());
+        return req;
     }
 
     public HttpProtocol(SocketAddress proxyTarget) {
-        this((s, req, replyHandler) -> proxyRequest(s, req, proxyTarget, replyHandler));
+        this((s, req, replyHandler) -> proxyRequest(s, setHost(req, s), proxyTarget, replyHandler));
     }
 
     @NotNull
