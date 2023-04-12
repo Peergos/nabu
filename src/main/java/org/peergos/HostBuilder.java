@@ -47,7 +47,7 @@ public class HostBuilder {
 
     public Optional<Kademlia> getWanDht() {
         return protocols.stream()
-                .filter(p -> p instanceof Kademlia && p.getProtocolDescriptor().getAnnounceProtocols().contains("/ipfs/kad/1.0.0"))
+                .filter(p -> p instanceof Kademlia)
                 .map(p -> (Kademlia)p)
                 .findFirst();
     }
@@ -111,10 +111,11 @@ public class HostBuilder {
                                     ProviderStore providers,
                                     RecordStore records,
                                     Blockstore blocks,
-                                    BlockRequestAuthoriser authoriser) {
+                                    BlockRequestAuthoriser authoriser,
+                                    boolean localEnabled) {
         HostBuilder builder = new HostBuilder().generateIdentity().listenLocalhost(listenPort);
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), "/ipfs/kad/1.0.0", 20, 3, localEnabled);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
         return builder.addProtocols(List.of(
@@ -165,6 +166,13 @@ public class HostBuilder {
                     .setPublicKey(ByteArrayExtKt.toProtobuf(privKey.publicKey().bytes()))
                     .addListenAddrs(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()))
                     .setObservedAddr(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()));
+
+            // TODO: Add constructor parameter for client/server mode and adjust identify protocol logic below using that param
+            // From https://github.com/libp2p/specs/blob/master/kad-dht/README.md:
+            // Nodes operating in server mode advertise the libp2p Kademlia protocol identifier via the identify protocol.
+            // In addition server mode nodes accept incoming streams using the Kademlia protocol identifier.
+            // Nodes operating in client mode do not advertise support for the libp2p Kademlia protocol identifier.
+            // In addition they do not offer the Kademlia protocol identifier for incoming streams.
             for (ProtocolBinding<?> protocol : protocols) {
                 identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());
             }

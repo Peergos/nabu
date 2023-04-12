@@ -29,10 +29,15 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     private final boolean localDht;
     private AddressBook addressBook;
 
-    public Kademlia(KademliaEngine dht, boolean localOnly) {
-        super("/ipfs/" + (localOnly ? "lan/" : "") + "kad/1.0.0", new KademliaProtocol(dht));
+    private final Integer replication;
+    private final Integer alpha;
+
+    public Kademlia(KademliaEngine dht, String protocolId, Integer replication, Integer alpha, boolean localDht) {
+        super(protocolId, new KademliaProtocol(dht));
         this.engine = dht;
-        this.localDht = localOnly;
+        this.localDht = localDht;
+        this.replication = replication;
+        this.alpha = alpha;
     }
 
     public void setAddressBook(AddressBook addrs) {
@@ -91,6 +96,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             return false;
         }
     }
+
     public void bootstrap(Host us) {
         // lookup a random peer id
         byte[] hash = new byte[32];
@@ -131,7 +137,9 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         Id keyId = Id.create(Hash.sha256(key), 256);
         SortedSet<RoutingEntry> closest = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
         SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
+
         List<PeerAddresses> localClosest = engine.getKClosestPeers(key);
+
         if (maxCount == 1) {
             Collection<Multiaddr> existing = addressBook.get(PeerId.fromBase58(peerIdkey.toBase58())).join();
             if (! existing.isEmpty())
@@ -140,21 +148,30 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             if (match.isPresent())
                 return Collections.singletonList(match.get());
         }
+
+        // At initialization toQuery is seeded with the k peers from our routing table we know are closest to Key, based on the XOR distance function
         closest.addAll(localClosest.stream()
                 .map(p -> new RoutingEntry(Id.create(Hash.sha256(p.peerId.toBytes()), 256), p))
                 .collect(Collectors.toList()));
         toQuery.addAll(closest);
+
+        // We keep track of the set of peers we've already queried
         Set<Multihash> queried = new HashSet<>();
-        int queryParallelism = 3;
+
         while (true) {
-            List<RoutingEntry> queryThisRound = toQuery.stream().limit(queryParallelism).collect(Collectors.toList());
+            // The set of next query candidates. Pick as many peers from the candidate peers (closest) as the alpha concurrency factor allows.
+            List<RoutingEntry> queryThisRound = toQuery.stream().limit(alpha).collect(Collectors.toList());
             toQuery.removeAll(queryThisRound);
+
+            // Send each a FIND_NODE(Key) request, and mark it as queried in Pq.
             queryThisRound.forEach(r -> queried.add(r.addresses.peerId));
             List<CompletableFuture<List<PeerAddresses>>> futures = queryThisRound.stream()
                     .map(r -> getCloserPeers(peerIdkey, r.addresses, us))
                     .collect(Collectors.toList());
+
             boolean foundCloser = false;
             for (CompletableFuture<List<PeerAddresses>> future : futures) {
+                // If successful the response will contain the k closest nodes the peer knows to the key
                 List<PeerAddresses> result = future.join();
                 for (PeerAddresses peer : result) {
                     if (! queried.contains(peer.peerId)) {
@@ -170,6 +187,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     }
                 }
             }
+
             // if no new peers in top k were returned we are done
             if (! foundCloser)
                 break;
@@ -190,11 +208,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 .collect(Collectors.toList()));
 
         Set<Multihash> queried = new HashSet<>();
-        int queryParallelism = 3;
+
         while (true) {
             if (providers.size() >= desiredCount)
                 return CompletableFuture.completedFuture(providers);
-            List<RoutingEntry> queryThisRound = toQuery.stream().limit(queryParallelism).collect(Collectors.toList());
+            List<RoutingEntry> queryThisRound = toQuery.stream().limit(alpha).collect(Collectors.toList());
             toQuery.removeAll(queryThisRound);
             queryThisRound.forEach(r -> queried.add(r.addresses.peerId));
             List<CompletableFuture<Providers>> futures = queryThisRound.stream()
@@ -262,7 +280,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     }
 
     public CompletableFuture<Void> provideBlock(Multihash block, Host us, PeerAddresses ourAddrs) {
-        List<PeerAddresses> closestPeers = findClosestPeers(block, 20, us);
+        List<PeerAddresses> closestPeers = findClosestPeers(block, replication, us);
         List<CompletableFuture<Boolean>> provides = closestPeers.stream()
                 .parallel()
                 .map(p -> dialPeer(p, us).join().provide(block, ourAddrs))
@@ -276,8 +294,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         long ttl = hours * 3600_000_000_000L;
 
         int publishes = 0;
-        while (publishes < 20) {
-            List<PeerAddresses> closestPeers = findClosestPeers(publisher, 20, us);
+        while (publishes < replication) {
+            List<PeerAddresses> closestPeers = findClosestPeers(publisher, replication, us);
             for (PeerAddresses peer : closestPeers) {
                 boolean success = dialPeer(peer, us).join().putValue("/ipfs/" + value, expiry, sequence,
                         ttl, publisher, priv).join();
@@ -289,7 +307,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     }
 
     public CompletableFuture<String> resolveIpnsValue(Multihash publisher, Host us) {
-        List<PeerAddresses> closestPeers = findClosestPeers(publisher, 20, us);
+        List<PeerAddresses> closestPeers = findClosestPeers(publisher, replication, us);
         List<IpnsRecord> candidates = new ArrayList<>();
         Set<PeerAddresses> queryCandidates = new HashSet<>();
         Set<Multihash> queriedPeers = new HashSet<>();
