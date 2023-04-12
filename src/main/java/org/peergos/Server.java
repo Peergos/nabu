@@ -75,7 +75,7 @@ public class Server {
         Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toString());
         ProviderStore providers = new RamProviderStore();
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), "/ipfs/kad/1.0.0", 20, 3, false);
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), "/ipfs/kad/1.0.0", 20, 3, false, false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);

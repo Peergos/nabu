@@ -11,10 +11,12 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
     public static final int MAX_MESSAGE_SIZE = 1024*1024;
 
     private final KademliaEngine engine;
+    private final boolean clientMode;
 
-    public KademliaProtocol(KademliaEngine engine) {
+    public KademliaProtocol(KademliaEngine engine, boolean clientMode) {
         super(Dht.Message.getDefaultInstance(), MAX_MESSAGE_SIZE, MAX_MESSAGE_SIZE);
         this.engine = engine;
+        this.clientMode = clientMode;
     }
 
     @NotNull
@@ -26,9 +28,11 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
         return CompletableFuture.completedFuture(handler);
     }
 
-    @NotNull
     @Override
     protected CompletableFuture<KademliaController> onStartResponder(@NotNull Stream stream) {
+        if (clientMode) {
+            throw new Libp2pException("Client mode mustn't respond to queries");
+        }
         engine.addIncomingConnection(stream.remotePeerId(), stream.getConnection().remoteAddress());
         IncomingRequestHandler handler = new IncomingRequestHandler(engine);
         stream.pushHandler(handler);
