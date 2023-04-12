@@ -32,8 +32,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     private final Integer replication;
     private final Integer alpha;
 
-    public Kademlia(KademliaEngine dht, String protocolId, Integer replication, Integer alpha, boolean localDht) {
-        super(protocolId, new KademliaProtocol(dht));
+    public Kademlia(KademliaEngine dht, String protocolId, Integer replication, Integer alpha, boolean localDht, boolean clientMode) {
+        super(protocolId, new KademliaProtocol(dht, clientMode));
         this.engine = dht;
         this.localDht = localDht;
         this.replication = replication;
