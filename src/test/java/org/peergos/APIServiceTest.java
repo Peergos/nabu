@@ -46,9 +46,9 @@ public class APIServiceTest {
 
     @Test
     public void bulkGetTest() {
-        APIService service = new APIService(new RamBlockstore(), new BitswapBlockService(null, null));
-        Cid cid1 = service.putBlock("Hello".getBytes(), "raw");
-        Cid cid2= service.putBlock("world!".getBytes(), "raw");
+        APIService service = new APIService(new RamBlockstore(), new BitswapBlockService(null, null), null);
+        Cid cid1 = service.putBlock("Hello".getBytes(), Cid.Codec.Raw);
+        Cid cid2= service.putBlock("world!".getBytes(), Cid.Codec.Raw);
         List<Want> wants = new ArrayList<>();
         wants.add(new Want(cid1, Optional.of("auth")));
         wants.add(new Want(cid2, Optional.of("auth")));
@@ -58,13 +58,13 @@ public class APIServiceTest {
 
     public class Tester {
         public static void runAPIServiceTest(Blockstore blocks) {
-            APIService service = new APIService(blocks, new BitswapBlockService(null, null));
+            APIService service = new APIService(blocks, new BitswapBlockService(null, null), null);
             Cid cid = Cid.decode("zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg");
             Assert.assertFalse("cid found", service.hasBlock(cid));
             String text = "Hello world!";
             byte[] block = text.getBytes();
 
-            Cid cidAdded = service.putBlock(block, "raw");
+            Cid cidAdded = service.putBlock(block, Cid.Codec.Raw);
             Assert.assertTrue("cid added was found", service.hasBlock(cidAdded));
 
             List<HashedBlock> blockRetrieved = service.getBlocks(List.of(new Want(cidAdded)), Collections.emptySet(), false);
