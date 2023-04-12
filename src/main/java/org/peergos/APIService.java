@@ -2,6 +2,7 @@ package org.peergos;
 import io.ipfs.cid.Cid;
 import io.libp2p.core.*;
 import org.peergos.blockstore.Blockstore;
+import org.peergos.protocol.dht.Kademlia;
 import org.peergos.util.Version;
 
 import java.util.*;
@@ -15,9 +16,13 @@ public class APIService {
     private final Blockstore store;
     private final BlockService remoteBlocks;
 
-    public APIService(Blockstore store, BlockService remoteBlocks) {
+    private final Kademlia dht;
+
+
+    public APIService(Blockstore store, BlockService remoteBlocks, Kademlia dht) {
         this.store = store;
         this.remoteBlocks = remoteBlocks;
+        this.dht = dht;
     }
 
     public List<HashedBlock> getBlocks(List<Want> wants, Set<PeerId> peers, boolean addToLocal) {
@@ -43,15 +48,7 @@ public class APIService {
                 .collect(Collectors.toList());
     }
     
-    public Cid putBlock(byte[] block, String format) {
-        Cid.Codec codec = null;
-        if (format.equals("raw")) {
-            codec = Cid.Codec.Raw;
-        } else if (format.equals("cbor")) {
-            codec = Cid.Codec.DagCbor;
-        } else {
-            throw new IllegalArgumentException("only raw and cbor format supported");
-        }
+    public Cid putBlock(byte[] block, Cid.Codec codec) {
         return store.put(block, codec).join();
     }
 
@@ -68,5 +65,10 @@ public class APIService {
 
     public Boolean bloomAdd(Cid cid) {
         return store.bloomAdd(cid).join();
+    }
+
+    public List<PeerAddresses> findProviders(Cid cid, Host node, int numProviders) {
+        List<PeerAddresses> providers = dht.findProviders(cid, node, numProviders).join();
+        return providers;
     }
 }
