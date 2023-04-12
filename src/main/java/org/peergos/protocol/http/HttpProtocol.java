@@ -145,6 +145,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     protected CompletableFuture<HttpController> onStartResponder(@NotNull Stream stream) {
         Receiver proxier = new Receiver(handler);
         stream.pushHandler(new HttpRequestDecoder());
+        stream.pushHandler(new HttpObjectAggregator(1024*1024));
         stream.pushHandler(proxier);
         stream.pushHandler(new HttpResponseEncoder());
         return CompletableFuture.completedFuture(proxier);

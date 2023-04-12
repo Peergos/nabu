@@ -44,6 +44,7 @@ public class P2pHttpChatTest {
             for (int i=0; i < 20; i++) {
                 byte[] msg1 = "G'day from node1!".getBytes();
                 FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.copiedBuffer(msg1));
+                httpRequest.headers().set(HttpHeaderNames.CONTENT_LENGTH, msg1.length);
                 HttpProtocol.HttpController proxier1 = node1Http.dial(node1, address2)
                         .getController().join();
                 long t1 = System.currentTimeMillis();
@@ -53,6 +54,7 @@ public class P2pHttpChatTest {
 
 //                byte[] msg2 = "G'day node1! I'm node2.".getBytes();
 //                FullHttpRequest httpRequest2 = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.copiedBuffer(msg2));
+//                httpRequest2.headers().set(HttpHeaderNames.CONTENT_LENGTH, msg2.length);
 //                HttpProtocol.HttpController proxier2 = node2Http.dial(node2, address1)
 //                        .getController().join();
 //                long t3 = System.currentTimeMillis();
