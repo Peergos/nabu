@@ -165,6 +165,7 @@ public class ChatServer {
                                 ChannelPipeline p = ch.pipeline();
                                 p.addLast(new HttpRequestDecoder());
                                 p.addLast(new HttpResponseEncoder());
+                                p.addLast(new HttpObjectAggregator(1024*1024));
                                 p.addLast(new CustomHttpServerHandler(chat));
                             }
                         });
@@ -179,14 +180,6 @@ public class ChatServer {
     }
     public class CustomHttpServerHandler extends SimpleChannelInboundHandler<Object> {
         private final Chat chat;
-        private HttpMethod method;
-        private String uri;
-        private boolean keepAlive;
-
-        private StringBuilder responseData;
-        private HttpResponseStatus responseCode;
-        private Map<String, String> responseHeaders;
-        private String mimeType;
         public CustomHttpServerHandler(Chat chat) {
             this.chat = chat;
         }
@@ -195,82 +188,66 @@ public class ChatServer {
             ctx.flush();
         }
 
-        //NOTE: is called twice for each request!
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, Object msgObj) {
-            if (msgObj instanceof HttpRequest) {
-                HttpRequest request = (HttpRequest) msgObj;
-                this.method = request.method();
-                this.uri = request.uri();
-                this.keepAlive = HttpUtil.isKeepAlive(request);
+            FullHttpRequest request =(FullHttpRequest) msgObj;
+            String uri = request.uri();
 
-                responseData = new StringBuilder();
-                responseCode = HttpResponseStatus.OK;
-                responseHeaders = new HashMap<>();
-                mimeType = "text/plain";
-            } else if (msgObj instanceof HttpContent) {
-                HttpContent httpContent = (HttpContent) msgObj;
-                int paramIndex = uri.lastIndexOf('?');
-                String path =  paramIndex > -1 ? uri.substring(0, paramIndex) : uri;
-                switch (path) {
-                    case "/": {
-                        if (method == HttpMethod.GET) {
-                            byte[] data = chat.getChatPage();
-                            responseData.append(new String(data));
-                            responseCode = HttpResponseStatus.OK;
-                            mimeType = "text/html";
-                        }
-                        break;
+            StringBuilder responseData = new StringBuilder();
+            HttpResponseStatus responseCode = HttpResponseStatus.OK;
+            Map<String, String> responseHeaders = new HashMap<>();
+            String mimeType = "text/plain";
+
+            int paramIndex = uri.lastIndexOf('?');
+            String path =  paramIndex > -1 ? uri.substring(0, paramIndex) : uri;
+            HttpMethod method = request.method();
+            switch (path) {
+                case "/": {
+                    if (method == HttpMethod.GET) {
+                        byte[] data = chat.getChatPage();
+                        responseData.append(new String(data));
+                        responseCode = HttpResponseStatus.OK;
+                        mimeType = "text/html";
                     }
-                    case "/messages": {
-                        if (method == HttpMethod.GET) {
-                            QueryStringDecoder queryStringDecoder = new QueryStringDecoder(uri);
-                            Map<String, List<String>> params = queryStringDecoder.parameters();
-                            Optional<String> fromOpt = Optional.ofNullable(params.get("from")).map(a -> a.get(0));
-                            List<Message> list = chat.getMessages(fromOpt);
-                            List<Map<String, Object>> msgs = list.stream().map(msg -> msg.toJson()).collect(Collectors.toList());
-                            String data = JSONParser.toString(msgs);
-                            responseData.append(data);
-                            responseCode = HttpResponseStatus.OK;
-                            mimeType = "text/plain";
-                        }
-                        break;
-                    }
-                    case "/sendMessage": {
-                        if (method == HttpMethod.POST) {
-                            ByteBuf content = httpContent.content();
-                            Message message = chat.addMessage(content.toString(CharsetUtil.UTF_8));
-                            String data = JSONParser.toString(message.toJson());
-                            responseHeaders.put(HttpHeaderNames.LOCATION.toString(), message.id);
-                            responseData.append(data);
-                            responseCode = HttpResponseStatus.CREATED;
-                            mimeType = "text/plain";
-                        }
-                        break;
-                    }
-                    default: {
-                        responseCode = BAD_REQUEST;
-                        break;
-                    }
+                    break;
                 }
-                if (msgObj instanceof LastHttpContent) {
-                    LastHttpContent trailer = (LastHttpContent) msgObj;
-                    if (! trailer.decoderResult().isSuccess()) {
-                        responseCode = BAD_REQUEST;
+                case "/messages": {
+                    if (method == HttpMethod.GET) {
+                        QueryStringDecoder queryStringDecoder = new QueryStringDecoder(uri);
+                        Map<String, List<String>> params = queryStringDecoder.parameters();
+                        Optional<String> fromOpt = Optional.ofNullable(params.get("from")).map(a -> a.get(0));
+                        List<Message> list = chat.getMessages(fromOpt);
+                        List<Map<String, Object>> msgs = list.stream().map(msg -> msg.toJson()).collect(Collectors.toList());
+                        String data = JSONParser.toString(msgs);
+                        responseData.append(data);
+                        responseCode = HttpResponseStatus.OK;
+                        mimeType = "text/plain";
                     }
-                    writeResponse(ctx);
+                    break;
+                }
+                case "/sendMessage": {
+                    if (method == HttpMethod.POST) {
+                        ByteBuf content = request.content();
+                        Message message = chat.addMessage(content.toString(CharsetUtil.UTF_8));
+                        String data = JSONParser.toString(message.toJson());
+                        responseHeaders.put(HttpHeaderNames.LOCATION.toString(), message.id);
+                        responseData.append(data);
+                        responseCode = HttpResponseStatus.CREATED;
+                        mimeType = "text/plain";
+                    }
+                    break;
+                }
+                default: {
+                    responseCode = BAD_REQUEST;
+                    break;
                 }
             }
-        }
-
-        private void writeResponse(ChannelHandlerContext ctx) {
-
             FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, responseCode, Unpooled.copiedBuffer(responseData.toString(), CharsetUtil.UTF_8));
-
             httpResponse.headers().set(HttpHeaderNames.CONTENT_TYPE, mimeType + "; charset=UTF-8");
             for(Map.Entry<String, String> entry : responseHeaders.entrySet()) {
                 httpResponse.headers().set(entry.getKey(), entry.getValue());
             }
+            boolean keepAlive = HttpUtil.isKeepAlive(request);
             if (keepAlive) {
                 httpResponse.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, httpResponse.content().readableBytes());
                 httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
