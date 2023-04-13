@@ -142,7 +142,8 @@ public class ChatServer {
             return messages.stream().skip(from).collect(Collectors.toList());
         }
     }
-    // code from https://github.com/eugenp/tutorials/tree/master/server-modules/netty/src/main/java/com/baeldung/http/server
+    // tutorial https://www.baeldung.com/java-netty-http-server
+    // and accompanying code from https://github.com/eugenp/tutorials/tree/master/server-modules/netty/src/main/java/com/baeldung/http/server
     public class HttpServer {
         private int port;
         private Chat chat;
