@@ -1,105 +1,67 @@
 package chatViaProxy;
 
-import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import io.libp2p.core.Host;
 import io.libp2p.core.multiformats.Multiaddr;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.QueryStringDecoder;
+
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpRequestDecoder;
+import io.netty.handler.codec.http.HttpResponseEncoder;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
+
+import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
+import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
+
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpUtil;
+
 import org.peergos.HostBuilder;
 import org.peergos.blockstore.RamBlockstore;
 import org.peergos.protocol.dht.RamProviderStore;
 import org.peergos.protocol.dht.RamRecordStore;
 import org.peergos.protocol.http.HttpProtocol;
-import org.peergos.util.HttpUtil;
 import org.peergos.util.JSONParser;
 
 import java.io.*;
-import java.net.InetSocketAddress;
 import java.net.URLEncoder;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.UUID.randomUUID;
 
 public class ChatServer {
-    public ChatServer() throws IOException {
+    public ChatServer() throws Exception {
 
         Chat chat = new Chat();
 
         HttpProtocol.Binding node2Http = new HttpProtocol.Binding((s, req, h) -> {
             System.out.println("Node 2 received: " + req);
-            String path = req.uri();
-            try {
-                switch (path) {
-                    case "/": {
-                        if (req.method() == HttpMethod.GET) {
-                            byte[] data = chat.getChatPage();
-                            FullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.copiedBuffer(new String(data), CharsetUtil.UTF_8));
-                            resp.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/html; charset=UTF-8");
-                            h.accept(resp);
-                        }
-                        break;
-                    }
-                    case "/sendMessage": {
-                        if (req.method() == HttpMethod.POST) {
-                            HttpContent httpContent = (HttpContent) req;
-                            StringBuilder responseData = new StringBuilder();
-                            ByteBuf content = httpContent.content();
-                            responseData.append(content.toString(CharsetUtil.UTF_8));
-                            Message message = chat.addMessage(responseData.toString().getBytes());
-                            String data = JSONParser.toString(message.toJson());
-                            FullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CREATED, Unpooled.copiedBuffer(data, CharsetUtil.UTF_8));
-                            resp.headers().set(HttpHeaderNames.LOCATION, message.id);
-                            resp.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
-                            h.accept(resp);
-                        }
-                        break;
-                    }
-                    case "/messages": {
-                        if (req.method() == HttpMethod.GET) {
-                            QueryStringDecoder queryStringDecoder = new QueryStringDecoder(path);
-                            Map<String, List<String>> params = queryStringDecoder.parameters();
-                            Optional<String> fromOpt = Optional.ofNullable(params.get("from")).map(a -> a.get(0));
-                            List<Message> list = chat.getMessages(fromOpt);
-                            List<Map<String, Object>> msgs = list.stream().map(msg -> msg.toJson()).collect(Collectors.toList());
-                            String data = JSONParser.toString(msgs);
-                            FullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.copiedBuffer(data, CharsetUtil.UTF_8));
-                            resp.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
-                            h.accept(resp);
-                        }
-                        break;
-                    }
-                    default: {
-                        FullHttpResponse replyErr = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND, Unpooled.buffer(0));
-                        replyErr.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
-                        h.accept(replyErr);
-                        break;
-                    }
-                }
-            } catch (Exception e) {
-                Throwable cause = e.getCause();
-                FullHttpResponse replyException = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST, Unpooled.buffer(0));
-                try {
-                if (cause != null)
-                    replyException.headers().set("Trailer", URLEncoder.encode(cause.getMessage(), "UTF-8"));
-                else
-                    replyException.headers().set("Trailer", URLEncoder.encode(e.getMessage(), "UTF-8"));
-                } catch (IOException ex) {
-                    replyException.headers().set("Trailer", "Unexpected error");
-                }
-                replyException.headers().set("Content-Type", "text/plain");
-                replyException.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
-                h.accept(replyException);
-            }
         });
         HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
@@ -110,15 +72,11 @@ public class ChatServer {
         System.out.println("Running Multiaddr: " + address2.toString());
 
         int port = 8000;
-        InetSocketAddress proxyTarget = new InetSocketAddress("127.0.0.1", port);
-        HttpServer localhostServer = HttpServer.create(proxyTarget, 20);
-        localhostServer.createContext("/", new ChatHandler(chat));
-        localhostServer.setExecutor(Executors.newSingleThreadExecutor());
-        localhostServer.start();
+        new HttpServer(chat, port).run();
+
         System.out.println("Started Chat server on port:" + port);
         Thread shutdownHook = new Thread(() -> {
             try {
-                localhostServer.stop(1);
                 node2.stop();
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -126,26 +84,7 @@ public class ChatServer {
         });
         Runtime.getRuntime().addShutdownHook(shutdownHook);
     }
-    protected static byte[] read(InputStream in) throws IOException {
-        try (ByteArrayOutputStream bout = new ByteArrayOutputStream();
-            OutputStream gout = new DataOutputStream(bout)) {
-            byte[] tmp = new byte[4096];
-            int r;
-            while ((r = in.read(tmp)) >= 0)
-                gout.write(tmp, 0, r);
-            in.close();
-            return bout.toByteArray();
-        }
-    }
-    private static void replyJson(HttpExchange exchange, String json, int status) {
-        try (DataOutputStream dout = new DataOutputStream(exchange.getResponseBody())){
-            byte[] raw = json.getBytes();
-            exchange.sendResponseHeaders(status, raw.length);
-            dout.write(raw);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+
     public class Message {
         public final String id;
         public final String text;
@@ -171,10 +110,26 @@ public class ChatServer {
         public Chat() {
 
         }
-        public byte[] getChatPage() throws IOException {
-            return read(ChatServer.class.getResourceAsStream("assets/index.html"));
+        public byte[] getChatPage()  {
+            try {
+                return read(ChatServer.class.getResourceAsStream("assets/index.html"));
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+                return "".getBytes();
+            }
         }
-        public Message addMessage(byte[] body) {
+        private byte[] read(InputStream in) throws IOException {
+            try (ByteArrayOutputStream bout = new ByteArrayOutputStream();
+                 OutputStream gout = new DataOutputStream(bout)) {
+                byte[] tmp = new byte[4096];
+                int r;
+                while ((r = in.read(tmp)) >= 0)
+                    gout.write(tmp, 0, r);
+                in.close();
+                return bout.toByteArray();
+            }
+        }
+        public Message addMessage(String body) {
             Map<String, Object> json = (Map) JSONParser.parse(body);
             String id = randomUUID().toString();
             LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
@@ -187,57 +142,151 @@ public class ChatServer {
             return messages.stream().skip(from).collect(Collectors.toList());
         }
     }
-    public class ChatHandler implements HttpHandler {
+    // code from https://github.com/eugenp/tutorials/tree/master/server-modules/netty/src/main/java/com/baeldung/http/server
+    public class HttpServer {
+        private int port;
+        private Chat chat;
+        public HttpServer(Chat chat, int port) {
+            this.chat = chat;
+            this.port = port;
+        }
+        public void run() throws Exception {
+            EventLoopGroup bossGroup = new NioEventLoopGroup(1);
+            EventLoopGroup workerGroup = new NioEventLoopGroup();
+            try {
+                ServerBootstrap b = new ServerBootstrap();
+                b.group(bossGroup, workerGroup)
+                        .channel(NioServerSocketChannel.class)
+                        .handler(new LoggingHandler(LogLevel.TRACE))
+                        .childHandler(new ChannelInitializer<SocketChannel>() {
+                            @Override
+                            protected void initChannel(SocketChannel ch) throws Exception {
+                                ChannelPipeline p = ch.pipeline();
+                                p.addLast(new HttpRequestDecoder());
+                                p.addLast(new HttpResponseEncoder());
+                                p.addLast(new CustomHttpServerHandler(chat));
+                            }
+                        });
 
+                ChannelFuture f = b.bind(port).sync();
+                f.channel().closeFuture().sync();
+            } finally {
+                bossGroup.shutdownGracefully();
+                workerGroup.shutdownGracefully();
+            }
+        }
+    }
+    public class CustomHttpServerHandler extends SimpleChannelInboundHandler<Object> {
         private final Chat chat;
-        public ChatHandler(Chat chat) {
+        private HttpMethod method;
+        private String uri;
+        private boolean keepAlive;
+
+        private StringBuilder responseData;
+        private HttpResponseStatus responseCode;
+        private Map<String, String> responseHeaders;
+        private String mimeType;
+        public CustomHttpServerHandler(Chat chat) {
             this.chat = chat;
         }
         @Override
-        public void handle(HttpExchange httpExchange) {
-            String path = httpExchange.getRequestURI().getPath();
-            try {
+        public void channelReadComplete(ChannelHandlerContext ctx) {
+            ctx.flush();
+        }
+
+        //NOTE: is called twice for each request!
+        @Override
+        protected void channelRead0(ChannelHandlerContext ctx, Object msgObj) {
+            if (msgObj instanceof HttpRequest) {
+                HttpRequest request = (HttpRequest) msgObj;
+                this.method = request.method();
+                this.uri = request.uri();
+                this.keepAlive = HttpUtil.isKeepAlive(request);
+
+                responseData = new StringBuilder();
+                responseCode = HttpResponseStatus.OK;
+                responseHeaders = new HashMap<>();
+                mimeType = "text/plain";
+            } else if (msgObj instanceof HttpContent) {
+                HttpContent httpContent = (HttpContent) msgObj;
+                int paramIndex = uri.lastIndexOf('?');
+                String path =  paramIndex > -1 ? uri.substring(0, paramIndex) : uri;
                 switch (path) {
                     case "/": {
-                        if (httpExchange.getRequestMethod().equals("GET")) {
-                            byte[] httpReply = chat.getChatPage();
-                            httpExchange.sendResponseHeaders(200, httpReply.length);
-                            httpExchange.getResponseBody().write(httpReply);
-                        }
-                        break;
-                    }
-                    case "/sendMessage": {
-                        if (httpExchange.getRequestMethod().equals("POST")) {
-                            Message message = chat.addMessage(read(httpExchange.getRequestBody()));
-                            Headers headers = httpExchange.getResponseHeaders();
-                            headers.set("location", message.id);
-                            replyJson(httpExchange, JSONParser.toString(message.toJson()), 201);
+                        if (method == HttpMethod.GET) {
+                            byte[] data = chat.getChatPage();
+                            responseData.append(new String(data));
+                            responseCode = HttpResponseStatus.OK;
+                            mimeType = "text/html";
                         }
                         break;
                     }
                     case "/messages": {
-                        if (httpExchange.getRequestMethod().equals("GET")) {
-                            Map<String, List<String>> params = HttpUtil.parseQuery(httpExchange.getRequestURI().getQuery());
+                        if (method == HttpMethod.GET) {
+                            QueryStringDecoder queryStringDecoder = new QueryStringDecoder(uri);
+                            Map<String, List<String>> params = queryStringDecoder.parameters();
                             Optional<String> fromOpt = Optional.ofNullable(params.get("from")).map(a -> a.get(0));
                             List<Message> list = chat.getMessages(fromOpt);
                             List<Map<String, Object>> msgs = list.stream().map(msg -> msg.toJson()).collect(Collectors.toList());
-                            replyJson(httpExchange, JSONParser.toString(msgs), 200);
+                            String data = JSONParser.toString(msgs);
+                            responseData.append(data);
+                            responseCode = HttpResponseStatus.OK;
+                            mimeType = "text/plain";
+                        }
+                        break;
+                    }
+                    case "/sendMessage": {
+                        if (method == HttpMethod.POST) {
+                            ByteBuf content = httpContent.content();
+                            Message message = chat.addMessage(content.toString(CharsetUtil.UTF_8));
+                            String data = JSONParser.toString(message.toJson());
+                            responseHeaders.put(HttpHeaderNames.LOCATION.toString(), message.id);
+                            responseData.append(data);
+                            responseCode = HttpResponseStatus.CREATED;
+                            mimeType = "text/plain";
                         }
                         break;
                     }
                     default: {
-                        httpExchange.sendResponseHeaders(404, 0);
+                        responseCode = BAD_REQUEST;
                         break;
                     }
                 }
-            } catch (Exception e) {
-                HttpUtil.replyError(httpExchange, e);
-            } finally {
-                httpExchange.close();
+                if (msgObj instanceof LastHttpContent) {
+                    LastHttpContent trailer = (LastHttpContent) msgObj;
+                    if (! trailer.decoderResult().isSuccess()) {
+                        responseCode = BAD_REQUEST;
+                    }
+                    writeResponse(ctx);
+                }
             }
         }
+
+        private void writeResponse(ChannelHandlerContext ctx) {
+
+            FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, responseCode, Unpooled.copiedBuffer(responseData.toString(), CharsetUtil.UTF_8));
+
+            httpResponse.headers().set(HttpHeaderNames.CONTENT_TYPE, mimeType + "; charset=UTF-8");
+            for(Map.Entry<String, String> entry : responseHeaders.entrySet()) {
+                httpResponse.headers().set(entry.getKey(), entry.getValue());
+            }
+            if (keepAlive) {
+                httpResponse.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, httpResponse.content().readableBytes());
+                httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+            }
+            ctx.write(httpResponse);
+            if (!keepAlive) {
+                ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+            }
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            cause.printStackTrace();
+            ctx.close();
+        }
     }
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws Exception {
         new ChatServer();
     }
 }
