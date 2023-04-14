@@ -8,6 +8,7 @@ import io.libp2p.core.Host;
 import io.libp2p.core.multiformats.Multiaddr;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
+import io.netty.util.CharsetUtil;
 import org.peergos.HostBuilder;
 import org.peergos.blockstore.RamBlockstore;
 import org.peergos.protocol.dht.RamProviderStore;
@@ -62,7 +63,8 @@ public class Sender {
                 String path = httpExchange.getRequestURI().getPath();
                 HttpMethod method = HttpMethod.valueOf(httpExchange.getRequestMethod());
                 byte[] body = read(httpExchange.getRequestBody());
-                FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path, Unpooled.copiedBuffer(body));
+                String bodyContent = new String(body);
+                FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path, Unpooled.copiedBuffer(bodyContent, CharsetUtil.UTF_8));
                 FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
                 ByteArrayOutputStream bout = new ByteArrayOutputStream();
                 int contentLength = resp.headers().getInt("content-length");
@@ -94,7 +96,7 @@ public class Sender {
     }
 
     public static void main(String[] args) throws IOException {
-        String addr2 = "/ip4/127.0.0.1/tcp/11316/p2p/12D3KooWBEC9JFcurQxMRbSYL5rNuK1T77kx6mTbJd1bYoe4Fibk";
+        String addr2 = "/ip4/127.0.0.1/tcp/23876/p2p/12D3KooWLzuWtFoS1avN4GnzrAoaM9gqnJbxvUVJW74jCZN4unUo";
         Multiaddr address2 = Multiaddr.fromString(addr2);
         new Sender(address2);
     }
