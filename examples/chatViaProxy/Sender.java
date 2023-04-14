@@ -71,7 +71,7 @@ public class Sender {
                 for (Map.Entry<String, String> entry: resp.headers().entries()) {
                     headers.replace(entry.getKey(), List.of(entry.getValue()));
                 }
-                httpExchange.sendResponseHeaders(200, contentLength);
+                httpExchange.sendResponseHeaders(resp.status().code(), contentLength);
                 httpExchange.getResponseBody().write(bout.toByteArray());
             } catch (Exception e) {
                 HttpUtil.replyError(httpExchange, e);
