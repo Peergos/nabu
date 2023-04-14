@@ -6,9 +6,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -24,18 +21,11 @@ import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 
-import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
-import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
+import io.netty.handler.codec.http.HttpVersion;
 
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpUtil;
-
 import org.peergos.HostBuilder;
 import org.peergos.blockstore.RamBlockstore;
 import org.peergos.protocol.dht.RamProviderStore;
@@ -44,24 +34,21 @@ import org.peergos.protocol.http.HttpProtocol;
 import org.peergos.util.JSONParser;
 
 import java.io.*;
-import java.net.URLEncoder;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-import java.util.List;
-import java.util.Map;
-
-import static java.util.UUID.randomUUID;
 
 public class ChatServer {
+    private Chat chat = new Chat();
+    private CustomHttpServerHandler chatHandler = new CustomHttpServerHandler(chat);
+
     public ChatServer() throws Exception {
-
-        Chat chat = new Chat();
-
         HttpProtocol.Binding node2Http = new HttpProtocol.Binding((s, req, h) -> {
             System.out.println("Node 2 received: " + req);
+            HttpObject response = chatHandler.handle(Optional.empty(), (FullHttpRequest) req);
+            h.accept(response);
         });
         HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
@@ -131,7 +118,7 @@ public class ChatServer {
         }
         public Message addMessage(String body) {
             Map<String, Object> json = (Map) JSONParser.parse(body);
-            String id = randomUUID().toString();
+            String id = UUID.randomUUID().toString();
             LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
             Message message = new Message(id, (String)json.get("text"), (String)json.get("author"), now);
             messages.add(message);
@@ -157,19 +144,18 @@ public class ChatServer {
             try {
                 ServerBootstrap b = new ServerBootstrap();
                 b.group(bossGroup, workerGroup)
-                        .channel(NioServerSocketChannel.class)
-                        .handler(new LoggingHandler(LogLevel.TRACE))
-                        .childHandler(new ChannelInitializer<SocketChannel>() {
-                            @Override
-                            protected void initChannel(SocketChannel ch) throws Exception {
-                                ChannelPipeline p = ch.pipeline();
-                                p.addLast(new HttpRequestDecoder());
-                                p.addLast(new HttpResponseEncoder());
-                                p.addLast(new HttpObjectAggregator(1024*1024));
-                                p.addLast(new CustomHttpServerHandler(chat));
-                            }
-                        });
-
+                .channel(NioServerSocketChannel.class)
+                .handler(new LoggingHandler(LogLevel.TRACE))
+                .childHandler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel ch) {
+                        ChannelPipeline p = ch.pipeline();
+                        p.addLast(new HttpRequestDecoder());
+                        p.addLast(new HttpResponseEncoder());
+                        p.addLast(new HttpObjectAggregator(1024*1024));
+                        p.addLast(chatHandler);
+                    }
+                });
                 ChannelFuture f = b.bind(port).sync();
                 f.channel().closeFuture().sync();
             } finally {
@@ -190,9 +176,10 @@ public class ChatServer {
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, Object msgObj) {
-            FullHttpRequest request =(FullHttpRequest) msgObj;
+            handle(Optional.of(ctx), (FullHttpRequest) msgObj);
+        }
+        public HttpObject handle(Optional<ChannelHandlerContext> ctx, FullHttpRequest request) {
             String uri = request.uri();
-
             StringBuilder responseData = new StringBuilder();
             HttpResponseStatus responseCode = HttpResponseStatus.OK;
             Map<String, String> responseHeaders = new HashMap<>();
@@ -220,29 +207,27 @@ public class ChatServer {
                         List<Map<String, Object>> msgs = list.stream().map(msg -> msg.toJson()).collect(Collectors.toList());
                         String data = JSONParser.toString(msgs);
                         responseData.append(data);
-                        responseCode = HttpResponseStatus.OK;
-                        mimeType = "text/plain";
                     }
                     break;
                 }
                 case "/sendMessage": {
                     if (method == HttpMethod.POST) {
                         ByteBuf content = request.content();
-                        Message message = chat.addMessage(content.toString(CharsetUtil.UTF_8));
+                        String bodyContent = content.toString(CharsetUtil.UTF_8);
+                        Message message = chat.addMessage(bodyContent);
                         String data = JSONParser.toString(message.toJson());
                         responseHeaders.put(HttpHeaderNames.LOCATION.toString(), message.id);
                         responseData.append(data);
                         responseCode = HttpResponseStatus.CREATED;
-                        mimeType = "text/plain";
                     }
                     break;
                 }
                 default: {
-                    responseCode = BAD_REQUEST;
+                    responseCode = HttpResponseStatus.NOT_FOUND;
                     break;
                 }
             }
-            FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, responseCode, Unpooled.copiedBuffer(responseData.toString(), CharsetUtil.UTF_8));
+            FullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, responseCode, Unpooled.copiedBuffer(responseData.toString(), CharsetUtil.UTF_8));
             httpResponse.headers().set(HttpHeaderNames.CONTENT_TYPE, mimeType + "; charset=UTF-8");
             for(Map.Entry<String, String> entry : responseHeaders.entrySet()) {
                 httpResponse.headers().set(entry.getKey(), entry.getValue());
@@ -252,10 +237,13 @@ public class ChatServer {
                 httpResponse.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, httpResponse.content().readableBytes());
                 httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
             }
-            ctx.write(httpResponse);
-            if (!keepAlive) {
-                ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+            if (ctx.isPresent()) {
+                ctx.get().write(httpResponse);
+                if (!keepAlive) {
+                    ctx.get().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                }
             }
+            return httpResponse;
         }
 
         @Override
