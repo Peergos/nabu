@@ -84,7 +84,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         }, "Kademlia bootstrap").start();
     }
 
-    private boolean connectTo(Host us, PeerAddresses peer) {
+    public boolean connectTo(Host us, PeerAddresses peer) {
         try {
             new Identify().dial(us, PeerId.fromBase58(peer.peerId.toBase58()), getPublic(peer)).getController().join().id().join();
             return true;
