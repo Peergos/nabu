@@ -46,7 +46,6 @@ public class ChatServer {
 
     public ChatServer() throws Exception {
         HttpProtocol.Binding node2Http = new HttpProtocol.Binding((s, req, h) -> {
-            System.out.println("Node 2 received: " + req);
             HttpObject response = chatHandler.handle(Optional.empty(), (FullHttpRequest) req);
             h.accept(response);
         });

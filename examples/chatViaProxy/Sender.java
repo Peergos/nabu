@@ -6,6 +6,8 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import io.libp2p.core.Host;
 import io.libp2p.core.multiformats.Multiaddr;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
@@ -63,8 +65,9 @@ public class Sender {
                 String path = httpExchange.getRequestURI().getPath();
                 HttpMethod method = HttpMethod.valueOf(httpExchange.getRequestMethod());
                 byte[] body = read(httpExchange.getRequestBody());
-                String bodyContent = new String(body);
-                FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path, Unpooled.copiedBuffer(bodyContent, CharsetUtil.UTF_8));
+                FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method,
+                        path, Unpooled.wrappedBuffer(body));
+                httpRequest.headers().set(HttpHeaderNames.CONTENT_LENGTH, body.length);
                 FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
                 ByteArrayOutputStream bout = new ByteArrayOutputStream();
                 int contentLength = resp.headers().getInt("content-length");
@@ -96,7 +99,7 @@ public class Sender {
     }
 
     public static void main(String[] args) throws IOException {
-        String addr2 = "/ip4/127.0.0.1/tcp/23876/p2p/12D3KooWLzuWtFoS1avN4GnzrAoaM9gqnJbxvUVJW74jCZN4unUo";
+        String addr2 = "/ip4/127.0.0.1/tcp/38647/p2p/12D3KooWKQt9BoJxv5VkH3hFp6PhQUMjBDmr3wUC7MoKSXtjcbWv";
         Multiaddr address2 = Multiaddr.fromString(addr2);
         new Sender(address2);
     }
