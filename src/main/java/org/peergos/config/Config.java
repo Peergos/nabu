@@ -60,7 +60,7 @@ public class Config {
 
         List<MultiAddress> swarmAddresses = List.of(new MultiAddress("/ip4/0.0.0.0/tcp/4001"),
                 new MultiAddress("/ip6/::/tcp/4001"));
-        MultiAddress apiAddress = new MultiAddress("/ip4/127.0.0.1/tcp/5001");
+        MultiAddress apiAddress = new MultiAddress("/ip4/0.0.0.0/tcp/5001");
         MultiAddress gatewayAddress = new MultiAddress("/ip4/127.0.0.1/tcp/8080");
         Optional<MultiAddress> proxyTargetAddress = Optional.of(new MultiAddress("/ip4/127.0.0.1/tcp/8000"));
 

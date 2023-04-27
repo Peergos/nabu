@@ -100,7 +100,7 @@ public class Server {
 
         int maxConnectionQueue = 500;
         int handlerThreads = 50;
-        info("Starting RPC API server at: localhost:" + localAPIAddress.getPort());
+        info("Starting RPC API server at " + apiAddress.getHost() + ":" + localAPIAddress.getPort());
         HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
 
         APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()), dht);
