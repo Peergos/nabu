@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install --assume-yes maven git
 COPY . /opt/nabu
 WORKDIR /opt/nabu
 
-RUN mvn package -DskipTests
+RUN mvn clean package -DskipTests
 
 
 FROM eclipse-temurin:17-jre
