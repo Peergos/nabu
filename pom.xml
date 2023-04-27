@@ -118,7 +118,7 @@
         <dependency>
             <groupId>com.github.peergos</groupId>
             <artifactId>jvm-libp2p</artifactId>
-            <version>0.9.10</version>
+            <version>0.9.12</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>

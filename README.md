@@ -29,6 +29,8 @@ Currently implemented properties:
 
 In the future we will add:
 * QUIC transport (and encryption and multiplexing)
+* more interop tests with other languages
+* configurable cid publishing function
 * circuit-relay
 * dcutr (direct connection upgrade through relay)
 * AutoRelay
