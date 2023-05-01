@@ -35,6 +35,7 @@ public class HandlerTest {
         NabuClient nabu = new NabuClient(address.getHost(), address.getPort(), "/api/v0/", false);
         String ver = nabu.version();
         PeerId id = nabu.id();
+        System.currentTimeMillis();
     }
 
     @Test

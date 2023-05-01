@@ -18,13 +18,12 @@ public class Logging {
         return NULL_LOG;
     }
 
-    public static synchronized void init(Path folder) {
+    public static synchronized void init(Path folder, boolean logToConsole) {
         Path logPath = folder.resolve("nabu.%g.log");
         logPath.toFile().getParentFile().mkdirs();
         int logLimit = 1024 * 1024;
         int logCount = 10;
         boolean logAppend = true;
-        boolean logToConsole = false;
         boolean logToFile = true;
         boolean printLogLocation =  true;
 
