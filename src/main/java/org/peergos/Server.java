@@ -47,11 +47,11 @@ public class Server {
                 blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
     }
 
-    public Server() throws Exception {
-        Path ipfsPath = getIPFSPath();
-        Logging.init(ipfsPath);
+    public Server(Args args) throws Exception {
+        Path ipfsPath = getIPFSPath(args);
+        Logging.init(ipfsPath, args.getBoolean("logToConsole", false));
         Config config = readConfig(ipfsPath);
-        info("Starting Nabu version: " + APIService.CURRENT_VERSION);
+        LOG.info("Starting Nabu version: " + APIService.CURRENT_VERSION);
 
         Path blocksPath = ipfsPath.resolve("blocks");
         File blocksDirectory = blocksPath.toFile();
@@ -88,19 +88,20 @@ public class Server {
 
         Host node = builder.build();
         node.start().join();
-        info("Node started and listening on " + node.listenAddresses());
-        info("Starting bootstrap process");
+        LOG.info("Node started and listening on " + node.listenAddresses());
+        LOG.info("Starting bootstrap process");
         int connections = dht.bootstrapRoutingTable(node, config.bootstrap.getBootstrapAddresses(), addr -> !addr.contains("/wss/"));
         if (connections == 0)
             throw new IllegalStateException("No connected peers!");
         dht.bootstrap(node);
 
-        MultiAddress apiAddress = config.addresses.apiAddress;
+        String apiAddressArg = "Addresses.API";
+        MultiAddress apiAddress = args.hasArg(apiAddressArg) ? new MultiAddress(args.getArg(apiAddressArg)) :  config.addresses.apiAddress;
         InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
         int maxConnectionQueue = 500;
         int handlerThreads = 50;
-        info("Starting RPC API server at " + apiAddress.getHost() + ":" + localAPIAddress.getPort());
+        LOG.info("Starting RPC API server at " + apiAddress.getHost() + ":" + localAPIAddress.getPort());
         HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
 
         APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()), dht);
@@ -109,7 +110,7 @@ public class Server {
         apiServer.start();
 
         Thread shutdownHook = new Thread(() -> {
-            info("Stopping server...");
+            LOG.info("Stopping server...");
             try {
                 node.stop().get();
                 apiServer.stop(3); //wait max 3 seconds
@@ -120,24 +121,21 @@ public class Server {
         });
         Runtime.getRuntime().addShutdownHook(shutdownHook);
     }
-    private void info(String message) {
-        LOG.info(message);
-        System.out.println(message);
-    }
-    private Path getIPFSPath() {
-        String ipfsPath = System.getenv("IPFS_PATH");
-        if (ipfsPath == null) {
-            String home = System.getenv("HOME");
+
+    private Path getIPFSPath(Args args) {
+        Optional<String> ipfsPath = args.getOptionalArg("IPFS_PATH");
+        if (ipfsPath.isEmpty()) {
+            String home = args.getArg("HOME");
             return Path.of(home, ".ipfs");
         }
-        return Path.of(ipfsPath);
+        return Path.of(ipfsPath.get());
     }
 
     private Config readConfig(Path configPath) throws IOException {
         Path configFilePath = configPath.resolve("config");
         File configFile = configFilePath.toFile();
         if (!configFile.exists()) {
-            info("Unable to find config file. Creating default config");
+            LOG.info("Unable to find config file. Creating default config");
             Config config = new Config();
             Files.write(configFilePath, config.toString().getBytes(), StandardOpenOption.CREATE);
             return config;
@@ -147,7 +145,7 @@ public class Server {
 
     public static void main(String[] args) {
         try {
-            new Server();
+            new Server(Args.parse(args));
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "SHUTDOWN", e);
         }
