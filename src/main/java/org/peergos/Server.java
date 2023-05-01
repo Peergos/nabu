@@ -8,6 +8,7 @@ import io.libp2p.protocol.Ping;
 import org.peergos.blockstore.*;
 import org.peergos.config.*;
 import org.peergos.net.APIHandler;
+import org.peergos.net.HttpProxyHandler;
 import org.peergos.protocol.autonat.AutonatProtocol;
 import org.peergos.protocol.bitswap.Bitswap;
 import org.peergos.protocol.bitswap.BitswapEngine;
@@ -106,6 +107,7 @@ public class Server {
 
         APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()), dht);
         apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
+        apiServer.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node, null)));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();
 
