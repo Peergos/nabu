@@ -20,11 +20,8 @@ public class HttpProxyService {
     private final Host node;
     public static final String API_URL = "/p2p/";
 
-    private Multiaddr node2Address; //FIXME this MUST be removed.
-
-    public HttpProxyService(Host node, Multiaddr node2Address) {
+    public HttpProxyService(Host node) {
         this.node = node;
-        this.node2Address = node2Address;
     }
     public ProxyResponse proxyRequest(Multihash targetNodeId, String targetPath) throws IOException {
         return proxyRequest(targetNodeId, targetPath, Optional.empty());
@@ -32,7 +29,7 @@ public class HttpProxyService {
 
     public ProxyResponse proxyRequest(Multihash targetNodeId, String targetPath, Optional<byte[]> body) throws IOException {
 
-        Multiaddr address2 = this.node2Address; //fixme
+        Multiaddr address2 = null; //fixme
         InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000); //fixme
         HttpProtocol.HttpController proxier = new HttpProtocol.Binding(unusedProxyTarget).dial(node, address2)
                 .getController().join();

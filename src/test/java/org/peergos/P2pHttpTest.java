@@ -32,20 +32,10 @@ public class P2pHttpTest {
 
     @Test
     public void p2pTest() {
-        /*
-        RamBlockstore blockstore = new RamBlockstore();
-        InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000); //fixme
-
+        //InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), blockstore, (c, b, p, a) -> CompletableFuture.completedFuture(true));
-        builder1 = builder1.addProtocol(new HttpProtocol.Binding(unusedProxyTarget)); //fixme
-        Host node1 = builder1.build();
-        node1.start().join();
-*/
-        InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
-        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                        new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
-                .addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
+                        new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+        //.addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
         Host node1 = builder1.build();
         node1.start().join();
 
@@ -67,7 +57,7 @@ public class P2pHttpTest {
             MultiAddress apiAddress1 = new MultiAddress("/ip4/127.0.0.1/tcp/" + localPort);
             InetSocketAddress localAPIAddress1 = new InetSocketAddress(apiAddress1.getHost(), apiAddress1.getPort());
             apiServer1 = HttpServer.create(localAPIAddress1, 500);
-            apiServer1.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node1, node2Address)));
+            apiServer1.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node1)));
             apiServer1.setExecutor(Executors.newFixedThreadPool(50));
             apiServer1.start();
 

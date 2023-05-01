@@ -107,7 +107,7 @@ public class Server {
 
         APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()), dht);
         apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
-        apiServer.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node, null)));
+        apiServer.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node)));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();
 
