@@ -37,6 +37,7 @@ In the future we will add:
 * S3 blockstore
 * mDNS peer discovery
 * Android compatibility
+* example serverless chat app using p2p http proxy for Android and iOS
 
 ## Usage
 You can use this as a standalone application for storing and retrieving blocks. Or you can embed it in your application. 
