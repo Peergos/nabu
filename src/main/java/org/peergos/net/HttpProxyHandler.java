@@ -2,7 +2,6 @@ package org.peergos.net;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
-import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.PeerId;
 import org.peergos.*;
@@ -10,10 +9,11 @@ import org.peergos.util.HttpUtil;
 import org.peergos.util.Logging;
 
 import java.io.*;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class HttpProxyHandler extends Handler {
 	private static final Logger LOG = Logging.LOG();
@@ -48,10 +48,18 @@ public class HttpProxyHandler extends Handler {
                 }
                 targetPath = targetPath.substring(HTTP_REQUEST.length());
                 byte[] body = read(httpExchange.getRequestBody());
-                ProxyResponse response = service.proxyRequest(targetNodeId, targetPath, Optional.of(body));
-                Headers headers = httpExchange.getResponseHeaders();
+                Map<String, List<String>> reqQueryParams = HttpUtil.parseQuery(httpExchange.getRequestURI().getQuery());
+
+                Map<String, List<String>> reqHeaders = httpExchange.getRequestHeaders().entrySet().stream()
+                        .collect(Collectors.toUnmodifiableMap(
+                                Map.Entry::getKey, e -> new LinkedList<>(e.getValue())));
+                ProxyRequest request = new ProxyRequest(targetPath,
+                        ProxyRequest.Method.valueOf(httpExchange.getRequestMethod()),
+                        reqHeaders, reqQueryParams, body);
+                ProxyResponse response = service.proxyRequest(targetNodeId, request);
+                Headers reponseHeaders = httpExchange.getResponseHeaders();
                 for (Map.Entry<String, String> entry: response.headers.entrySet()) {
-                    headers.replace(entry.getKey(), List.of(entry.getValue()));
+                    reponseHeaders.replace(entry.getKey(), List.of(entry.getValue()));
                 }
                 httpExchange.sendResponseHeaders(response.statusCode, response.body.length);
                 httpExchange.getResponseBody().write(response.body);

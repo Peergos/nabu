@@ -5,6 +5,8 @@ import io.ipfs.multiaddr.MultiAddress;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.protocol.Ping;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.*;
 import org.peergos.blockstore.*;
 import org.peergos.config.*;
 import org.peergos.net.APIHandler;
@@ -15,6 +17,7 @@ import org.peergos.protocol.bitswap.BitswapEngine;
 import org.peergos.protocol.circuit.CircuitHopProtocol;
 import org.peergos.protocol.circuit.CircuitStopProtocol;
 import org.peergos.protocol.dht.*;
+import org.peergos.protocol.http.HttpProtocol;
 import org.peergos.util.Logging;
 
 import java.io.File;
@@ -80,12 +83,18 @@ public class Server {
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
+        HttpProtocol.Binding p2pHttpBinding = new HttpProtocol.Binding((s, req, h) -> {
+            FullHttpResponse emptyReply = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.buffer(0));
+            emptyReply.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+            h.accept(emptyReply.retain());
+        });
         builder = builder.addProtocols(List.of(
                 new Ping(),
                 new AutonatProtocol.Binding(),
                 new CircuitHopProtocol.Binding(relayManager, stop),
                 new Bitswap(new BitswapEngine(blockStore, authoriser)),
-                dht));
+                dht,
+                p2pHttpBinding));
 
         Host node = builder.build();
         node.start().join();
@@ -107,7 +116,7 @@ public class Server {
 
         APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()), dht);
         apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
-        apiServer.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node, null)));
+        apiServer.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node, p2pHttpBinding)));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();
 
