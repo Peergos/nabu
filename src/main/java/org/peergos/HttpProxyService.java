@@ -67,7 +67,7 @@ public class HttpProxyService {
             sb.append("?");
             for (Map.Entry<String, List<String>> entry: queryParams.entrySet()) {
                 for(String value : entry.getValue()) {
-                    sb.append(entry.getKey() + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8));
+                    sb.append(entry.getKey() + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8) + "&");
                 }
             }
         }
