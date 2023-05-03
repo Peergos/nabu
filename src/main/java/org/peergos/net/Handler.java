@@ -6,8 +6,7 @@ import org.peergos.util.Exceptions;
 import org.peergos.util.HttpUtil;
 import org.peergos.util.Logging;
 
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,6 +34,18 @@ public abstract class Handler implements HttpHandler {
             LOG.severe("Error handling " + httpExchange.getRequestURI());
             LOG.log(Level.WARNING, t.getMessage(), t);
             HttpUtil.replyError(httpExchange, t);
+        }
+    }
+
+    protected static byte[] read(InputStream in) throws IOException {
+        try (ByteArrayOutputStream bout = new ByteArrayOutputStream();
+             OutputStream gout = new DataOutputStream(bout)) {
+            byte[] tmp = new byte[4096];
+            int r;
+            while ((r = in.read(tmp)) >= 0)
+                gout.write(tmp, 0, r);
+            in.close();
+            return bout.toByteArray();
         }
     }
 

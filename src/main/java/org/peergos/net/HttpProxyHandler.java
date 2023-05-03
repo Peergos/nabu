@@ -75,16 +75,4 @@ public class HttpProxyHandler extends Handler {
                 LOG.info("API Handler handled " + path + " query in: " + (t2 - t1) + " mS");
         }
     }
-
-    protected static byte[] read(InputStream in) throws IOException {
-        try (ByteArrayOutputStream bout = new ByteArrayOutputStream();
-             OutputStream gout = new DataOutputStream(bout)) {
-            byte[] tmp = new byte[4096];
-            int r;
-            while ((r = in.read(tmp)) >= 0)
-                gout.write(tmp, 0, r);
-            in.close();
-            return bout.toByteArray();
-        }
-    }
 }
