@@ -4,6 +4,7 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
+import io.libp2p.core.PeerId;
 import org.peergos.*;
 import org.peergos.util.HttpUtil;
 import org.peergos.util.Logging;
@@ -39,7 +40,8 @@ public class HttpProxyHandler extends Handler {
                 if (streamPathIndex == -1) {
                     throw new IllegalStateException("Expecting p2p request to include path in url");
                 }
-                Multihash targetNodeId = null;// fixme Cid.decode(path.substring(0, streamPathIndex));
+                String peerId = path.substring(0, streamPathIndex);
+                Multihash targetNodeId = Multihash.deserialize(PeerId.fromBase58(peerId).getBytes());
                 String targetPath = path.substring(streamPathIndex);
                 if (!targetPath.startsWith(HTTP_REQUEST)) {
                     throw new IllegalStateException("Expecting path to be a http request");

@@ -6,6 +6,9 @@ import io.ipfs.multiaddr.MultiAddress;
 import io.libp2p.core.Host;
 import io.libp2p.core.PeerId;
 import io.libp2p.core.multiformats.Multiaddr;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.*;
 import org.junit.Assert;
 import org.junit.Test;
 import org.peergos.blockstore.Blockstore;
@@ -24,6 +27,7 @@ import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -32,23 +36,34 @@ public class P2pHttpTest {
 
     @Test
     public void p2pTest() {
-        //InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
+        FullHttpResponse replyOk = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.buffer(0));
+
+        HttpProtocol.Binding node1Http = new HttpProtocol.Binding((s, req, h) -> {
+            h.accept(replyOk.retain());
+        });
         HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
-        //.addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
+        builder1 = builder1.addProtocol(node1Http);
         Host node1 = builder1.build();
         node1.start().join();
 
+        int node2Port = 23450;
         RamBlockstore blockstore2 = new RamBlockstore();
-        HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
+        HttpProtocol.Binding node2Http = new HttpProtocol.Binding((s, req, h) -> {
+            System.out.println("Node 2 received: " + req);
+            printBody(req);
+            h.accept(replyOk);
+        });
+        HostBuilder builder2 = HostBuilder.build(node2Port,
                 new RamProviderStore(), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true));
+        builder2 = builder2.addProtocol(node2Http);
         Host node2 = builder2.build();
         node2.start().join();
 
-
-        //ie "/ip4/127.0.0.1/tcp/38647/p2p/12D3KooWKQt9BoJxv5VkH3hFp6PhQUMjBDmr3wUC7MoKSXtjcbWv";
         Multiaddr node2Address = node2.listenAddresses().get(0);
         PeerId peerId2 = node2Address.getPeerId();
+
+        node1.getAddressBook().setAddrs(peerId2, 0, node2Address).join();
 
         HttpServer apiServer1 = null;
         HttpServer apiServer2 = null;
@@ -57,22 +72,12 @@ public class P2pHttpTest {
             MultiAddress apiAddress1 = new MultiAddress("/ip4/127.0.0.1/tcp/" + localPort);
             InetSocketAddress localAPIAddress1 = new InetSocketAddress(apiAddress1.getHost(), apiAddress1.getPort());
             apiServer1 = HttpServer.create(localAPIAddress1, 500);
-            apiServer1.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node1)));
+            apiServer1.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node1, node1Http)));
             apiServer1.setExecutor(Executors.newFixedThreadPool(50));
             apiServer1.start();
 
-            MultiAddress apiAddress2 = new MultiAddress("/ip4/127.0.0.1/tcp/8567");
-            InetSocketAddress localAPIAddress2 = new InetSocketAddress(apiAddress2.getHost(), apiAddress2.getPort());
-
-            apiServer2 = HttpServer.create(localAPIAddress2, 500);
-            Blockstore blocks2 = new TypeLimitedBlockstore(new RamBlockstore(), Set.of(Cid.Codec.Raw));
-            APIService service = new APIService(blocks2, new BitswapBlockService(node2, null), null);
-            apiServer2.createContext(APIService.API_URL, new APIHandler(service, node2));
-            apiServer2.setExecutor(Executors.newFixedThreadPool(50));
-            apiServer2.start();
-
             URL target = new URL("http", "localhost", localPort,
-                    "/p2p/" + peerId2.toBase58() + "/http/api/v0/version");
+                    "/p2p/" + peerId2.toBase58() + "/http/hello");
             String reply = new String(sendRequest(target));
             System.currentTimeMillis();
         } catch (IOException ioe) {
@@ -106,5 +111,12 @@ public class P2pHttpTest {
         } catch (IOException e) {
             throw new RuntimeException("IO Exception");
         }
+    }
+    public static void printBody(HttpRequest req) {
+        if (req instanceof FullHttpRequest) {
+            ByteBuf content = ((FullHttpRequest) req).content();
+            System.out.println(content.getCharSequence(0, content.readableBytes(), Charset.defaultCharset()));
+        }
+
     }
 }
