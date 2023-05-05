@@ -19,6 +19,7 @@ import org.peergos.protocol.circuit.CircuitHopProtocol;
 import org.peergos.protocol.circuit.CircuitStopProtocol;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.HttpProtocol;
+import org.peergos.util.HttpUtil;
 import org.peergos.util.Logging;
 
 import java.io.File;
@@ -90,10 +91,8 @@ public class Server {
                     FullHttpResponse reply = RequestSender.proxy(config.addresses.proxyTargetAddress.get(), (FullHttpRequest) req);
                     h.accept(reply.retain());
                 } catch (IOException ioe) {
-                    LOG.log(Level.INFO, "Unable to send request to proxyTargetAddress", ioe);
-                    FullHttpResponse emptyReply = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR, Unpooled.buffer(0));
-                    emptyReply.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
-                    h.accept(emptyReply.retain());
+                    FullHttpResponse exceptionReply = HttpUtil.replyError(ioe);
+                    h.accept(exceptionReply.retain());
                 }
             } else {
                 FullHttpResponse emptyReply = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND, Unpooled.buffer(0));

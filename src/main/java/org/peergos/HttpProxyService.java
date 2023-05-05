@@ -7,6 +7,7 @@ import io.libp2p.core.PeerId;
 import io.libp2p.core.multiformats.Multiaddr;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
+import org.peergos.net.ProxyException;
 import org.peergos.net.ProxyRequest;
 import org.peergos.net.ProxyResponse;
 import org.peergos.protocol.dht.Kademlia;
@@ -33,7 +34,7 @@ public class HttpProxyService {
         this.p2pHttpBinding = p2pHttpBinding;
         this.dht = dht;
     }
-    public ProxyResponse proxyRequest(Multihash targetNodeId, ProxyRequest request) throws IOException {
+    public ProxyResponse proxyRequest(Multihash targetNodeId, ProxyRequest request) throws IOException, ProxyException {
 
         AddressBook addressBook = node.getAddressBook();
         Optional<Multiaddr> targetAddressesOpt = addressBook.get(PeerId.fromBase58(targetNodeId.bareMultihash().toBase58())).join().stream().findFirst();
@@ -41,8 +42,7 @@ public class HttpProxyService {
             List<PeerAddresses> closestPeers = dht.findClosestPeers(targetNodeId, 20, node);
             Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetNodeId)).findFirst();
             if (matching.isEmpty()) {
-                LOG.info("Target not found: " + targetNodeId);
-                return new ProxyResponse(new byte[0], new HashMap<>(), 404);
+                throw new ProxyException("Target not found: " + targetNodeId);
             }
             PeerAddresses peer = matching.get();
             Multiaddr[] addrs = peer.getPublicAddresses().stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
