@@ -8,6 +8,7 @@ import io.libp2p.protocol.Ping;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 import org.peergos.blockstore.*;
+import org.peergos.client.RequestSender;
 import org.peergos.config.*;
 import org.peergos.net.APIHandler;
 import org.peergos.net.HttpProxyHandler;
@@ -84,9 +85,21 @@ public class Server {
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
         HttpProtocol.Binding p2pHttpBinding = new HttpProtocol.Binding((s, req, h) -> {
-            FullHttpResponse emptyReply = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.buffer(0));
-            emptyReply.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
-            h.accept(emptyReply.retain());
+            if (config.addresses.proxyTargetAddress.isPresent()) {
+                try {
+                    FullHttpResponse reply = RequestSender.proxy(config.addresses.proxyTargetAddress.get(), (FullHttpRequest) req);
+                    h.accept(reply.retain());
+                } catch (IOException ioe) {
+                    LOG.log(Level.INFO, "Unable to send request to proxyTargetAddress", ioe);
+                    FullHttpResponse emptyReply = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR, Unpooled.buffer(0));
+                    emptyReply.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+                    h.accept(emptyReply.retain());
+                }
+            } else {
+                FullHttpResponse emptyReply = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND, Unpooled.buffer(0));
+                emptyReply.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+                h.accept(emptyReply.retain());
+            }
         });
         builder = builder.addProtocols(List.of(
                 new Ping(),
@@ -116,7 +129,7 @@ public class Server {
 
         APIService service = new APIService(blockStore, new BitswapBlockService(node, builder.getBitswap().get()), dht);
         apiServer.createContext(APIService.API_URL, new APIHandler(service, node));
-        apiServer.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node, p2pHttpBinding)));
+        apiServer.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node, p2pHttpBinding, dht)));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();
 

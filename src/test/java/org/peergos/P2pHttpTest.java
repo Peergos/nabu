@@ -1,7 +1,6 @@
 package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
-import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
 import io.libp2p.core.Host;
 import io.libp2p.core.PeerId;
@@ -12,21 +11,14 @@ import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
 import org.junit.Assert;
 import org.junit.Test;
-import org.peergos.blockstore.Blockstore;
 import org.peergos.blockstore.RamBlockstore;
-import org.peergos.blockstore.TypeLimitedBlockstore;
-import org.peergos.net.APIHandler;
+import org.peergos.client.RequestSender;
 import org.peergos.net.HttpProxyHandler;
 import org.peergos.protocol.dht.RamProviderStore;
 import org.peergos.protocol.dht.RamRecordStore;
 import org.peergos.protocol.http.HttpProtocol;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.ConnectException;
-import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.charset.Charset;
@@ -60,6 +52,8 @@ public class P2pHttpTest {
         String urlParamValue = "hello";
         String urlParam = "?" + urlParamKey + "=" + urlParamValue + "";
         RamBlockstore blockstore2 = new RamBlockstore();
+        int localPort = 8321;
+
         HttpProtocol.Binding node2Http = new HttpProtocol.Binding((s, req, h) -> {
             System.out.println("Node 2 received: " + req);
             printBody(req);
@@ -76,10 +70,13 @@ public class P2pHttpTest {
             ByteBuf content = fullRequest.content();
             String bodyContent = content.toString(CharsetUtil.UTF_8);
             Assert.assertTrue("body content", requestBody.equals(bodyContent));
-
-            FullHttpResponse reply = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.copiedBuffer(responseText, CharsetUtil.UTF_8));
-            reply.headers().set(HttpHeaderNames.CONTENT_LENGTH, responseText.length());
-            h.accept(reply);
+            MultiAddress proxyTargetAddress = new MultiAddress("/ip4/127.0.0.1/tcp/" + localPort);
+            try {
+                FullHttpResponse reply = RequestSender.proxy(proxyTargetAddress, (FullHttpRequest) req);
+                h.accept(reply.retain());
+            } catch (IOException ioe) {
+                Assert.assertTrue("Unexpected exception: " + ioe.toString(), false);
+            }
         });
         HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true));
@@ -93,20 +90,37 @@ public class P2pHttpTest {
         node1.getAddressBook().setAddrs(peerId2, 0, node2Address).join();
 
         HttpServer apiServer1 = null;
-        HttpServer apiServer2 = null;
+        HttpServer server2 = null;
         try {
-            int localPort = 8321;
-            MultiAddress apiAddress1 = new MultiAddress("/ip4/127.0.0.1/tcp/" + localPort);
+            int port = 8777;
+            MultiAddress apiAddress1 = new MultiAddress("/ip4/127.0.0.1/tcp/" + port);
             InetSocketAddress localAPIAddress1 = new InetSocketAddress(apiAddress1.getHost(), apiAddress1.getPort());
             apiServer1 = HttpServer.create(localAPIAddress1, 500);
-            apiServer1.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node1, node1Http)));
+            apiServer1.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(node1, node1Http, null)));
             apiServer1.setExecutor(Executors.newFixedThreadPool(50));
             apiServer1.start();
 
-            URL target = new URL("http", "localhost", localPort,
+            InetSocketAddress proxyTarget = new InetSocketAddress("127.0.0.1", localPort);
+            server2 = HttpServer.create(proxyTarget, 20);
+            server2.createContext("/", httpExchange -> {
+                try {
+                    byte[] body = responseText.getBytes();
+                    httpExchange.sendResponseHeaders(200, body.length);
+                    httpExchange.getResponseBody().write(body);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Assert.assertTrue(false);
+                } finally {
+                    httpExchange.close();
+                }
+            });
+            server2.setExecutor(Executors.newSingleThreadExecutor());
+            server2.start();
+
+            URL target = new URL("http", "localhost", port,
                     "/p2p/" + peerId2.toBase58() + "/http/message" + urlParam);
-            String replyText = new String(sendRequest(target, requestBody.getBytes(), requestHeaders));
-            Assert.assertTrue("reply", responseText.equals(replyText));
+            RequestSender.Response reply = RequestSender.send(target, "POST", requestBody.getBytes(), requestHeaders);
+            Assert.assertTrue("reply", responseText.equals(new String(reply.body)));
         } catch (IOException ioe) {
             ioe.printStackTrace();
             Assert.assertTrue("IOException", false);
@@ -116,37 +130,12 @@ public class P2pHttpTest {
             if (apiServer1 != null) {
                 apiServer1.stop(1);
             }
-            if (apiServer2 != null) {
-                apiServer2.stop(1);
+            if (server2 != null) {
+                server2.stop(1);
             }
         }
     }
-    private static byte[] sendRequest(URL target, byte[] body, Map<String, String> headers) throws IOException {
-        HttpURLConnection conn = (HttpURLConnection) target.openConnection();
-        conn.setDoOutput(true);
-        conn.setRequestMethod("POST");
-        for (Map.Entry<String, String> entry: headers.entrySet()) {
-            conn.setRequestProperty(entry.getKey(), entry.getValue());
-        }
-        try {
-            OutputStream out = conn.getOutputStream();
-            out.write(body);
-            out.flush();
-            out.close();
 
-            InputStream in = conn.getInputStream();
-            ByteArrayOutputStream resp = new ByteArrayOutputStream();
-            byte[] buf = new byte[4096];
-            int r;
-            while ((r = in.read(buf)) >= 0)
-                resp.write(buf, 0, r);
-            return resp.toByteArray();
-        } catch (ConnectException e) {
-            throw new RuntimeException("Couldn't connect to IPFS daemon at "+target+"\n Is IPFS running?");
-        } catch (IOException e) {
-            throw new RuntimeException("IO Exception");
-        }
-    }
     public static void printBody(HttpRequest req) {
         if (req instanceof FullHttpRequest) {
             ByteBuf content = ((FullHttpRequest) req).content();
