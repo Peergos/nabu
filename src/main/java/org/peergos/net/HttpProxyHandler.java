@@ -46,7 +46,7 @@ public class HttpProxyHandler extends Handler {
                 if (!targetPath.startsWith(HTTP_REQUEST)) {
                     throw new IllegalStateException("Expecting path to be a http request");
                 }
-                targetPath = targetPath.substring(HTTP_REQUEST.length());
+                targetPath = targetPath.substring(HTTP_REQUEST.length() - 1);
                 byte[] body = read(httpExchange.getRequestBody());
                 Map<String, List<String>> reqQueryParams = HttpUtil.parseQuery(httpExchange.getRequestURI().getQuery());
 
