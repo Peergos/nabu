@@ -1,7 +1,11 @@
 package org.peergos.util;
 
 import com.sun.net.httpserver.HttpExchange;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.*;
+
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.*;
 import java.util.*;
 import java.util.logging.Level;
@@ -52,5 +56,21 @@ public class HttpUtil {
         } catch (IOException e) {
             Logging.LOG().log(Level.WARNING, e.getMessage(), e);
         }
+    }
+
+    public static FullHttpResponse replyError(Throwable throwable) {
+        Logging.LOG().log(Level.WARNING, throwable.getMessage(), throwable);
+        FullHttpResponse reply = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST, Unpooled.buffer(0));
+        Throwable cause = throwable.getCause();
+        try {
+            if (cause != null)
+                reply.headers().set("Trailer", URLEncoder.encode(cause.getMessage(), "UTF-8"));
+            else
+                reply.headers().set("Trailer", URLEncoder.encode(throwable.getMessage(), "UTF-8"));
+        } catch (UnsupportedEncodingException uee) {
+        }
+        reply.headers().set("Content-Type", "text/plain");
+        reply.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+        return reply;
     }
 }

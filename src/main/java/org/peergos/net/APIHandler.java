@@ -1,23 +1,19 @@
 package org.peergos.net;
 
 import io.ipfs.cid.Cid;
-import io.ipfs.multihash.Multihash;
 import io.libp2p.core.Host;
 import io.libp2p.core.PeerId;
 import org.peergos.*;
 import org.peergos.util.*;
 import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.*;
 
-
-public class APIHandler implements HttpHandler {
+public class APIHandler extends Handler {
 	private static final Logger LOG = Logging.LOG();
 
     private static final boolean LOGGING = true;
@@ -43,21 +39,6 @@ public class APIHandler implements HttpHandler {
         this.node = node;
     }
 
-    @Override
-    public void handle(HttpExchange httpExchange) {
-        try {
-            if (!HttpUtil.allowedQuery(httpExchange)) {
-                httpExchange.sendResponseHeaders(403, 0);
-            } else {
-                handleCallToAPI(httpExchange);
-            }
-        } catch (Exception e) {
-            Throwable t = Exceptions.getRootCause(e);
-            LOG.severe("Error handling " + httpExchange.getRequestURI());
-            LOG.log(Level.WARNING, t.getMessage(), t);
-            HttpUtil.replyError(httpExchange, t);
-        }
-    }
     public void handleCallToAPI(HttpExchange httpExchange) {
 
         long t1 = System.currentTimeMillis();
@@ -233,33 +214,6 @@ public class APIHandler implements HttpHandler {
             long t2 = System.currentTimeMillis();
             if (LOGGING)
                 LOG.info("API Handler handled " + path + " query in: " + (t2 - t1) + " mS");
-        }
-    }
-
-    private static void replyJson(HttpExchange exchange, String json) {
-        try {
-            byte[] raw = json.getBytes();
-            exchange.sendResponseHeaders(200, raw.length);
-            DataOutputStream dout = new DataOutputStream(exchange.getResponseBody());
-            dout.write(raw);
-            dout.flush();
-            dout.close();
-        } catch (IOException e)
-        {
-            LOG.log(Level.WARNING, e.getMessage(), e);
-        }
-    }
-
-    private static void replyBytes(HttpExchange exchange, byte[] body) {
-        try {
-            exchange.sendResponseHeaders(200, body.length);
-            DataOutputStream dout = new DataOutputStream(exchange.getResponseBody());
-            dout.write(body);
-            dout.flush();
-            dout.close();
-        } catch (IOException e)
-        {
-            LOG.log(Level.WARNING, e.getMessage(), e);
         }
     }
 }

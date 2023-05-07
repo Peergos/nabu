@@ -48,6 +48,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
             CompletableFuture<FullHttpResponse> res = new CompletableFuture<>();
             queue.add(res);
+            req.headers().set(HttpHeaderNames.HOST, stream.remotePeerId());
             stream.writeAndFlush(req);
             return res;
         }
