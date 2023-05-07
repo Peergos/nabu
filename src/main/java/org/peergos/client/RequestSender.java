@@ -21,7 +21,7 @@ public class RequestSender {
 
     public static FullHttpResponse proxy(MultiAddress proxyTargetAddress, FullHttpRequest request) throws IOException {
         HttpMethod method = request.method();
-        String uri = "/" + request.uri();
+        String uri = request.uri();
         ByteBuf content = request.content();
         HttpHeaders headers = request.headers();
         Map<String, String> reqHeaders = new HashMap<>();
