@@ -1,6 +1,7 @@
 package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
+import io.ipfs.cid.*;
 import io.ipfs.multiaddr.MultiAddress;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
@@ -32,6 +33,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.*;
 
 public class Server {
 
@@ -116,6 +118,25 @@ public class Server {
         if (connections == 0)
             throw new IllegalStateException("No connected peers!");
         dht.bootstrap(node);
+
+        new Thread(() -> {
+            while (true) {
+                try {
+                    List<Cid> refs = blockStore.refs().join();
+                    PeerAddresses ourAddrs = PeerAddresses.fromHost(node);
+                    List<CompletableFuture<Void>> published = refs.stream().parallel()
+                            .map(ref -> dht.provideBlock(ref, node, ourAddrs))
+                            .collect(Collectors.toList());
+                    for (CompletableFuture<Void> fut : published) {
+                        fut.join();
+                    }
+                    long reprovideInterval = 22 * 3600_000L;
+                    Thread.sleep(reprovideInterval);
+                } catch (Exception e) {
+                    LOG.log(Level.WARNING, e.getMessage(), e);
+                }
+            }
+        }, "CidPublisher").start();
 
         String apiAddressArg = "Addresses.API";
         MultiAddress apiAddress = args.hasArg(apiAddressArg) ? new MultiAddress(args.getArg(apiAddressArg)) :  config.addresses.apiAddress;
