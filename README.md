@@ -26,11 +26,10 @@ Currently implemented properties:
 * basic HTTP API (block.{get, put, rm, has, stat}, id, getRefs, bloomAdd) compatible with matching kubo api calls
 * bloom/[infini filtered](https://www.rasmuspagh.net/papers/infinifilter.pdf) blockstore
 * connect bitswap to kademlia for discovery, with a faster version with supplied peerids
+* configurable cid publishing function
 
 In the future we will add:
-* QUIC transport (and encryption and multiplexing)
 * more interop tests with other languages
-* configurable cid publishing function
 * circuit-relay
 * dcutr (direct connection upgrade through relay)
 * AutoRelay
@@ -38,6 +37,7 @@ In the future we will add:
 * mDNS peer discovery
 * Android compatibility
 * example serverless chat app using p2p http proxy for Android and iOS
+* QUIC transport (and encryption and multiplexing)
 
 ## Usage
 You can use this as a standalone application for storing and retrieving blocks. Or you can embed it in your application. 

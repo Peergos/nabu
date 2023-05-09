@@ -1,6 +1,7 @@
 package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
+import io.ipfs.cid.*;
 import io.ipfs.multiaddr.MultiAddress;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
@@ -32,6 +33,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.*;
 
 public class Server {
 
@@ -68,7 +70,7 @@ public class Server {
         } else if (blocksDirectory.isFile()) {
             throw new IllegalStateException("Unable to create blocks directory");
         }
-        Blockstore blockStore = buildBlockStore(config, blocksPath);
+        ProvidingBlockstore blockStore = new ProvidingBlockstore(buildBlockStore(config, blocksPath));
 
         List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();
         int hostPort = swarmAddresses.get(0).getPort();
@@ -116,6 +118,10 @@ public class Server {
         if (connections == 0)
             throw new IllegalStateException("No connected peers!");
         dht.bootstrap(node);
+
+        PeriodicBlockProvider blockProvider = new PeriodicBlockProvider(22 * 3600_000L,
+                () -> blockStore.refs().join().stream(), node, dht, blockStore.toPublish);
+        blockProvider.start();
 
         String apiAddressArg = "Addresses.API";
         MultiAddress apiAddress = args.hasArg(apiAddressArg) ? new MultiAddress(args.getArg(apiAddressArg)) :  config.addresses.apiAddress;
