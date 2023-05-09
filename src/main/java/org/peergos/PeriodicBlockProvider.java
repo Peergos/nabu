@@ -18,16 +18,23 @@ public class PeriodicBlockProvider {
     private final Supplier<Stream<Cid>> getBlocks;
     private final Host us;
     private final Kademlia dht;
+    private final Queue<Cid> newBlocksToPublish;
 
-    public PeriodicBlockProvider(long reprovideIntervalMillis, Supplier<Stream<Cid>> getBlocks, Host us, Kademlia dht) {
+    public PeriodicBlockProvider(long reprovideIntervalMillis,
+                                 Supplier<Stream<Cid>> getBlocks,
+                                 Host us,
+                                 Kademlia dht,
+                                 Queue<Cid> newBlocksToPublish) {
         this.reprovideIntervalMillis = reprovideIntervalMillis;
         this.getBlocks = getBlocks;
         this.us = us;
         this.dht = dht;
+        this.newBlocksToPublish = newBlocksToPublish;
     }
 
     public void start() {
-        new Thread(this::run, "CidPublisher").start();
+        new Thread(this::run, "CidReprovider").start();
+        new Thread(this::provideNewBlocks, "NewCidProvider").start();
     }
 
     public void run() {
@@ -35,6 +42,17 @@ public class PeriodicBlockProvider {
             try {
                 publish(getBlocks.get());
                 Thread.sleep(reprovideIntervalMillis);
+            } catch (Throwable e) {
+                LOG.log(Level.WARNING, e.getMessage(), e);
+            }
+        }
+    }
+
+    public void provideNewBlocks() {
+        while (true) {
+            try {
+                Cid c = newBlocksToPublish.poll();
+                publish(Stream.of(c));
             } catch (Throwable e) {
                 LOG.log(Level.WARNING, e.getMessage(), e);
             }

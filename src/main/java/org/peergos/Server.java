@@ -70,7 +70,7 @@ public class Server {
         } else if (blocksDirectory.isFile()) {
             throw new IllegalStateException("Unable to create blocks directory");
         }
-        Blockstore blockStore = buildBlockStore(config, blocksPath);
+        ProvidingBlockstore blockStore = new ProvidingBlockstore(buildBlockStore(config, blocksPath));
 
         List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();
         int hostPort = swarmAddresses.get(0).getPort();
@@ -119,7 +119,8 @@ public class Server {
             throw new IllegalStateException("No connected peers!");
         dht.bootstrap(node);
 
-        PeriodicBlockProvider blockProvider = new PeriodicBlockProvider(22 * 3600_000L, () -> blockStore.refs().join().stream(), node, dht);
+        PeriodicBlockProvider blockProvider = new PeriodicBlockProvider(22 * 3600_000L,
+                () -> blockStore.refs().join().stream(), node, dht, blockStore.toPublish);
         blockProvider.start();
 
         String apiAddressArg = "Addresses.API";
