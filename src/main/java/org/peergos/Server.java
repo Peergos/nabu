@@ -132,7 +132,7 @@ public class Server {
                     }
                     long reprovideInterval = 22 * 3600_000L;
                     Thread.sleep(reprovideInterval);
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     LOG.log(Level.WARNING, e.getMessage(), e);
                 }
             }
