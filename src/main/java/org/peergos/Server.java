@@ -119,24 +119,8 @@ public class Server {
             throw new IllegalStateException("No connected peers!");
         dht.bootstrap(node);
 
-        new Thread(() -> {
-            while (true) {
-                try {
-                    List<Cid> refs = blockStore.refs().join();
-                    PeerAddresses ourAddrs = PeerAddresses.fromHost(node);
-                    List<CompletableFuture<Void>> published = refs.stream().parallel()
-                            .map(ref -> dht.provideBlock(ref, node, ourAddrs))
-                            .collect(Collectors.toList());
-                    for (CompletableFuture<Void> fut : published) {
-                        fut.join();
-                    }
-                    long reprovideInterval = 22 * 3600_000L;
-                    Thread.sleep(reprovideInterval);
-                } catch (Throwable e) {
-                    LOG.log(Level.WARNING, e.getMessage(), e);
-                }
-            }
-        }, "CidPublisher").start();
+        PeriodicBlockProvider blockProvider = new PeriodicBlockProvider(22 * 3600_000L, () -> blockStore.refs().join().stream(), node, dht);
+        blockProvider.start();
 
         String apiAddressArg = "Addresses.API";
         MultiAddress apiAddress = args.hasArg(apiAddressArg) ? new MultiAddress(args.getArg(apiAddressArg)) :  config.addresses.apiAddress;
