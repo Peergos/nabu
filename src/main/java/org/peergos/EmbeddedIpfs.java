@@ -18,12 +18,14 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.*;
+import java.util.stream.*;
 
 public class EmbeddedIpfs {
     private static final Logger LOG = Logger.getLogger(EmbeddedIpfs.class.getName());
 
     public final Host node;
     public final ProvidingBlockstore blockstore;
+    public final BlockService blocks;
     public final DatabaseRecordStore records;
 
     public final Kademlia dht;
@@ -45,6 +47,30 @@ public class EmbeddedIpfs {
         this.bitswap = bitswap;
         this.p2pHttp = p2pHttp;
         this.bootstrap = bootstrap;
+        this.blocks = new BitswapBlockService(node, bitswap);
+    }
+
+    public List<HashedBlock> getBlocks(List<Want> wants, Set<PeerId> peers, boolean addToLocal) {
+        List<HashedBlock> blocksFound = new ArrayList<>();
+
+        List<Want> local = new ArrayList<>();
+        List<Want> remote = new ArrayList<>();
+
+        for (Want w : wants) {
+            if (blockstore.has(w.cid).join())
+                local.add(w);
+            else
+                remote.add(w);
+        }
+        local.stream()
+                .map(w -> new HashedBlock(w.cid, blockstore.get(w.cid).join().get()))
+                .forEach(blocksFound::add);
+        if (remote.isEmpty())
+            return blocksFound;
+        return java.util.stream.Stream.concat(
+                        blocksFound.stream(),
+                        blocks.get(remote, peers, addToLocal).stream())
+                .collect(Collectors.toList());
     }
 
     public void start() {

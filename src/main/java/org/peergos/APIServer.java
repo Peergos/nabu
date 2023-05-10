@@ -44,7 +44,7 @@ public class APIServer {
         Path ipfsPath = getIPFSPath(args);
         Logging.init(ipfsPath, args.getBoolean("logToConsole", false));
         Config config = readConfig(ipfsPath);
-        LOG.info("Starting Nabu version: " + APIService.CURRENT_VERSION);
+        LOG.info("Starting Nabu version: " + APIHandler.CURRENT_VERSION);
 
         EmbeddedIpfs ipfs = EmbeddedIpfs.build(ipfsPath,
                 buildBlockStore(config, ipfsPath),
@@ -63,8 +63,7 @@ public class APIServer {
         LOG.info("Starting RPC API server at " + apiAddress.getHost() + ":" + localAPIAddress.getPort());
         HttpServer apiServer = HttpServer.create(localAPIAddress, maxConnectionQueue);
 
-        APIService service = new APIService(ipfs.blockstore, new BitswapBlockService(ipfs.node, ipfs.bitswap), ipfs.dht);
-        apiServer.createContext(APIService.API_URL, new APIHandler(service, ipfs.node));
+        apiServer.createContext(APIHandler.API_URL, new APIHandler(ipfs));
         if (config.addresses.proxyTargetAddress.isPresent())
             apiServer.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(ipfs.node, ipfs.p2pHttp.get(), ipfs.dht)));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));

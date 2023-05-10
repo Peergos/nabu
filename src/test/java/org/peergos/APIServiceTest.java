@@ -5,9 +5,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.peergos.blockstore.FileBlockstore;
-import org.peergos.blockstore.Blockstore;
-import org.peergos.blockstore.RamBlockstore;
+import org.peergos.blockstore.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,40 +44,39 @@ public class APIServiceTest {
 
     @Test
     public void bulkGetTest() {
-        APIService service = new APIService(new RamBlockstore(), new BitswapBlockService(null, null), null);
-        Cid cid1 = service.putBlock("Hello".getBytes(), Cid.Codec.Raw);
-        Cid cid2= service.putBlock("world!".getBytes(), Cid.Codec.Raw);
+        EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(new RamBlockstore()), null, null, null, Optional.empty(), Collections.emptyList());
+        Cid cid1 = ipfs.blockstore.put("Hello".getBytes(), Cid.Codec.Raw).join();
+        Cid cid2= ipfs.blockstore.put("world!".getBytes(), Cid.Codec.Raw).join();
         List<Want> wants = new ArrayList<>();
         wants.add(new Want(cid1, Optional.of("auth")));
         wants.add(new Want(cid2, Optional.of("auth")));
-        List<HashedBlock> blocks = service.getBlocks(wants, Collections.emptySet(), false);
+        List<HashedBlock> blocks = ipfs.getBlocks(wants, Collections.emptySet(), false);
         Assert.assertTrue("blocks retrieved", blocks.size() == 2);
     }
 
     public class Tester {
         public static void runAPIServiceTest(Blockstore blocks) {
-            APIService service = new APIService(blocks, new BitswapBlockService(null, null), null);
+            EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(blocks), null, null, null, Optional.empty(), Collections.emptyList());
             Cid cid = Cid.decode("zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg");
-            Assert.assertFalse("cid found", service.hasBlock(cid));
+            Assert.assertFalse("cid found", ipfs.blockstore.has(cid).join());
             String text = "Hello world!";
             byte[] block = text.getBytes();
 
-            Cid cidAdded = service.putBlock(block, Cid.Codec.Raw);
-            Assert.assertTrue("cid added was found", service.hasBlock(cidAdded));
+            Cid cidAdded = ipfs.blockstore.put(block, Cid.Codec.Raw).join();
+            Assert.assertTrue("cid added was found", ipfs.blockstore.has(cidAdded).join());
 
-            List<HashedBlock> blockRetrieved = service.getBlocks(List.of(new Want(cidAdded)), Collections.emptySet(), false);
+            List<HashedBlock> blockRetrieved = ipfs.getBlocks(List.of(new Want(cidAdded)), Collections.emptySet(), false);
             Assert.assertTrue("block retrieved", blockRetrieved.size() == 1);
             Assert.assertTrue("block is as expected", text.equals(new String(blockRetrieved.get(0).block)));
 
-            List<Cid> localRefs = service.getRefs();
+            List<Cid> localRefs = ipfs.blockstore.refs().join();
             for (Cid ref : localRefs) {
-                List<HashedBlock> res = service.getBlocks(List.of(new Want(ref)), Collections.emptySet(), false);
+                List<HashedBlock> res = ipfs.getBlocks(List.of(new Want(ref)), Collections.emptySet(), false);
                 Assert.assertTrue("ref retrieved", res.size() == 1);
             }
 
-            Assert.assertTrue("block removed", service.rmBlock(cidAdded));
-            Assert.assertFalse("cid still found", service.hasBlock(cidAdded));
-
+            Assert.assertTrue("block removed", ipfs.blockstore.rm(cidAdded).join());
+            Assert.assertFalse("cid still found", ipfs.blockstore.has(cidAdded).join());
         }
     }
 }
