@@ -3,18 +3,15 @@ package org.peergos;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.*;
 import io.libp2p.core.*;
+import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
-import io.netty.buffer.*;
-import io.netty.handler.codec.http.*;
 import org.peergos.blockstore.*;
-import org.peergos.client.*;
 import org.peergos.config.*;
 import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
-import org.peergos.util.HttpUtil;
 
 import java.io.*;
 import java.nio.file.*;
@@ -31,7 +28,7 @@ public class EmbeddedIpfs {
 
     public final Kademlia dht;
     public final Bitswap bitswap;
-    public final HttpProtocol.Binding p2pHttp;
+    public final Optional<HttpProtocol.Binding> p2pHttp;
     private final List<MultiAddress> bootstrap;
 
     public EmbeddedIpfs(Host node,
@@ -39,7 +36,7 @@ public class EmbeddedIpfs {
                         DatabaseRecordStore records,
                         Kademlia dht,
                         Bitswap bitswap,
-                        HttpProtocol.Binding p2pHttp,
+                        Optional<HttpProtocol.Binding> p2pHttp,
                         List<MultiAddress> bootstrap) {
         this.node = node;
         this.blockstore = blockstore;
@@ -69,7 +66,7 @@ public class EmbeddedIpfs {
         return node.stop();
     }
 
-    private static Blockstore buildBlockStore(Config config, Path ipfsPath) {
+    public static Blockstore buildBlockStore(Config config, Path ipfsPath) {
         Path blocksPath = ipfsPath.resolve("blocks");
         File blocksDirectory = blocksPath.toFile();
         if (!blocksDirectory.exists()) {
@@ -94,16 +91,20 @@ public class EmbeddedIpfs {
                 blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
     }
 
-    public static EmbeddedIpfs build(Config config, Path ipfsPath) {
-        ProvidingBlockstore blockstore = new ProvidingBlockstore(buildBlockStore(config, ipfsPath));
+    public static EmbeddedIpfs build(Path ipfsPath,
+                                     Blockstore blocks,
+                                     List<MultiAddress> swarmAddresses,
+                                     List<MultiAddress> bootstrap,
+                                     IdentitySection identity,
+                                     Optional<HttpProtocol.HttpRequestProcessor> handler) {
+        ProvidingBlockstore blockstore = new ProvidingBlockstore(blocks);
         Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toString());
         ProviderStore providers = new RamProviderStore();
 
-        List<MultiAddress> swarmAddresses = config.addresses.getSwarmAddresses();
         int hostPort = swarmAddresses.get(0).getPort();
-        HostBuilder builder = new HostBuilder().setIdentity(config.identity.privKeyProtobuf).listenLocalhost(hostPort);
-        if (! builder.getPeerId().equals(config.identity.peerId)) {
+        HostBuilder builder = new HostBuilder().setIdentity(identity.privKeyProtobuf).listenLocalhost(hostPort);
+        if (! builder.getPeerId().equals(identity.peerId)) {
             throw new IllegalStateException("PeerId invalid");
         }
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
@@ -112,32 +113,19 @@ public class EmbeddedIpfs {
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
-        HttpProtocol.Binding p2pHttpBinding = new HttpProtocol.Binding((s, req, h) -> {
-            if (config.addresses.proxyTargetAddress.isPresent()) {
-                try {
-                    FullHttpResponse reply = RequestSender.proxy(config.addresses.proxyTargetAddress.get(), (FullHttpRequest) req);
-                    h.accept(reply.retain());
-                } catch (IOException ioe) {
-                    FullHttpResponse exceptionReply = HttpUtil.replyError(ioe);
-                    h.accept(exceptionReply.retain());
-                }
-            } else {
-                FullHttpResponse emptyReply = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND, Unpooled.buffer(0));
-                emptyReply.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
-                h.accept(emptyReply.retain());
-            }
-        });
         Bitswap bitswap = new Bitswap(new BitswapEngine(blockstore, authoriser));
-        builder = builder.addProtocols(List.of(
-                new Ping(),
-                new AutonatProtocol.Binding(),
-                new CircuitHopProtocol.Binding(relayManager, stop),
-                bitswap,
-                dht,
-                p2pHttpBinding));
+        Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
-        Host node = builder.build();
+        List<ProtocolBinding> protocols = new ArrayList<>();
+        protocols.add(new Ping());
+        protocols.add(new AutonatProtocol.Binding());
+        protocols.add(new CircuitHopProtocol.Binding(relayManager, stop));
+        protocols.add(bitswap);
+        protocols.add(dht);
+        httpHandler.ifPresent(protocols::add);
 
-        return new EmbeddedIpfs(node, blockstore, records, dht, bitswap, p2pHttpBinding, config.bootstrap.getBootstrapAddresses());
+        Host node = builder.addProtocols(protocols).build();
+
+        return new EmbeddedIpfs(node, blockstore, records, dht, bitswap, httpHandler, bootstrap);
     }
 }

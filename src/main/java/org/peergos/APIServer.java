@@ -2,9 +2,13 @@ package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
 import io.ipfs.multiaddr.MultiAddress;
+import io.netty.handler.codec.http.*;
+import org.peergos.client.*;
 import org.peergos.config.*;
 import org.peergos.net.APIHandler;
 import org.peergos.net.HttpProxyHandler;
+import org.peergos.protocol.http.*;
+import org.peergos.util.HttpUtil;
 import org.peergos.util.Logging;
 
 import java.io.File;
@@ -18,17 +22,37 @@ import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Server {
+import static org.peergos.EmbeddedIpfs.buildBlockStore;
 
-    private static final Logger LOG = Logger.getLogger(Server.class.getName());
+public class APIServer {
 
-    public Server(Args args) throws Exception {
+    private static final Logger LOG = Logger.getLogger(APIServer.class.getName());
+
+    private static HttpProtocol.HttpRequestProcessor proxyHandler(MultiAddress target) {
+        return (s, req, h) -> {
+            try {
+                FullHttpResponse reply = RequestSender.proxy(target, (FullHttpRequest) req);
+                h.accept(reply.retain());
+            } catch (IOException ioe) {
+                FullHttpResponse exceptionReply = HttpUtil.replyError(ioe);
+                h.accept(exceptionReply.retain());
+            }
+        };
+    }
+
+    public APIServer(Args args) throws Exception {
         Path ipfsPath = getIPFSPath(args);
         Logging.init(ipfsPath, args.getBoolean("logToConsole", false));
         Config config = readConfig(ipfsPath);
         LOG.info("Starting Nabu version: " + APIService.CURRENT_VERSION);
 
-        EmbeddedIpfs ipfs = EmbeddedIpfs.build(config, ipfsPath);
+        EmbeddedIpfs ipfs = EmbeddedIpfs.build(ipfsPath,
+                buildBlockStore(config, ipfsPath),
+                config.addresses.getSwarmAddresses(),
+                config.bootstrap.getBootstrapAddresses(),
+                config.identity,
+                config.addresses.proxyTargetAddress.map(APIServer::proxyHandler)
+        );
 
         String apiAddressArg = "Addresses.API";
         MultiAddress apiAddress = args.hasArg(apiAddressArg) ? new MultiAddress(args.getArg(apiAddressArg)) :  config.addresses.apiAddress;
@@ -41,7 +65,8 @@ public class Server {
 
         APIService service = new APIService(ipfs.blockstore, new BitswapBlockService(ipfs.node, ipfs.bitswap), ipfs.dht);
         apiServer.createContext(APIService.API_URL, new APIHandler(service, ipfs.node));
-        apiServer.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(ipfs.node, ipfs.p2pHttp, ipfs.dht)));
+        if (config.addresses.proxyTargetAddress.isPresent())
+            apiServer.createContext(HttpProxyService.API_URL, new HttpProxyHandler(new HttpProxyService(ipfs.node, ipfs.p2pHttp.get(), ipfs.dht)));
         apiServer.setExecutor(Executors.newFixedThreadPool(handlerThreads));
         apiServer.start();
 
@@ -80,7 +105,7 @@ public class Server {
 
     public static void main(String[] args) {
         try {
-            new Server(Args.parse(args));
+            new APIServer(Args.parse(args));
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "SHUTDOWN", e);
         }

@@ -18,7 +18,6 @@ public class APIService {
 
     private final Kademlia dht;
 
-
     public APIService(Blockstore store, BlockService remoteBlocks, Kademlia dht) {
         this.store = store;
         this.remoteBlocks = remoteBlocks;

@@ -20,6 +20,6 @@ WORKDIR /opt/nabu
 RUN mkdir -p /opt/nabu/.ipfs
 COPY --from=build /opt/nabu/target /opt/nabu
 
-ENTRYPOINT ["java", "-cp", "/opt/nabu/nabu-v0.0.1-SNAPSHOT-jar-with-dependencies.jar", "org.peergos.Server", "Addresses.API", "/ip4/0.0.0.0/tcp/5001"]
+ENTRYPOINT ["java", "-cp", "/opt/nabu/nabu-v0.0.1-SNAPSHOT-jar-with-dependencies.jar", "org.peergos.APIServer", "Addresses.API", "/ip4/0.0.0.0/tcp/5001"]
 
 EXPOSE 4001 5001 8080 8000
