@@ -24,7 +24,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 public class HandlerTest {
 
@@ -35,6 +34,7 @@ public class HandlerTest {
         NabuClient nabu = new NabuClient(address.getHost(), address.getPort(), "/api/v0/", false);
         String ver = nabu.version();
         PeerId id = nabu.id();
+        System.currentTimeMillis();
     }
 
     @Test
