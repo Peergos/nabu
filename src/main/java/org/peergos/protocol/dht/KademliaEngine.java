@@ -14,10 +14,11 @@ import org.peergos.protocol.ipns.*;
 
 import java.time.*;
 import java.util.*;
+import java.util.logging.Logger;
 import java.util.stream.*;
 
 public class KademliaEngine {
-
+    private static final Logger LOG = Logger.getLogger(KademliaEngine.class.getName());
     private final ProviderStore providersStore;
     private final RecordStore ipnsStore;
     public final Router router;
@@ -46,7 +47,7 @@ public class KademliaEngine {
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
         int k = 20;
         List<Node> nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
-        System.out.println("Nodes: " + nodes.size());
+        LOG.fine("Nodes: " + nodes.size());
         return nodes.stream()
                 .map(n -> {
                     List<MultiAddress> addrs = addressBook.getAddrs(PeerId.fromBase58(n.getLink())).join()

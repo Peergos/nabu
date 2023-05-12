@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 
 public class RamAddressBook implements AddressBook {
 
-    Map<PeerId, Set<Multiaddr>> addresses = new ConcurrentHashMap<>();
+    public Map<PeerId, Set<Multiaddr>> addresses = new ConcurrentHashMap<>();
 
     @NotNull
     @Override

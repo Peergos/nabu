@@ -45,6 +45,10 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         this.addressBook = addrs;
     }
 
+    public AddressBook getAddressBook() {
+        return addressBook;
+    }
+
     public int bootstrapRoutingTable(Host host, List<MultiAddress> addrs, Predicate<String> filter) {
         List<String> resolved = addrs.stream()
                 .parallel()
@@ -78,7 +82,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     bootstrap(us);
                     Thread.sleep(BOOTSTRAP_PERIOD_MILLIS);
                 } catch (Throwable t) {
-                    t.printStackTrace();
+                    LOG.fine("Error in bootstrap thread: " + t.getMessage());
                 }
             }
         }, "Kademlia bootstrap").start();
@@ -90,9 +94,9 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             return true;
         } catch (Exception e) {
             if (e.getCause() instanceof NothingToCompleteException)
-                LOG.info("Couldn't connect to " + peer.peerId);
+                LOG.fine("Couldn't connect to " + peer.peerId);
             else
-                e.printStackTrace();
+                LOG.fine("Error connecting to " + peer.peerId + ": " + e.getMessage());
             return false;
         }
     }
@@ -112,7 +116,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             if (connectTo(us, peer))
                 connectedClosest++;
         }
-        LOG.info("Bootstrap connected to " + connectedClosest + " nodes close to us.");
+        LOG.fine("Bootstrap connected to " + connectedClosest + " nodes close to us.");
     }
 
     static class RoutingEntry {
@@ -242,7 +246,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     }
                 } catch (Exception e) {
                     if (! (e.getCause() instanceof TimeoutException))
-                        e.printStackTrace();
+                        LOG.fine( "Timeout Exception: " + e.getMessage());
                 }
             }
             // if no new peers in top k were returned we are done
@@ -258,11 +262,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             return dialPeer(target, us).orTimeout(2, TimeUnit.SECONDS).join().closerPeers(peerIDKey);
         } catch (Exception e) {
             if (e.getCause() instanceof NothingToCompleteException)
-                LOG.info("Couldn't dial " + peerIDKey + " addrs: " + target.addresses);
+                LOG.fine("Couldn't dial " + peerIDKey + " addrs: " + target.addresses);
             else if (e.getCause() instanceof TimeoutException)
-                LOG.info("Timeout dialing " + peerIDKey + " addrs: " + target.addresses);
+                LOG.fine("Timeout dialing " + peerIDKey + " addrs: " + target.addresses);
             else
-                e.printStackTrace();
+                LOG.fine("Unknown error: " + e.getMessage());
         }
         return CompletableFuture.completedFuture(Collections.emptyList());
     }
