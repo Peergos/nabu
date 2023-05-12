@@ -21,12 +21,13 @@ import java.util.logging.*;
 import java.util.stream.*;
 import java.util.stream.Stream;
 
-public class Kademlia extends StrictProtocolBinding<KademliaController> implements AddressBookConsumer {
+public class Kademlia extends StrictProtocolBinding<KademliaController> implements AddressBookConsumer, ClientMode {
 
     private static final Logger LOG = Logger.getLogger(Kademlia.class.getName());
     public static final int BOOTSTRAP_PERIOD_MILLIS = 300_000;
     private final KademliaEngine engine;
     private final boolean localDht;
+    private final boolean clientMode;
     private AddressBook addressBook;
 
     private final Integer replication;
@@ -38,6 +39,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         this.localDht = localDht;
         this.replication = replication;
         this.alpha = alpha;
+        this.clientMode = clientMode;
     }
 
     public void setAddressBook(AddressBook addrs) {
@@ -117,6 +119,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 connectedClosest++;
         }
         LOG.fine("Bootstrap connected to " + connectedClosest + " nodes close to us.");
+    }
+
+    @Override
+    public boolean isClient() {
+        return this.clientMode;
     }
 
     static class RoutingEntry {

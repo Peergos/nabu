@@ -174,6 +174,9 @@ public class HostBuilder {
             // Nodes operating in client mode do not advertise support for the libp2p Kademlia protocol identifier.
             // In addition they do not offer the Kademlia protocol identifier for incoming streams.
             for (ProtocolBinding<?> protocol : protocols) {
+                if (protocol instanceof ClientMode && ((ClientMode) protocol).isClient()) {
+                    continue;
+                }
                 identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());
             }
             b.getProtocols().add(new Identify(identifyBuilder.build()));
