@@ -45,12 +45,14 @@ public class APIServer {
         Logging.init(ipfsPath, args.getBoolean("logToConsole", false));
         Config config = readConfig(ipfsPath);
         LOG.info("Starting Nabu version: " + APIHandler.CURRENT_VERSION);
+        BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
 
         EmbeddedIpfs ipfs = EmbeddedIpfs.build(ipfsPath,
                 buildBlockStore(config, ipfsPath),
                 config.addresses.getSwarmAddresses(),
                 config.bootstrap.getBootstrapAddresses(),
                 config.identity,
+                authoriser,
                 config.addresses.proxyTargetAddress.map(APIServer::proxyHandler)
         );
 

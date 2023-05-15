@@ -122,6 +122,7 @@ public class EmbeddedIpfs {
                                      List<MultiAddress> swarmAddresses,
                                      List<MultiAddress> bootstrap,
                                      IdentitySection identity,
+                                     BlockRequestAuthoriser authoriser,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler) {
         ProvidingBlockstore blockstore = new ProvidingBlockstore(blocks);
         Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
@@ -138,7 +139,6 @@ public class EmbeddedIpfs {
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
-        BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
         Bitswap bitswap = new Bitswap(new BitswapEngine(blockstore, authoriser));
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
