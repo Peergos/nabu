@@ -9,9 +9,7 @@ import io.libp2p.core.PeerId;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.peergos.blockstore.Blockstore;
-import org.peergos.blockstore.RamBlockstore;
-import org.peergos.blockstore.TypeLimitedBlockstore;
+import org.peergos.blockstore.*;
 import org.peergos.client.NabuClient;
 import org.peergos.net.APIHandler;
 import org.peergos.protocol.dht.Kademlia;
@@ -46,8 +44,8 @@ public class HandlerTest {
 
             apiServer = HttpServer.create(localAPIAddress, 500);
             Blockstore blocks = new TypeLimitedBlockstore(new RamBlockstore(), Set.of(Cid.Codec.Raw));
-            APIService service = new APIService(blocks, new BitswapBlockService(null, null), null);
-            apiServer.createContext(APIService.API_URL, new APIHandler(service, null));
+            EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(blocks), null, null, null, Optional.empty(), Collections.emptyList());
+            apiServer.createContext(APIHandler.API_URL, new APIHandler(ipfs));
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
@@ -99,14 +97,14 @@ public class HandlerTest {
             InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
             apiServer = HttpServer.create(localAPIAddress, 500);
-            APIService service = new APIService(new RamBlockstore(), new BitswapBlockService(null, null), dht);
-            apiServer.createContext(APIService.API_URL, new APIHandler(service, node1));
+            EmbeddedIpfs ipfs = new EmbeddedIpfs(node1, new ProvidingBlockstore(new RamBlockstore()), null, dht, null, Optional.empty(), Collections.emptyList());
+            apiServer.createContext(APIHandler.API_URL, new APIHandler(ipfs));
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
-            NabuClient ipfs = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
+            NabuClient client = new NabuClient(apiAddress.getHost(), apiAddress.getPort(), "/api/v0/", false);
             Cid cid = Cid.decode("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
-            List<PeerAddresses> providers = ipfs.findProviders(cid);
+            List<PeerAddresses> providers = client.findProviders(cid);
             if (providers.isEmpty())
                 throw new IllegalStateException("Couldn't find provider of block!");
         } finally {
@@ -124,8 +122,8 @@ public class HandlerTest {
             InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
             apiServer = HttpServer.create(localAPIAddress, 500);
-            APIService service = new APIService(new RamBlockstore(), new BitswapBlockService(null, null), null);
-            apiServer.createContext(APIService.API_URL, new APIHandler(service, null));
+            EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(new RamBlockstore()), null, null, null, Optional.empty(), Collections.emptyList());
+            apiServer.createContext(APIHandler.API_URL, new APIHandler(ipfs));
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
 
