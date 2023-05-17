@@ -47,7 +47,7 @@ public class KademliaEngine {
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
         int k = 20;
         List<Node> nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
-        LOG.fine("Nodes: " + nodes.size());
+        LOG.fine(nodes.size() + " Nodes discovered by kad router: ");
         return nodes.stream()
                 .map(n -> {
                     List<MultiAddress> addrs = addressBook.getAddrs(PeerId.fromBase58(n.getLink())).join()
