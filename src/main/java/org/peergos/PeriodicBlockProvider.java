@@ -52,7 +52,9 @@ public class PeriodicBlockProvider {
         while (true) {
             try {
                 Cid c = newBlocksToPublish.poll();
-                publish(Stream.of(c));
+                if (c != null) {
+                    publish(Stream.of(c));
+                }
             } catch (Throwable e) {
                 LOG.log(Level.WARNING, e.getMessage(), e);
             }

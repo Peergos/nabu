@@ -55,7 +55,7 @@ public class APIServer {
                 authoriser,
                 config.addresses.proxyTargetAddress.map(APIServer::proxyHandler)
         );
-
+        ipfs.start();
         String apiAddressArg = "Addresses.API";
         MultiAddress apiAddress = args.hasArg(apiAddressArg) ? new MultiAddress(args.getArg(apiAddressArg)) :  config.addresses.apiAddress;
         InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
