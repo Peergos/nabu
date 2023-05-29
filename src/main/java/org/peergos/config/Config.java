@@ -26,7 +26,7 @@ public class Config {
         this.identity = config.identity;
     }
 
-    private Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore, IdentitySection identity) {
+    public Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore, IdentitySection identity) {
         this.addresses = addresses;
         this.bootstrap = bootstrap;
         this.datastore = datastore;
@@ -64,7 +64,7 @@ public class Config {
         MultiAddress gatewayAddress = new MultiAddress("/ip4/127.0.0.1/tcp/8080");
         Optional<MultiAddress> proxyTargetAddress = Optional.of(new MultiAddress("/ip4/127.0.0.1/tcp/8000"));
 
-        Optional<String> allowTarget = Optional.of("http://localhost:8000");
+        Optional<String> allowTarget = Optional.of("http://localhost:8002");
         List<MultiAddress> bootstrapNodes = List.of(
                         "/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
                         "/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
