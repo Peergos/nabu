@@ -1,6 +1,7 @@
 package org.peergos;
 
 import identify.pb.*;
+import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
@@ -21,6 +22,7 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import java.util.*;
+import java.util.stream.*;
 
 public class HostBuilder {
     private PrivKey privKey;
@@ -83,6 +85,11 @@ public class HostBuilder {
 
     public HostBuilder advertiseLocalhost(int listenPort) {
         advertisedAddr = Multiaddr.fromString("/ip4/127.0.0.1/tcp/" + listenPort).withP2P(peerId);
+        return this;
+    }
+
+    public HostBuilder listen(List<MultiAddress> listenAddrs) {
+        this.listenAddrs.addAll(listenAddrs.stream().map(MultiAddress::toString).collect(Collectors.toList()));
         return this;
     }
 
@@ -163,7 +170,11 @@ public class HostBuilder {
                     .setProtocolVersion("ipfs/0.1.0")
                     .setAgentVersion("nabu/v0.1.0")
                     .setPublicKey(ByteArrayExtKt.toProtobuf(privKey.publicKey().bytes()))
-                    .addListenAddrs(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()))
+                    .addAllListenAddrs(listenAddrs.stream()
+                            .map(Multiaddr::fromString)
+                            .map(Multiaddr::serialize)
+                            .map(ByteArrayExtKt::toProtobuf)
+                            .collect(Collectors.toList()))
                     .setObservedAddr(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()));
             for (ProtocolBinding<?> protocol : protocols) {
                 identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());

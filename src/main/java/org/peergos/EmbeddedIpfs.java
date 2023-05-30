@@ -129,8 +129,7 @@ public class EmbeddedIpfs {
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toString());
         ProviderStore providers = new RamProviderStore();
 
-        int hostPort = swarmAddresses.get(0).getPort();
-        HostBuilder builder = new HostBuilder().setIdentity(identity.privKeyProtobuf).listenLocalhost(hostPort);
+        HostBuilder builder = new HostBuilder().setIdentity(identity.privKeyProtobuf).listen(swarmAddresses);
         if (! builder.getPeerId().equals(identity.peerId)) {
             throw new IllegalStateException("PeerId invalid");
         }
