@@ -6,7 +6,6 @@ import io.libp2p.core.multiformats.*;
 import io.netty.handler.codec.http.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
-import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
 
@@ -21,12 +20,12 @@ public class HttpProxyTest {
     @Test
     public void p2pProxyRequest() throws IOException {
         InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
-        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
+        HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
                 .addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
         Host node1 = builder1.build();
         InetSocketAddress proxyTarget = new InetSocketAddress("127.0.0.1", 8000);
-        HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
+        HostBuilder builder2 = HostBuilder.create(10000 + new Random().nextInt(50000),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
                 .addProtocol(new HttpProtocol.Binding(proxyTarget));
         Host node2 = builder2.build();

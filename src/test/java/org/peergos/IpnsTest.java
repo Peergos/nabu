@@ -22,7 +22,7 @@ public class IpnsTest {
     @Test
     public void publishIPNSRecordToKubo() throws IOException {
         RamBlockstore blockstore1 = new RamBlockstore();
-        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
+        HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), blockstore1, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
@@ -67,7 +67,7 @@ public class IpnsTest {
     @Ignore // Kubo publish call is super slow and flakey
     public void retrieveKuboPublishedIPNS() throws IOException {
         RamBlockstore blockstore1 = new RamBlockstore();
-        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
+        HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), blockstore1, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
