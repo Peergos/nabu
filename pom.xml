@@ -127,6 +127,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>4.3.0</version>
+        </dependency>
+        <dependency>
             <groupId>com.github.multiformats</groupId>
             <artifactId>java-multiaddr</artifactId>
             <version>${version.multiaddr}</version>
