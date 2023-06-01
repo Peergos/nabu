@@ -1,6 +1,7 @@
 package org.peergos;
 
 import io.ipfs.api.*;
+import io.ipfs.multiaddr.*;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.mux.*;
@@ -19,7 +20,7 @@ public class KuboPingTest {
     public void runPingOverYamux() throws IOException {
         Host node1 = new HostBuilder()
                 .generateIdentity()
-                .listenLocalhost(11001)
+                .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + 11001)))
                 .addProtocols(List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true)))))
                 .addMuxers(List.of(StreamMuxerProtocol.getYamux()))
                 .build();

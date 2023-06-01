@@ -36,7 +36,7 @@ public class P2pHttpTest {
             emptyReply.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
             h.accept(emptyReply.retain());
         });
-        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
+        HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
         builder1 = builder1.addProtocol(node1Http);
         Host node1 = builder1.build();
@@ -78,7 +78,7 @@ public class P2pHttpTest {
                 Assert.assertTrue("Unexpected exception: " + ioe.toString(), false);
             }
         });
-        HostBuilder builder2 = HostBuilder.build(10000 + new Random().nextInt(50000),
+        HostBuilder builder2 = HostBuilder.create(10000 + new Random().nextInt(50000),
                 new RamProviderStore(), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         builder2 = builder2.addProtocol(node2Http);
         Host node2 = builder2.build();

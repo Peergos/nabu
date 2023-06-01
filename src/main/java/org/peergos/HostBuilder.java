@@ -28,7 +28,6 @@ public class HostBuilder {
     private PrivKey privKey;
     private PeerId peerId;
     private List<String> listenAddrs = new ArrayList<>();
-    private Multiaddr advertisedAddr;
     private List<ProtocolBinding> protocols = new ArrayList<>();
     private List<StreamMuxerProtocol> muxers = new ArrayList<>();
 
@@ -83,19 +82,9 @@ public class HostBuilder {
         return this;
     }
 
-    public HostBuilder advertiseLocalhost(int listenPort) {
-        advertisedAddr = Multiaddr.fromString("/ip4/127.0.0.1/tcp/" + listenPort).withP2P(peerId);
-        return this;
-    }
-
     public HostBuilder listen(List<MultiAddress> listenAddrs) {
         this.listenAddrs.addAll(listenAddrs.stream().map(MultiAddress::toString).collect(Collectors.toList()));
         return this;
-    }
-
-    public HostBuilder listenLocalhost(int listenPort) {
-        listenAddrs.add("/ip4/127.0.0.1/tcp/" + listenPort);
-        return advertiseLocalhost(listenPort);
     }
 
     public HostBuilder generateIdentity() {
@@ -114,12 +103,14 @@ public class HostBuilder {
         return this;
     }
 
-    public static HostBuilder build(int listenPort,
-                                    ProviderStore providers,
-                                    RecordStore records,
-                                    Blockstore blocks,
-                                    BlockRequestAuthoriser authoriser) {
-        HostBuilder builder = new HostBuilder().generateIdentity().listenLocalhost(listenPort);
+    public static HostBuilder create(int listenPort,
+                                     ProviderStore providers,
+                                     RecordStore records,
+                                     Blockstore blocks,
+                                     BlockRequestAuthoriser authoriser) {
+        HostBuilder builder = new HostBuilder()
+                .generateIdentity()
+                .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)));
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
@@ -136,7 +127,7 @@ public class HostBuilder {
                              List<ProtocolBinding> protocols) {
         return new HostBuilder()
                 .generateIdentity()
-                .listenLocalhost(listenPort)
+                .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)))
                 .addProtocols(protocols)
                 .build();
     }
@@ -144,12 +135,11 @@ public class HostBuilder {
     public Host build() {
         if (muxers.isEmpty())
             muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
-        return build(privKey, listenAddrs, advertisedAddr, protocols, muxers);
+        return build(privKey, listenAddrs, protocols, muxers);
     }
 
     public static Host build(PrivKey privKey,
                              List<String> listenAddrs,
-                             Multiaddr advertisedAddr,
                              List<ProtocolBinding> protocols,
                              List<StreamMuxerProtocol> muxers) {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
@@ -174,8 +164,7 @@ public class HostBuilder {
                             .map(Multiaddr::fromString)
                             .map(Multiaddr::serialize)
                             .map(ByteArrayExtKt::toProtobuf)
-                            .collect(Collectors.toList()))
-                    .setObservedAddr(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()));
+                            .collect(Collectors.toList()));
             for (ProtocolBinding<?> protocol : protocols) {
                 identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());
             }
