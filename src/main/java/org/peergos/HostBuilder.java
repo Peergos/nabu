@@ -159,6 +159,8 @@ public class HostBuilder {
             b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, m));
             b.getMuxers().addAll(muxers);
             b.getAddressBook().setImpl(new RamAddressBook());
+            // Uncomment to add mux debug logging
+//            b.getDebug().getMuxFramesHandler().addLogger(LogLevel.INFO, "MUX");
 
             for (ProtocolBinding<?> protocol : protocols) {
                 b.getProtocols().add(protocol);
