@@ -64,6 +64,7 @@ public class InteropTestClient {
     }
 
     private static String getLocalIPAddress() {
+        System.err.println("Getting localIP");
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress("google.com", 80));
             return socket.getLocalAddress().getHostAddress();
@@ -77,6 +78,10 @@ public class InteropTestClient {
             if (is_dialer) {
                 ip = "0.0.0.0";
             } else {
+                ip = getLocalIPAddress();
+            }
+        } else {
+            if (!is_dialer && ip.equals("0.0.0.0")) {
                 ip = getLocalIPAddress();
             }
         }
