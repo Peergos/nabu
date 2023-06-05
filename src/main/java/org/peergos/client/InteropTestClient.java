@@ -32,37 +32,6 @@ import java.util.stream.Collectors;
 
 public class InteropTestClient {
 
-    private class RamAddressBook implements AddressBook {
-
-        Map<PeerId, Set<Multiaddr>> addresses = new ConcurrentHashMap<>();
-
-        @NotNull
-        @Override
-        public CompletableFuture<Void> addAddrs(@NotNull PeerId peerId, long ttl, @NotNull Multiaddr... multiaddrs) {
-            addresses.putIfAbsent(peerId, new HashSet<>());
-            Set<Multiaddr> val = addresses.get(peerId);
-            synchronized (val) {
-                val.addAll(Arrays.asList(multiaddrs));
-            }
-            return CompletableFuture.completedFuture(null);
-        }
-
-        @NotNull
-        @Override
-        public CompletableFuture<Collection<Multiaddr>> getAddrs(@NotNull PeerId peerId) {
-            return CompletableFuture.completedFuture(addresses.getOrDefault(peerId, Collections.emptySet()));
-        }
-
-        @NotNull
-        @Override
-        public CompletableFuture<Void> setAddrs(@NotNull PeerId peerId, long ttl, @NotNull Multiaddr... multiaddrs) {
-            Set<Multiaddr> val = new HashSet<>();
-            val.addAll(Arrays.asList(multiaddrs));
-            addresses.put(peerId, val);
-            return CompletableFuture.completedFuture(null);
-        }
-    }
-
     private static String getLocalIPAddress() {
         System.err.println("Getting localIP");
         try (Socket socket = new Socket()) {
@@ -98,15 +67,12 @@ public class InteropTestClient {
             throw new IllegalStateException("transport == null ||  muxer == null || security == null");
         }
         int port = 10000 + new Random().nextInt(50000);
-        //.listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)))
         Multiaddr address = Multiaddr.fromString("/ip4/" + ip + "/tcp/" + port);
-
         List<MultiAddress> swarmAddresses = List.of(new MultiAddress(address.toString()));
 
         List<ProtocolBinding> protocols = new ArrayList<>();
         protocols.add(new Ping());
 
-        // HostBuilder builder =  new HostBuilder().generateIdentity();
         PrivKey privKey = Ed25519Kt.generateEd25519KeyPair().getFirst();
         PeerId peerId = PeerId.fromPubKey(privKey.publicKey());
         Multiaddr advertisedAddr = address.withP2P(peerId);
@@ -129,7 +95,6 @@ public class InteropTestClient {
                 muxers.add(StreamMuxerProtocol.getYamux());
             }
             b.getMuxers().addAll(muxers);
-            b.getAddressBook().setImpl(new RamAddressBook());
 
             for (ProtocolBinding<?> protocol : protocols) {
                 b.getProtocols().add(protocol);
@@ -175,7 +140,7 @@ public class InteropTestClient {
                 if (listenerAddrs == null || listenerAddrs.isEmpty()) {
                     throw new IllegalStateException("listenerAddr not set");
                 }
-                String listenerAddrStr = listenerAddrs.get(listenerAddrs.size() -1);// jedis.get("listenerAddr");
+                String listenerAddrStr = listenerAddrs.get(listenerAddrs.size() -1);
                 Multiaddr listenerAddr = Multiaddr.fromString(listenerAddrStr);
                 System.err.println("Other peer multiaddr is: " + listenerAddr);
                 try {
@@ -193,8 +158,6 @@ public class InteropTestClient {
                     node.stop();
                 }
             } else {
-                //jedis.set("listenerAddr", advertisedAddr.toString());
-                //_, err := rClient.RPush(ctx, "listenerAddr", host.Addrs()[0].Encapsulate(ma.StringCast("/p2p/"+host.ID().String())).String()).Result()
                 jedis.rpush("listenerAddr", advertisedAddr.toString());
                 Thread.sleep(Integer.parseInt(test_timeout_seconds) * 1000);
             }
@@ -212,14 +175,6 @@ public class InteropTestClient {
             String ip = System.getenv("ip");
             String redis_addr = System.getenv("redis_addr");
             String test_timeout_seconds = System.getenv("test_timeout_seconds");
-            /*
-            String transport = "tcp";
-            String muxer = "yamux";//, "yamux"
-            String security = "noise";//, "noise"
-            boolean is_dialer = true;
-            String ip = null;
-            String redis_addr = "127.0.0.1:6379";
-            String test_timeout_seconds = "180";*/
             new InteropTestClient(transport, muxer, security, is_dialer, ip, redis_addr, test_timeout_seconds);
         } catch (Throwable t) {
             System.err.println("Unexpected exit: " + t);
