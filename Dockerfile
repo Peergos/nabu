@@ -18,6 +18,6 @@ WORKDIR /opt/nabu
 
 COPY --from=build /opt/nabu/target /opt/nabu
 
-ENTRYPOINT ["java", "-cp", "/opt/nabu/nabu-v0.0.1-SNAPSHOT-jar-with-dependencies.jar", "org.peergos.client.InteropTestClient"]
+ENTRYPOINT ["java", "-cp", "/opt/nabu/nabu-v0.1.0-SNAPSHOT-jar-with-dependencies.jar", "org.peergos.client.InteropTestClient"]
 
 EXPOSE 4001

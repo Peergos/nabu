@@ -75,9 +75,9 @@ public class InteropTestClient {
                               String ip, String redis_addr, String test_timeout_seconds) throws Exception {
         if (ip == null || ip.length() == 0) {
             if (is_dialer) {
-                ip = getLocalIPAddress();
-            } else {
                 ip = "0.0.0.0";
+            } else {
+                ip = getLocalIPAddress();
             }
         }
         if (redis_addr == null || redis_addr.length() == 0) {
