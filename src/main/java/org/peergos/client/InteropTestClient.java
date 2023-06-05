@@ -86,7 +86,7 @@ public class InteropTestClient {
             if (security.equals("noise")) {
                 b.getSecureChannels().add((k, m) -> new NoiseXXSecureChannel(k, m));
             } else if(security.equals("tls")) {
-                b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, m));
+                b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, m, "ECDSA"));
             }
             List<StreamMuxerProtocol> muxers = new ArrayList<>();
             if (muxer.equals("mplex")) {
