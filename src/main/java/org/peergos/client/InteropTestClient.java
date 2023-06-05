@@ -22,6 +22,9 @@ import io.ipfs.multiaddr.MultiAddress;
 import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,10 +63,22 @@ public class InteropTestClient {
         }
     }
 
+    private static String getLocalIPAddress() {
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress("google.com", 80));
+            return socket.getLocalAddress().getHostAddress();
+        } catch (IOException ioe){
+            throw new IllegalStateException("Unable to determine local IPAddress");
+        }
+    }
     private InteropTestClient(String transport, String muxer, String security, boolean is_dialer,
                               String ip, String redis_addr, String test_timeout_seconds) throws Exception {
         if (ip == null || ip.length() == 0) {
-            ip = "0.0.0.0";
+            if (is_dialer) {
+                ip = getLocalIPAddress();
+            } else {
+                ip = "0.0.0.0";
+            }
         }
         if (redis_addr == null || redis_addr.length() == 0) {
             redis_addr = "redis:6379";
@@ -78,6 +93,7 @@ public class InteropTestClient {
             throw new IllegalStateException("transport == null ||  muxer == null || security == null");
         }
         int port = 10000 + new Random().nextInt(50000);
+        //.listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)))
         Multiaddr address = Multiaddr.fromString("/ip4/" + ip + "/tcp/" + port);
 
         List<MultiAddress> swarmAddresses = List.of(new MultiAddress(address.toString()));
@@ -97,9 +113,9 @@ public class InteropTestClient {
                 b.getTransports().add(TcpTransport::new);
             }
             if (security.equals("noise")) {
-                b.getSecureChannels().add((k, m) -> new NoiseXXSecureChannel(k, (List<String>) m));
+                b.getSecureChannels().add((k, m) -> new NoiseXXSecureChannel(k, m));
             } else if(security.equals("tls")) {
-                b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, (List<String>) m));
+                b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, m));
             }
             List<StreamMuxerProtocol> muxers = new ArrayList<>();
             if (muxer.equals("mplex")) {
@@ -122,8 +138,7 @@ public class InteropTestClient {
                             .map(Multiaddr::fromString)
                             .map(Multiaddr::serialize)
                             .map(ByteArrayExtKt::toProtobuf)
-                            .collect(Collectors.toList()))
-                    .setObservedAddr(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()));
+                            .collect(Collectors.toList()));
             for (ProtocolBinding<?> protocol : protocols) {
                 identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());
             }
