@@ -1,7 +1,6 @@
 package org.peergos.client;
 
 import identify.pb.IdentifyOuterClass;
-import io.libp2p.core.AddressBook;
 import io.libp2p.core.Host;
 import io.libp2p.core.PeerId;
 import io.libp2p.core.crypto.PrivKey;
@@ -19,19 +18,21 @@ import io.libp2p.security.noise.NoiseXXSecureChannel;
 import io.libp2p.security.tls.TlsSecureChannel;
 import io.libp2p.transport.tcp.TcpTransport;
 import io.ipfs.multiaddr.MultiAddress;
-import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.security.Security;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class InteropTestClient {
 
+    static {
+        Security.setProperty("ssl.KeyManagerFactory.algorithm","PKIX");
+        Security.setProperty("ssl.TrustManagerFactory.algorithm","PKIX");
+    }
     private static String getLocalIPAddress() {
         System.err.println("Getting localIP");
         try (Socket socket = new Socket()) {
