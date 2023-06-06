@@ -1,6 +1,5 @@
 package org.peergos.config;
 
-import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
 import io.libp2p.core.PeerId;
 import io.libp2p.core.crypto.PrivKey;
@@ -64,7 +63,7 @@ public class Config {
         MultiAddress gatewayAddress = new MultiAddress("/ip4/127.0.0.1/tcp/8080");
         Optional<MultiAddress> proxyTargetAddress = Optional.of(new MultiAddress("/ip4/127.0.0.1/tcp/8000"));
 
-        Optional<String> allowTarget = Optional.of("http://localhost:8000");
+        Optional<String> allowTarget = Optional.of("http://localhost:8002");
         List<MultiAddress> bootstrapNodes = List.of(
                         "/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
                         "/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
