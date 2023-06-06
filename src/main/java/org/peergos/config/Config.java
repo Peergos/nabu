@@ -26,7 +26,7 @@ public class Config {
         this.identity = config.identity;
     }
 
-    private Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore, IdentitySection identity) {
+    public Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore, IdentitySection identity) {
         this.addresses = addresses;
         this.bootstrap = bootstrap;
         this.datastore = datastore;
