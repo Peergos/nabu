@@ -95,12 +95,12 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
     }
 
-    public static void proxyRequest(Stream stream,
-                                    HttpRequest msg,
+    private static final NioEventLoopGroup pool = new NioEventLoopGroup();
+    public static void proxyRequest(HttpRequest msg,
                                     SocketAddress proxyTarget,
                                     Consumer<HttpObject> replyHandler) {
         Bootstrap b = new Bootstrap();
-        b.group(stream.eventLoop())
+        b.group(pool)
                 .channel(NioSocketChannel.class)
                 .handler(new LoggingHandler(LogLevel.TRACE));
 
@@ -127,7 +127,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     }
 
     public HttpProtocol(SocketAddress proxyTarget) {
-        this((s, req, replyHandler) -> proxyRequest(s, setHost(req, s), proxyTarget, replyHandler));
+        this((s, req, replyHandler) -> proxyRequest(setHost(req, s), proxyTarget, replyHandler));
     }
 
     @NotNull

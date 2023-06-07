@@ -44,7 +44,9 @@ public class P2pHttpChatTest {
             Multiaddr address1 = node1.listenAddresses().get(0);
             Multiaddr address2 = node2.listenAddresses().get(0);
 
-            for (int i=0; i < 20; i++) {
+            int count = 200;
+            long totalDuration = 0;
+            for (int i = 0; i < count; i++) {
                 byte[] msg1 = "G'day from node1!".getBytes();
                 FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.copiedBuffer(msg1));
                 httpRequest.headers().set(HttpHeaderNames.CONTENT_LENGTH, msg1.length);
@@ -54,6 +56,7 @@ public class P2pHttpChatTest {
                 proxier1.send(httpRequest.retain()).join();
                 long t2 = System.currentTimeMillis();
                 System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
+                totalDuration += t2 - t1;
 
                 byte[] msg2 = "G'day node1! I'm node2.".getBytes();
                 FullHttpRequest httpRequest2 = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.copiedBuffer(msg2));
@@ -64,7 +67,9 @@ public class P2pHttpChatTest {
                 proxier2.send(httpRequest2.retain()).join();
                 long t4 = System.currentTimeMillis();
                 System.out.println("P2P HTTP request took " + (t4 - t3) + "ms");
+                totalDuration += t4 - t3;
             }
+            System.out.println("Average: " + (totalDuration / (count * 2)));
         } finally {
             node1.stop();
             node2.stop();
