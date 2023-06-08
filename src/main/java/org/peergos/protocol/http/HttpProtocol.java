@@ -95,12 +95,12 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
     }
 
-    public static void proxyRequest(Stream stream,
-                                    HttpRequest msg,
+    private static final NioEventLoopGroup pool = new NioEventLoopGroup();
+    public static void proxyRequest(HttpRequest msg,
                                     SocketAddress proxyTarget,
                                     Consumer<HttpObject> replyHandler) {
         Bootstrap b = new Bootstrap();
-        b.group(stream.eventLoop())
+        b.group(pool)
                 .channel(NioSocketChannel.class)
                 .handler(new LoggingHandler(LogLevel.TRACE));
 
@@ -110,7 +110,14 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         ch.pipeline().addLast(new HttpResponseDecoder());
         ch.pipeline().addLast(new ResponseWriter(replyHandler));
 
-        fut.addListener(x -> ch.writeAndFlush(msg));
+        HttpRequest retained = retain(msg);
+        fut.addListener(x -> ch.writeAndFlush(retained));
+    }
+
+    private static HttpRequest retain(HttpRequest req) {
+        if (req instanceof FullHttpRequest)
+            return ((FullHttpRequest) req).retain();
+        return req;
     }
 
     private static final int TRAFFIC_LIMIT = 2*1024*1024;
@@ -127,7 +134,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     }
 
     public HttpProtocol(SocketAddress proxyTarget) {
-        this((s, req, replyHandler) -> proxyRequest(s, setHost(req, s), proxyTarget, replyHandler));
+        this((s, req, replyHandler) -> proxyRequest(setHost(req, s), proxyTarget, replyHandler));
     }
 
     @NotNull

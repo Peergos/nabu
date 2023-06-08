@@ -50,11 +50,14 @@ public class HttpProxyTest {
             HttpProtocol.HttpController proxier = new HttpProtocol.Binding(unusedProxyTarget).dial(node1, address2)
                     .getController().join();
             FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
-            for (int i=0; i < 20; i++) {
+            long totalTime = 0;
+            int count = 200;
+            for (int i = 0; i < count; i++) {
                 long t1 = System.currentTimeMillis();
                 FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
                 long t2 = System.currentTimeMillis();
                 System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
+                totalTime += t2 - t1;
 
                 ByteArrayOutputStream bout = new ByteArrayOutputStream();
                 resp.content().readBytes(bout, resp.headers().getInt("content-length"));
@@ -62,6 +65,7 @@ public class HttpProxyTest {
                 if (!Arrays.equals(replyBody, httpReply))
                     throw new IllegalStateException("Different http response!");
             }
+            System.out.println("Average: " + totalTime / count);
         } finally {
             node1.stop();
             node2.stop();
