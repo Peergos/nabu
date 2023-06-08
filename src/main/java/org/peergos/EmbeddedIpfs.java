@@ -93,16 +93,7 @@ public class EmbeddedIpfs {
     }
 
     public static Blockstore buildBlockStore(Config config, Path ipfsPath) {
-        Path blocksPath = ipfsPath.resolve("blocks");
-        File blocksDirectory = blocksPath.toFile();
-        if (!blocksDirectory.exists()) {
-            if (!blocksDirectory.mkdir()) {
-                throw new IllegalStateException("Unable to make blocks directory");
-            }
-        } else if (blocksDirectory.isFile()) {
-            throw new IllegalStateException("Unable to create blocks directory");
-        }
-        FileBlockstore blocks = new FileBlockstore(blocksPath);
+        FileBlockstore blocks = new FileBlockstore(ipfsPath);
         Blockstore blockStore;
         if (config.datastore.filter.type == FilterType.BLOOM) {
             blockStore = FilteredBlockstore.bloomBased(blocks, config.datastore.filter.falsePositiveRate);
