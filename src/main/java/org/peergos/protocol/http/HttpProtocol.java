@@ -110,7 +110,14 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         ch.pipeline().addLast(new HttpResponseDecoder());
         ch.pipeline().addLast(new ResponseWriter(replyHandler));
 
-        fut.addListener(x -> ch.writeAndFlush(msg));
+        HttpRequest retained = retain(msg);
+        fut.addListener(x -> ch.writeAndFlush(retained));
+    }
+
+    private static HttpRequest retain(HttpRequest req) {
+        if (req instanceof FullHttpRequest)
+            return ((FullHttpRequest) req).retain();
+        return req;
     }
 
     private static final int TRAFFIC_LIMIT = 2*1024*1024;
