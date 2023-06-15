@@ -25,7 +25,7 @@ public class Config {
         this.identity = config.identity;
     }
 
-    private Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore, IdentitySection identity) {
+    public Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore, IdentitySection identity) {
         this.addresses = addresses;
         this.bootstrap = bootstrap;
         this.datastore = datastore;
@@ -57,8 +57,7 @@ public class Config {
         PrivKey privKey = builder.getPrivateKey();
         PeerId peerId = builder.getPeerId();
 
-        List<MultiAddress> swarmAddresses = List.of(new MultiAddress("/ip4/0.0.0.0/tcp/4001"),
-                new MultiAddress("/ip6/::/tcp/4001"));
+        List<MultiAddress> swarmAddresses = List.of(new MultiAddress("/ip6/::/tcp/4001"));
         MultiAddress apiAddress = new MultiAddress("/ip4/127.0.0.1/tcp/5001");
         MultiAddress gatewayAddress = new MultiAddress("/ip4/127.0.0.1/tcp/8080");
         Optional<MultiAddress> proxyTargetAddress = Optional.of(new MultiAddress("/ip4/127.0.0.1/tcp/8000"));
@@ -101,9 +100,6 @@ public class Config {
 
         if (config.addresses.getSwarmAddresses().isEmpty()) {
             throw new IllegalStateException("Expecting Addresses/Swarm entries");
-        }
-        if (config.bootstrap.getBootstrapAddresses().isEmpty()) {
-            throw new IllegalStateException("Expecting Bootstrap addresses");
         }
         Mount blockMount = config.datastore.blockMount;
         if (!(blockMount.prefix.equals("flatfs.datastore") && blockMount.type.equals("measure"))) {
