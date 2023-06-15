@@ -21,12 +21,13 @@ import java.util.logging.*;
 import java.util.stream.*;
 import java.util.stream.Stream;
 
-public class Kademlia extends StrictProtocolBinding<KademliaController> implements AddressBookConsumer {
+public class Kademlia extends StrictProtocolBinding<KademliaController> implements AddressBookConsumer, ClientMode {
 
     private static final Logger LOG = Logger.getLogger(Kademlia.class.getName());
     public static final int BOOTSTRAP_PERIOD_MILLIS = 300_000;
     private final KademliaEngine engine;
     private final boolean localDht;
+    private final boolean clientMode;
     private AddressBook addressBook;
 
     private final Integer replication;
@@ -38,11 +39,16 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         this.localDht = localDht;
         this.replication = replication;
         this.alpha = alpha;
+        this.clientMode = clientMode;
     }
 
     public void setAddressBook(AddressBook addrs) {
         engine.setAddressBook(addrs);
         this.addressBook = addrs;
+    }
+
+    public AddressBook getAddressBook() {
+        return addressBook;
     }
 
     public int bootstrapRoutingTable(Host host, List<MultiAddress> addrs, Predicate<String> filter) {
@@ -78,7 +84,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     bootstrap(us);
                     Thread.sleep(BOOTSTRAP_PERIOD_MILLIS);
                 } catch (Throwable t) {
-                    t.printStackTrace();
+                    LOG.fine("Error in bootstrap thread: " + t.getMessage());
                 }
             }
         }, "Kademlia bootstrap").start();
@@ -90,9 +96,9 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             return true;
         } catch (Exception e) {
             if (e.getCause() instanceof NothingToCompleteException)
-                LOG.info("Couldn't connect to " + peer.peerId);
+                LOG.fine("Couldn't connect to " + peer.peerId);
             else
-                e.printStackTrace();
+                LOG.fine("Error connecting to " + peer.peerId + ": " + e.getMessage());
             return false;
         }
     }
@@ -112,7 +118,12 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             if (connectTo(us, peer))
                 connectedClosest++;
         }
-        LOG.info("Bootstrap connected to " + connectedClosest + " nodes close to us.");
+        LOG.fine("Bootstrap connected to " + connectedClosest + " nodes close to us.");
+    }
+
+    @Override
+    public boolean isClient() {
+        return this.clientMode;
     }
 
     static class RoutingEntry {
@@ -242,7 +253,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     }
                 } catch (Exception e) {
                     if (! (e.getCause() instanceof TimeoutException))
-                        e.printStackTrace();
+                        LOG.fine( "Timeout Exception: " + e.getMessage());
                 }
             }
             // if no new peers in top k were returned we are done
@@ -258,11 +269,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             return dialPeer(target, us).orTimeout(2, TimeUnit.SECONDS).join().closerPeers(peerIDKey);
         } catch (Exception e) {
             if (e.getCause() instanceof NothingToCompleteException)
-                LOG.info("Couldn't dial " + peerIDKey + " addrs: " + target.addresses);
+                LOG.fine("Couldn't dial " + peerIDKey + " addrs: " + target.addresses);
             else if (e.getCause() instanceof TimeoutException)
-                LOG.info("Timeout dialing " + peerIDKey + " addrs: " + target.addresses);
+                LOG.fine("Timeout dialing " + peerIDKey + " addrs: " + target.addresses);
             else
-                e.printStackTrace();
+                LOG.fine("Unknown error: " + e.getMessage());
         }
         return CompletableFuture.completedFuture(Collections.emptyList());
     }

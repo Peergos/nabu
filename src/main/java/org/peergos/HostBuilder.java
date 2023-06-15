@@ -21,8 +21,10 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import java.util.*;
+import java.util.logging.Logger;
 
 public class HostBuilder {
+    private static final Logger LOG = Logger.getLogger(HostBuilder.class.getName());
     private PrivKey privKey;
     private PeerId peerId;
     private List<String> listenAddrs = new ArrayList<>();
@@ -174,6 +176,9 @@ public class HostBuilder {
             // Nodes operating in client mode do not advertise support for the libp2p Kademlia protocol identifier.
             // In addition they do not offer the Kademlia protocol identifier for incoming streams.
             for (ProtocolBinding<?> protocol : protocols) {
+                if (protocol instanceof ClientMode && ((ClientMode) protocol).isClient()) {
+                    continue;
+                }
                 identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());
             }
             b.getProtocols().add(new Identify(identifyBuilder.build()));
@@ -182,7 +187,7 @@ public class HostBuilder {
                 b.getNetwork().listen(listenAddr);
             }
 
-            b.getConnectionHandlers().add(conn -> System.out.println(conn.localAddress() +
+            b.getConnectionHandlers().add(conn -> LOG.fine(conn.localAddress() +
                     " received connection from " + conn.remoteAddress() +
                     " on transport " + conn.transport()));
         });
