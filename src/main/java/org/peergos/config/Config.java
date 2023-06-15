@@ -103,9 +103,6 @@ public class Config {
         if (config.addresses.getSwarmAddresses().isEmpty()) {
             throw new IllegalStateException("Expecting Addresses/Swarm entries");
         }
-        if (config.bootstrap.getBootstrapAddresses().isEmpty()) {
-            throw new IllegalStateException("Expecting Bootstrap addresses");
-        }
         Mount blockMount = config.datastore.blockMount;
         if (!(blockMount.prefix.equals("flatfs.datastore") && blockMount.type.equals("measure"))) {
             throw new IllegalStateException("Expecting /blocks mount to have prefix == 'flatfs.datastore' and type == 'measure'");

@@ -135,6 +135,7 @@ public class JsonHelper {
                 .replaceAll("\\]\\}", "]\n}")
                 .replaceAll("\\}\\]", "\n}]")
                 .replaceAll("\"\\]", "\"\n]")
+                .replaceAll("\\[\\]", "[\n]")
                 .replaceAll(",\"", ",\n\"");
         StringTokenizer st = new StringTokenizer(formatted, "\n");
         StringBuilder sb = new StringBuilder();
