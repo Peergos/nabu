@@ -21,40 +21,32 @@ import io.ipfs.multiaddr.MultiAddress;
 import redis.clients.jedis.Jedis;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
+import java.net.*;
 import java.security.Security;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class InteropTestClient {
 
-    static {
-        Security.setProperty("ssl.KeyManagerFactory.algorithm","PKIX");
-        Security.setProperty("ssl.TrustManagerFactory.algorithm","PKIX");
-    }
-    private static String getLocalIPAddress() {
+    private static String getLocalIPAddress() throws SocketException {
         System.err.println("Getting localIP");
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress("google.com", 80));
-            return socket.getLocalAddress().getHostAddress();
-        } catch (IOException ioe){
-            throw new IllegalStateException("Unable to determine local IPAddress");
+        List<NetworkInterface> interfaces = NetworkInterface.networkInterfaces().collect(Collectors.toList());
+        for (NetworkInterface inter : interfaces) {
+            for (InterfaceAddress addr : inter.getInterfaceAddresses()) {
+                InetAddress address = addr.getAddress();
+                if (! address.isLoopbackAddress() && !(address instanceof Inet6Address))
+                    return address.getHostAddress();
+            }
         }
+        throw new IllegalStateException("Unable to determine local IPAddress");
     }
     private InteropTestClient(String transport, String muxer, String security, boolean is_dialer,
                               String ip, String redis_addr, String test_timeout_seconds) throws Exception {
-        if (ip == null || ip.length() == 0) {
-            if (is_dialer) {
-                ip = "0.0.0.0";
-            } else {
-                ip = getLocalIPAddress();
-            }
-        } else {
-            if (!is_dialer && ip.equals("0.0.0.0")) {
-                ip = getLocalIPAddress();
-            }
-        }
+        if (ip == null || ip.length() == 0)
+            ip = "0.0.0.0";
+        if (! is_dialer && ip.equals("0.0.0.0"))
+            ip = getLocalIPAddress();
+
         if (redis_addr == null || redis_addr.length() == 0) {
             redis_addr = "redis:6379";
         }
