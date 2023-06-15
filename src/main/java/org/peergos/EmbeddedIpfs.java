@@ -78,8 +78,6 @@ public class EmbeddedIpfs {
         LOG.info("Node started and listening on " + node.listenAddresses());
         LOG.info("Starting bootstrap process");
         int connections = dht.bootstrapRoutingTable(node, bootstrap, addr -> !addr.contains("/wss/"));
-        //if (connections == 0)
-        //    throw new IllegalStateException("No connected peers!");
         dht.bootstrap(node);
 
         PeriodicBlockProvider blockProvider = new PeriodicBlockProvider(22 * 3600_000L,
