@@ -136,20 +136,16 @@ public class InteropTestClient {
                 String listenerAddrStr = listenerAddrs.get(listenerAddrs.size() -1);
                 Multiaddr listenerAddr = Multiaddr.fromString(listenerAddrStr);
                 System.err.println("Other peer multiaddr is: " + listenerAddr);
-                try {
-                    System.err.println("Sending ping messages to " + listenerAddr);
-                    long handshakeStart = System.currentTimeMillis();
-                    PingController pinger = new Ping().dial(node, listenerAddr).getController().join();
-                    long pingRTTMilllis = pinger.ping().join();
-                    long handshakeEnd = System.currentTimeMillis();
-                    long handshakePlusOneRTT = handshakeEnd - handshakeStart;
-                    System.err.println("Ping latency " + pingRTTMilllis + "ms");
-                    String jsonResult = "{\"handshakePlusOneRTTMillis\":" + Double.valueOf(handshakePlusOneRTT) +
-                            ",\"pingRTTMilllis\":" + Double.valueOf(pingRTTMilllis) + "}";
-                    System.out.println(jsonResult);
-                } finally {
-                    node.stop();
-                }
+                System.err.println("Sending ping messages to " + listenerAddr);
+                long handshakeStart = System.currentTimeMillis();
+                PingController pinger = new Ping().dial(node, listenerAddr).getController().join();
+                long pingRTTMilllis = pinger.ping().join();
+                long handshakeEnd = System.currentTimeMillis();
+                long handshakePlusOneRTT = handshakeEnd - handshakeStart;
+                System.err.println("Ping latency " + pingRTTMilllis + "ms");
+                String jsonResult = "{\"handshakePlusOneRTTMillis\":" + Double.valueOf(handshakePlusOneRTT) +
+                        ",\"pingRTTMilllis\":" + Double.valueOf(pingRTTMilllis) + "}";
+                System.out.println(jsonResult);
             } else {
                 jedis.rpush("listenerAddr", advertisedAddr.toString());
                 Thread.sleep(Integer.parseInt(test_timeout_seconds) * 1000);
