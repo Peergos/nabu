@@ -9,6 +9,8 @@ import org.peergos.net.APIHandler;
 import org.peergos.net.HttpProxyHandler;
 import org.peergos.protocol.http.*;
 import org.peergos.util.HttpUtil;
+import org.peergos.util.JSONParser;
+import org.peergos.util.JsonHelper;
 import org.peergos.util.Logging;
 
 import java.io.File;
@@ -24,9 +26,9 @@ import java.util.logging.Logger;
 
 import static org.peergos.EmbeddedIpfs.buildBlockStore;
 
-public class APIServer {
+public class Nabu {
 
-    private static final Logger LOG = Logger.getLogger(APIServer.class.getName());
+    private static final Logger LOG = Logger.getLogger(Nabu.class.getName());
 
     private static HttpProtocol.HttpRequestProcessor proxyHandler(MultiAddress target) {
         return (s, req, h) -> {
@@ -40,10 +42,10 @@ public class APIServer {
         };
     }
 
-    public APIServer(Args args) throws Exception {
+    public Nabu(Args args) throws Exception {
         Path ipfsPath = getIPFSPath(args);
         Logging.init(ipfsPath, args.getBoolean("logToConsole", false));
-        Config config = readConfig(ipfsPath);
+        Config config = readConfig(ipfsPath, args);
         LOG.info("Starting Nabu version: " + APIHandler.CURRENT_VERSION);
         BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
 
@@ -53,7 +55,7 @@ public class APIServer {
                 config.bootstrap.getBootstrapAddresses(),
                 config.identity,
                 authoriser,
-                config.addresses.proxyTargetAddress.map(APIServer::proxyHandler)
+                config.addresses.proxyTargetAddress.map(Nabu::proxyHandler)
         );
         ipfs.start();
         String apiAddressArg = "Addresses.API";
@@ -92,12 +94,32 @@ public class APIServer {
         return Path.of(ipfsPath.get());
     }
 
-    private Config readConfig(Path configPath) throws IOException {
+    private Config readConfig(Path configPath, Args args) throws IOException {
         Path configFilePath = configPath.resolve("config");
         File configFile = configFilePath.toFile();
         if (!configFile.exists()) {
             LOG.info("Unable to find config file. Creating default config");
-            Config config = new Config();
+            Optional<String> s3datastoreArgs = args.getOptionalArg("s3.datastore");
+            Config config = null;
+            if (s3datastoreArgs.isPresent()) {
+                Map<String, Object> json = (Map) JSONParser.parse(s3datastoreArgs.get());
+                Map<String, Object> blockChildMap = new LinkedHashMap<>();
+                blockChildMap.put("region", JsonHelper.getStringProperty(json,"region"));
+                blockChildMap.put("bucket", JsonHelper.getStringProperty(json,"bucket"));
+                blockChildMap.put("rootDirectory", JsonHelper.getStringProperty(json,"rootDirectory"));
+                blockChildMap.put("regionEndpoint", JsonHelper.getStringProperty(json,"regionEndpoint"));
+                if (JsonHelper.getOptionalProperty(json,"accessKey").isPresent()) {
+                    blockChildMap.put("accessKey", JsonHelper.getStringProperty(json, "accessKey"));
+                }
+                if (JsonHelper.getOptionalProperty(json,"secretKey").isPresent()) {
+                    blockChildMap.put("secretKey", JsonHelper.getStringProperty(json, "secretKey"));
+                }
+                blockChildMap.put("type", "s3ds");
+                Mount s3BlockMount = new Mount("/blocks", "s3.datastore", "measure", blockChildMap);
+                config = new Config(() -> s3BlockMount);
+            } else {
+                config = new Config();
+            }
             Files.write(configFilePath, config.toString().getBytes(), StandardOpenOption.CREATE);
             return config;
         }
@@ -106,7 +128,7 @@ public class APIServer {
 
     public static void main(String[] args) {
         try {
-            new APIServer(Args.parse(args));
+            new Nabu(Args.parse(args));
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "SHUTDOWN", e);
         }

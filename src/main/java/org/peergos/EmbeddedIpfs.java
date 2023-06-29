@@ -6,6 +6,7 @@ import io.libp2p.core.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
 import org.peergos.blockstore.*;
+import org.peergos.blockstore.s3.S3Blockstore;
 import org.peergos.config.*;
 import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
@@ -13,7 +14,6 @@ import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
 
-import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -91,7 +91,14 @@ public class EmbeddedIpfs {
     }
 
     public static Blockstore buildBlockStore(Config config, Path ipfsPath) {
-        FileBlockstore blocks = new FileBlockstore(ipfsPath);
+        Blockstore blocks = null;
+        if (config.datastore.blockMount.prefix.equals("flatfs.datastore")) {
+            blocks = new FileBlockstore(ipfsPath);
+        }else if (config.datastore.blockMount.prefix.equals("s3.datastore")) {
+            blocks = new S3Blockstore(config.datastore.blockMount.getParams());
+        } else {
+            throw new IllegalStateException("Unrecognized datastore prefix: " + config.datastore.blockMount.prefix);
+        }
         Blockstore blockStore;
         if (config.datastore.filter.type == FilterType.BLOOM) {
             blockStore = FilteredBlockstore.bloomBased(blocks, config.datastore.filter.falsePositiveRate);

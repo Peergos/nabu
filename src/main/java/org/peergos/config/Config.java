@@ -3,11 +3,13 @@ package org.peergos.config;
 import io.ipfs.multiaddr.MultiAddress;
 import io.libp2p.core.PeerId;
 import io.libp2p.core.crypto.PrivKey;
+import org.peergos.Args;
 import org.peergos.HostBuilder;
 import org.peergos.util.JSONParser;
 import org.peergos.util.JsonHelper;
 
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public class Config {
@@ -18,13 +20,19 @@ public class Config {
     public final IdentitySection identity;
 
     public Config() {
-        Config config = defaultConfig();
+        Config config = defaultConfig(Optional.empty());
         this.addresses = config.addresses;
         this.bootstrap = config.bootstrap;
         this.datastore = config.datastore;
         this.identity = config.identity;
     }
-
+    public Config(Supplier<Mount> dataStoreSupplier) {
+        Config config = defaultConfig(Optional.of(dataStoreSupplier));
+        this.addresses = config.addresses;
+        this.bootstrap = config.bootstrap;
+        this.datastore = config.datastore;
+        this.identity = config.identity;
+    }
     public Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore, IdentitySection identity) {
         this.addresses = addresses;
         this.bootstrap = bootstrap;
@@ -52,7 +60,7 @@ public class Config {
         return JsonHelper.pretty(configMap);
     }
 
-    public Config defaultConfig() {
+    public Config defaultConfig(Optional<Supplier<Mount>> dataStoreSupplier) {
         HostBuilder builder = new HostBuilder().generateIdentity();
         PrivKey privKey = builder.getPrivateKey();
         PeerId peerId = builder.getPeerId();
@@ -72,14 +80,17 @@ public class Config {
                         "/ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ").stream()
                 .map(MultiAddress::new)
                 .collect(Collectors.toList());
-
-        Map<String, Object> blockChildMap = new LinkedHashMap<>();
-        blockChildMap.put("path", "blocks");
-        blockChildMap.put("shardFunc", "/repo/flatfs/shard/v1/next-to-last/2");
-        blockChildMap.put("sync", "true");
-        blockChildMap.put("type", "flatfs");
-        Mount blockMount = new Mount("/blocks", "flatfs.datastore", "measure", blockChildMap);
-
+        Mount blockMount = null;
+        if (dataStoreSupplier.isPresent()) {
+            blockMount = dataStoreSupplier.get().get();
+        } else {
+            Map<String, Object> blockChildMap = new LinkedHashMap<>();
+            blockChildMap.put("path", "blocks");
+            blockChildMap.put("shardFunc", "/repo/flatfs/shard/v1/next-to-last/2");
+            blockChildMap.put("sync", "true");
+            blockChildMap.put("type", "flatfs");
+            blockMount = new Mount("/blocks", "flatfs.datastore", "measure", blockChildMap);
+        }
         Map<String, Object> dataChildMap = new LinkedHashMap<>();
         dataChildMap.put("compression", "none");
         dataChildMap.put("path", "datastore");
@@ -102,16 +113,19 @@ public class Config {
             throw new IllegalStateException("Expecting Addresses/Swarm entries");
         }
         Mount blockMount = config.datastore.blockMount;
-        if (!(blockMount.prefix.equals("flatfs.datastore") && blockMount.type.equals("measure"))) {
-            throw new IllegalStateException("Expecting /blocks mount to have prefix == 'flatfs.datastore' and type == 'measure'");
+        if (!( (blockMount.prefix.equals("flatfs.datastore")  || blockMount.prefix.equals("s3.datastore"))
+                && blockMount.type.equals("measure"))) {
+            throw new IllegalStateException("Expecting /blocks mount to have prefix == ('flatfs.datastore' or 's3.datastore') and type == 'measure'");
         }
         Map<String, Object> blockParams = blockMount.getParams();
         String blockPath = (String) blockParams.get("path");
         String blockShardFunc = (String) blockParams.get("shardFunc");
         String blockType = (String) blockParams.get("type");
-        if (!(blockPath.equals("blocks") && blockShardFunc.equals("/repo/flatfs/shard/v1/next-to-last/2")
-                && blockType.equals("flatfs"))) {
+        if (blockType.equals("flatfs") && !(blockPath.equals("blocks") && blockShardFunc.equals("/repo/flatfs/shard/v1/next-to-last/2"))) {
             throw new IllegalStateException("Expecting flatfs mount at /blocks");
+        }
+        if (blockMount.prefix.equals("s3.datastore") && !blockType.equals("s3ds")) {
+            throw new IllegalStateException("Expecting /blocks s3.datastore mount to have a type of 's3ds'");
         }
 
         Mount rootMount = config.datastore.rootMount;
@@ -123,7 +137,7 @@ public class Config {
         String rootCompression = (String) rootParams.get("compression");
         String rootType = (String) rootParams.get("type");
         if (!(rootPath.equals("datastore") && rootCompression.equals("none") && rootType.equals("h2"))) {
-            throw new IllegalStateException("Expecting flatfs mount at /blocks");
+            throw new IllegalStateException("Expecting flatfs mount at /");
         }
     }
 }

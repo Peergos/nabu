@@ -20,7 +20,7 @@ Currently implemented properties:
 * autonat
 * uPnP port forwarding
 * nat-pmp port forwarding
-* file based blockstore
+* file and S3 based blockstore
 * persistent datastores (IPNS record store) using H2 DB
 * persistent identities and config
 * basic HTTP API (block.{get, put, rm, has, stat}, id, getRefs, bloomAdd) compatible with matching kubo api calls
@@ -32,7 +32,6 @@ In the future we will add:
 * circuit-relay
 * dcutr (direct connection upgrade through relay)
 * AutoRelay
-* S3 blockstore
 * mDNS peer discovery
 * Android compatibility
 * example serverless chat app using p2p http proxy for Android and iOS
@@ -62,3 +61,14 @@ for Maven, add the following sections to your pom.xml (replacing $LATEST_VERSION
     </dependency>
   </dependencies>
 ```
+
+
+### S3 Blockstore
+
+By default, Nabu will construct a File based blockstore
+
+If you are configuring a brand new Nabu instance without any data, you can enable S3 by passing in a command line parameter:
+```
+-s3.datastore "{\"region\": \"us-east-1\", \"bucket\": \"$bucketname\", \"rootDirectory\": \"$bucketsubdirectory\", \"regionEndpoint\": \"us-east-1.linodeobjects.com\", \"accessKey\": \"1\", \"secretKey\": \"2\"}
+```
+Note: accessKey and secretKey are optional. They can be set via env vars AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY or read from ~/.aws/credentials
