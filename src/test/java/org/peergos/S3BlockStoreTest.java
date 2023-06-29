@@ -20,7 +20,6 @@ mc alias set minio 'http://local-s3.localhost:9000' 'test' 'testdslocal'
 public class S3BlockStoreTest {
 
     @Test
-    @Ignore
     public void testFileStore() {
         Map<String, Object> params = new HashMap<>();
         params.put("type", "s3ds");
