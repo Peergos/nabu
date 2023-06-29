@@ -20,7 +20,7 @@ Currently implemented properties:
 * autonat
 * uPnP port forwarding
 * nat-pmp port forwarding
-* file based blockstore
+* file and S3 based blockstore
 * persistent datastores (IPNS record store) using H2 DB
 * persistent identities and config
 * basic HTTP API (block.{get, put, rm, has, stat}, id, getRefs, bloomAdd) compatible with matching kubo api calls
