@@ -3,15 +3,9 @@ package org.peergos;
 import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
 import org.junit.*;
-import org.peergos.blockstore.FileBlockstore;
 import org.peergos.blockstore.S3Blockstore;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /*
 To run set up minIO and mc. ie for mac
