@@ -24,9 +24,9 @@ import java.util.logging.Logger;
 
 import static org.peergos.EmbeddedIpfs.buildBlockStore;
 
-public class APIServer {
+public class Nabu {
 
-    private static final Logger LOG = Logger.getLogger(APIServer.class.getName());
+    private static final Logger LOG = Logger.getLogger(Nabu.class.getName());
 
     private static HttpProtocol.HttpRequestProcessor proxyHandler(MultiAddress target) {
         return (s, req, h) -> {
@@ -40,7 +40,7 @@ public class APIServer {
         };
     }
 
-    public APIServer(Args args) throws Exception {
+    public Nabu(Args args) throws Exception {
         Path ipfsPath = getIPFSPath(args);
         Logging.init(ipfsPath, args.getBoolean("logToConsole", false));
         Config config = readConfig(ipfsPath);
@@ -53,7 +53,7 @@ public class APIServer {
                 config.bootstrap.getBootstrapAddresses(),
                 config.identity,
                 authoriser,
-                config.addresses.proxyTargetAddress.map(APIServer::proxyHandler)
+                config.addresses.proxyTargetAddress.map(Nabu::proxyHandler)
         );
         ipfs.start();
         String apiAddressArg = "Addresses.API";
@@ -106,7 +106,7 @@ public class APIServer {
 
     public static void main(String[] args) {
         try {
-            new APIServer(Args.parse(args));
+            new Nabu(Args.parse(args));
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "SHUTDOWN", e);
         }

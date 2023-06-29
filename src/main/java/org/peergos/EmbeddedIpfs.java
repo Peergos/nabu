@@ -91,7 +91,14 @@ public class EmbeddedIpfs {
     }
 
     public static Blockstore buildBlockStore(Config config, Path ipfsPath) {
-        FileBlockstore blocks = new FileBlockstore(ipfsPath);
+        Blockstore blocks = null;
+        if (config.datastore.blockMount.prefix.equals("flatfs.datastore")) {
+            blocks = new FileBlockstore(ipfsPath);
+        }else if (config.datastore.blockMount.prefix.equals("s3.datastore")) {
+            blocks = new S3Blockstore(config.datastore.blockMount.getParams());
+        } else {
+            throw new IllegalStateException("Unrecognized datastore prefix: " + config.datastore.blockMount.prefix);
+        }
         Blockstore blockStore;
         if (config.datastore.filter.type == FilterType.BLOOM) {
             blockStore = FilteredBlockstore.bloomBased(blocks, config.datastore.filter.falsePositiveRate);
