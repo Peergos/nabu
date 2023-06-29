@@ -29,7 +29,6 @@ Currently implemented properties:
 * configurable cid publishing function
 
 In the future we will add:
-* more interop tests with other languages
 * circuit-relay
 * dcutr (direct connection upgrade through relay)
 * AutoRelay
