@@ -110,8 +110,11 @@ public class S3AdminRequests {
         PresignedUrl listReq = preSignList(prefix, maxKeys, continuationToken, now, host, region, accessKeyId, s3SecretKey, useHttps, h).join();
         try {
             ByteArrayInputStream bais = new ByteArrayInputStream(getter.apply(listReq));
-            String docString = new String(bais.readAllBytes()); //todo remove debugging code
-            Document xml = builder.get().parse(docString);
+            if (false) { //debugging code
+                String docString = new String(bais.readAllBytes());
+                System.currentTimeMillis();
+            }
+            Document xml = builder.get().parse(bais);
             List<ObjectMetadata> res = new ArrayList<>();
             Node root = xml.getFirstChild();
             NodeList topLevel = root.getChildNodes();

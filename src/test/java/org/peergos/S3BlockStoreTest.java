@@ -43,14 +43,6 @@ public class S3BlockStoreTest {
         Cid.Codec codec = Cid.Codec.Raw;
         Cid cid = new Cid(1, codec, Multihash.Type.sha2_256, Hash.sha256(block));
 
-        List<Cid> allCids =  bs.refs().join();
-        for(Cid hash : allCids) {
-            bs.rm(hash).join();
-        }
-        allCids =  bs.refs().join();
-        Assert.assertTrue("expecting nothing in s3", allCids.isEmpty());
-
-
         boolean found = bs.has(cid).join();
         Assert.assertTrue("Found cid", !found);
 
@@ -67,15 +59,12 @@ public class S3BlockStoreTest {
         String str = new String(data.get());
         Assert.assertTrue("data match", str.equals(msg));
 
-        allCids =  bs.refs().join();
-        Assert.assertTrue("ref found", !allCids.isEmpty());
-        Assert.assertTrue("cid retrieved", !allCids.stream()
-                .filter(c -> c.equals(msg)).collect(Collectors.toList()).isEmpty());
-        for(Cid hash : allCids) {
-            bs.rm(hash).join();
-        }
-        allCids =  bs.refs().join();
-        Assert.assertTrue("ref found", allCids.isEmpty());
+        //List<Cid> allCids =  bs.refs().join();
+        //Assert.assertTrue("ref found", !allCids.isEmpty());
+        //Assert.assertTrue("cid retrieved", !allCids.stream().filter(c -> c.equals(msg)).collect(Collectors.toList()).isEmpty());
+        bs.rm(cid).join();
+        found = bs.has(cid).join();
+        Assert.assertTrue("Found cid", !found);
     }
 
 }

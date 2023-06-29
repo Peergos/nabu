@@ -32,7 +32,6 @@ In the future we will add:
 * circuit-relay
 * dcutr (direct connection upgrade through relay)
 * AutoRelay
-* S3 blockstore
 * mDNS peer discovery
 * Android compatibility
 * example serverless chat app using p2p http proxy for Android and iOS
@@ -61,4 +60,27 @@ for Maven, add the following sections to your pom.xml (replacing $LATEST_VERSION
       <version>$LATEST_VERSION</version>
     </dependency>
   </dependencies>
+```
+
+
+### S3 Blockstore
+
+By default, Nabu will construct a File based blockstore
+
+To use S3, replace existing /blocks mount and configure:
+```
+{
+    "mountpoint":"/blocks",
+    "prefix":"s3.datastore",
+    "child":{
+        "type": "s3ds",
+        "region": "us-east-1",
+        "bucket": "$bucketname",
+        "rootDirectory": "$bucketsubdirectory",
+        "regionEndpoint": "us-east-1.linodeobjects.com",
+        "accessKey": "",
+        "secretKey": ""
+    },
+    "type":"measure"
+},
 ```
