@@ -67,20 +67,8 @@ for Maven, add the following sections to your pom.xml (replacing $LATEST_VERSION
 
 By default, Nabu will construct a File based blockstore
 
-To use S3, replace existing /blocks mount and configure:
+If you are configuring a brand new Nabu instance without any data, you can enable S3 by passing in a command line parameter:
 ```
-{
-    "mountpoint":"/blocks",
-    "prefix":"s3.datastore",
-    "child":{
-        "type": "s3ds",
-        "region": "us-east-1",
-        "bucket": "$bucketname",
-        "rootDirectory": "$bucketsubdirectory",
-        "regionEndpoint": "us-east-1.linodeobjects.com",
-        "accessKey": "",
-        "secretKey": ""
-    },
-    "type":"measure"
-},
+-s3.datastore "{\"region\": \"us-east-1\", \"bucket\": \"$bucketname\", \"rootDirectory\": \"$bucketsubdirectory\", \"regionEndpoint\": \"us-east-1.linodeobjects.com\", \"accessKey\": \"1\", \"secretKey\": \"2\"}
 ```
+Note: accessKey and secretKey are optional. They can be set via env vars AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY or read from ~/.aws/credentials
