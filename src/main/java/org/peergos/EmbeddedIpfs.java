@@ -6,6 +6,7 @@ import io.libp2p.core.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
 import org.peergos.blockstore.*;
+import org.peergos.blockstore.s3.S3Blockstore;
 import org.peergos.config.*;
 import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
@@ -13,7 +14,6 @@ import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
 
-import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;

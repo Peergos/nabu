@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 import org.peergos.blockstore.RateLimitException;
+import org.peergos.blockstore.s3.PresignedUrl;
 
 import java.io.*;
 import java.net.*;
@@ -74,11 +75,11 @@ public class HttpUtil {
         return reply;
     }
 
-    public static Map<String, List<String>> head(PresignedUrl head) throws IOException {
+    public static Map<String, List<String>> head(String uri, Map<String, String> fields) throws IOException {
         try {
-            HttpURLConnection conn = (HttpURLConnection) new URI(head.base).toURL().openConnection();
+            HttpURLConnection conn = (HttpURLConnection) new URI(uri).toURL().openConnection();
             conn.setRequestMethod("HEAD");
-            for (Map.Entry<String, String> e : head.fields.entrySet()) {
+            for (Map.Entry<String, String> e : fields.entrySet()) {
                 conn.setRequestProperty(e.getKey(), e.getValue());
             }
 
@@ -103,13 +104,13 @@ public class HttpUtil {
         }
     }
 
-    public static byte[] get(PresignedUrl url) throws IOException {
+    public static byte[] get(String uri, Map<String, String> fields) throws IOException {
         try {
-            HttpURLConnection conn = (HttpURLConnection) new URI(url.base).toURL().openConnection();
+            HttpURLConnection conn = (HttpURLConnection) new URI(uri).toURL().openConnection();
             conn.setConnectTimeout(10_000);
             conn.setReadTimeout(60_000);
             conn.setRequestMethod("GET");
-            for (Map.Entry<String, String> e : url.fields.entrySet()) {
+            for (Map.Entry<String, String> e : fields.entrySet()) {
                 conn.setRequestProperty(e.getKey(), e.getValue());
             }
 
@@ -133,10 +134,10 @@ public class HttpUtil {
         }
     }
 
-    public static void delete(PresignedUrl target) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URI(target.base).toURL().openConnection();
+    public static void delete(String uri, Map<String, String> fields) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) new URI(uri).toURL().openConnection();
         conn.setRequestMethod("DELETE");
-        for (Map.Entry<String, String> e : target.fields.entrySet()) {
+        for (Map.Entry<String, String> e : fields.entrySet()) {
             conn.setRequestProperty(e.getKey(), e.getValue());
         }
 
@@ -162,20 +163,20 @@ public class HttpUtil {
         }
     }
 
-    public static byte[] put(PresignedUrl target, byte[] body) throws IOException {
-        return putOrPost("PUT", target, body);
+    public static byte[] put(String uri, Map<String, String> fields, byte[] body) throws IOException {
+        return putOrPost("PUT", uri, fields, body);
     }
 
-    public static byte[] post(PresignedUrl target, byte[] body) throws IOException {
-        return putOrPost("POST", target, body);
+    public static byte[] post(String uri, Map<String, String> fields, byte[] body) throws IOException {
+        return putOrPost("POST", uri, fields, body);
     }
 
-    private static byte[] putOrPost(String method, PresignedUrl target, byte[] body) throws IOException {
+    private static byte[] putOrPost(String method, String uri, Map<String, String> fields, byte[] body) throws IOException {
         HttpURLConnection conn = null;
         try {
-            conn = (HttpURLConnection) new URI(target.base).toURL().openConnection();
+            conn = (HttpURLConnection) new URI(uri).toURL().openConnection();
             conn.setRequestMethod(method);
-            for (Map.Entry<String, String> e : target.fields.entrySet()) {
+            for (Map.Entry<String, String> e : fields.entrySet()) {
                 conn.setRequestProperty(e.getKey(), e.getValue());
             }
             conn.setDoOutput(true);

@@ -1,5 +1,6 @@
-package org.peergos.util;
+package org.peergos.blockstore.s3;
 
+import org.peergos.util.Hasher;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;

@@ -1,8 +1,10 @@
-package org.peergos.blockstore;
+package org.peergos.blockstore.s3;
 
 import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
 import org.peergos.Hash;
+import org.peergos.blockstore.Blockstore;
+import org.peergos.blockstore.RateLimitException;
 import org.peergos.util.Hasher;
 import org.peergos.util.*;
 
@@ -166,7 +168,7 @@ public class S3Blockstore implements Blockstore {
         try {
             PresignedUrl headUrl = S3Request.preSignHead(folder + hashToKey(cid), Optional.of(60),
                     S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, region, accessKeyId, secretKey, useHttps, hasher).join();
-            Map<String, List<String>> headRes = HttpUtil.head(headUrl);
+            Map<String, List<String>> headRes = HttpUtil.head(headUrl.base, headUrl.fields);
             long size = Long.parseLong(headRes.get("Content-Length").get(0));
             return Futures.of(Optional.of((int)size));
         } catch (FileNotFoundException f) {
@@ -198,7 +200,7 @@ public class S3Blockstore implements Blockstore {
         PresignedUrl getUrl = S3Request.preSignGet(path, Optional.of(600), range,
                 S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, region, accessKeyId, secretKey, useHttps, hasher).join();
         try {
-            byte[] block = HttpUtil.get(getUrl);
+            byte[] block = HttpUtil.get(getUrl.base, getUrl.fields);
             return Futures.of(Optional.of(block));
         } catch (SocketTimeoutException | SSLException e) {
             // S3 can't handle the load so treat this as a rate limit and slow down
@@ -233,7 +235,7 @@ public class S3Blockstore implements Blockstore {
             String contentHash =  ArrayOps.bytesToHex(hash);
             PresignedUrl putUrl = S3Request.preSignPut(s3Key, block.length, contentHash, false,
                     S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, extraHeaders, region, accessKeyId, secretKey, useHttps, hasher).join();
-            HttpUtil.put(putUrl, block);
+            HttpUtil.put(putUrl.base, putUrl.fields, block);
             return CompletableFuture.completedFuture(cid);
         } catch (IOException e) {
             String msg = e.getMessage();
@@ -251,7 +253,7 @@ public class S3Blockstore implements Blockstore {
         try {
             PresignedUrl delUrl = S3Request.preSignDelete(folder + hashToKey(cid), S3AdminRequests.asAwsDate(ZonedDateTime.now()), host,
                     region, accessKeyId, secretKey, useHttps, hasher).join();
-            HttpUtil.delete(delUrl);
+            HttpUtil.delete(delUrl.base, delUrl.fields);
             return CompletableFuture.completedFuture(true);
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -280,7 +282,7 @@ public class S3Blockstore implements Blockstore {
                 result = S3AdminRequests.listObjects(folder, 1_000, continuationToken,
                         ZonedDateTime.now(), host, region, accessKeyId, secretKey, url -> {
                             try {
-                                return HttpUtil.get(url);
+                                return HttpUtil.get(url.base, url.fields);
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }

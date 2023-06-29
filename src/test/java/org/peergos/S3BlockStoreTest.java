@@ -3,7 +3,7 @@ package org.peergos;
 import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
 import org.junit.*;
-import org.peergos.blockstore.S3Blockstore;
+import org.peergos.blockstore.s3.S3Blockstore;
 
 import java.util.*;
 

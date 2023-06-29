@@ -1,4 +1,4 @@
-package org.peergos.util;
+package org.peergos.blockstore.s3;
 
 import java.util.Map;
 
