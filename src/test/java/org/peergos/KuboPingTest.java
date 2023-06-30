@@ -31,11 +31,13 @@ public class KuboPingTest {
             PingController pinger = new Ping().dial(node1, address2).getController().join();
 
             System.out.println("Sending ping messages to " + address2);
-            for (int i = 0; i < 10_000; i++) { // 8091 is where we hit the yamux 256kb window size, so do more than that
+            long totalDuration = 0;
+            int count = 10_000;
+            for (int i = 0; i < count; i++) { // 8091 is where we hit the yamux 256kb window size, so do more than that
                 long latency = pinger.ping().join();
-                if (i % 10 == 0)
-                    System.out.println("Ping " + i + ", latency " + latency + "ms");
+                totalDuration += latency;
             }
+            System.out.println("Ping average: " + (totalDuration / count) + "ms");
         } finally {
             node1.stop();
         }

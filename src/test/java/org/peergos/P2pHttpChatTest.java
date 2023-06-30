@@ -20,8 +20,8 @@ public class P2pHttpChatTest {
         FullHttpResponse replyOk = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.buffer(0));
         replyOk.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
         HttpProtocol.Binding node1Http = new HttpProtocol.Binding((s, req, h) -> {
-            System.out.println("Node 1 received: " + req);
-            printBody(req);
+            //System.out.println("Node 1 received: " + req);
+            //printBody(req);
             h.accept(replyOk.retain());
         });
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
@@ -29,9 +29,9 @@ public class P2pHttpChatTest {
                 .addProtocol(node1Http);
         Host node1 = builder1.build();
         HttpProtocol.Binding node2Http = new HttpProtocol.Binding((s, req, h) -> {
-            System.out.println("Node 2 received: " + req);
-            printBody(req);
-            h.accept(replyOk);
+            //System.out.println("Node 2 received: " + req);
+            //printBody(req);
+            h.accept(replyOk.retain());
         });
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
@@ -53,9 +53,9 @@ public class P2pHttpChatTest {
                 HttpProtocol.HttpController proxier1 = node1Http.dial(node1, address2)
                         .getController().join();
                 long t1 = System.currentTimeMillis();
-                proxier1.send(httpRequest.retain()).join();
+                proxier1.send(httpRequest.retain()).join().release();
                 long t2 = System.currentTimeMillis();
-                System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
+                //System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
                 totalDuration += t2 - t1;
 
                 byte[] msg2 = "G'day node1! I'm node2.".getBytes();
@@ -64,9 +64,9 @@ public class P2pHttpChatTest {
                 HttpProtocol.HttpController proxier2 = node2Http.dial(node2, address1)
                         .getController().join();
                 long t3 = System.currentTimeMillis();
-                proxier2.send(httpRequest2.retain()).join();
+                proxier2.send(httpRequest2.retain()).join().release();
                 long t4 = System.currentTimeMillis();
-                System.out.println("P2P HTTP request took " + (t4 - t3) + "ms");
+                //System.out.println("P2P HTTP request took " + (t4 - t3) + "ms");
                 totalDuration += t4 - t3;
             }
             System.out.println("Average: " + (totalDuration / (count * 2)));
