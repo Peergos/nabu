@@ -68,7 +68,9 @@ public class HttpProxyService {
         for (Map.Entry<String, String> entry: resp.headers().entries()) {
             headers.put(entry.getKey(), entry.getValue());
         }
-        return new ProxyResponse(bout.toByteArray(), headers, resp.status().code());
+        int code = resp.status().code();
+        resp.release();
+        return new ProxyResponse(bout.toByteArray(), headers, code);
     }
     private String constructQueryParamString(Map<String, List<String>> queryParams) {
         StringBuilder sb = new StringBuilder();

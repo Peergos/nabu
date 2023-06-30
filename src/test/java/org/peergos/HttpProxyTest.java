@@ -52,7 +52,7 @@ public class HttpProxyTest {
                     .getController().join();
             FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
             long totalTime = 0;
-            int count = 200;
+            int count = 2000;
             for (int i = 0; i < count; i++) {
                 long t1 = System.currentTimeMillis();
                 FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
