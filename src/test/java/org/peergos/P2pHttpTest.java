@@ -36,7 +36,7 @@ public class P2pHttpTest {
             emptyReply.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
             h.accept(emptyReply.retain());
         });
-        HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
+        HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
         builder1 = builder1.addProtocol(node1Http);
         Host node1 = builder1.build();
@@ -52,7 +52,7 @@ public class P2pHttpTest {
         String urlParamValue = "hello";
         String urlParam = "?" + urlParamKey + "=" + urlParamValue + "";
         RamBlockstore blockstore2 = new RamBlockstore();
-        int localPort = 8321;
+        int localPort = TestPorts.getPort();
 
         HttpProtocol.Binding node2Http = new HttpProtocol.Binding((s, req, h) -> {
             System.out.println("Node 2 received: " + req);
@@ -78,7 +78,7 @@ public class P2pHttpTest {
                 Assert.assertTrue("Unexpected exception: " + ioe.toString(), false);
             }
         });
-        HostBuilder builder2 = HostBuilder.create(10000 + new Random().nextInt(50000),
+        HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
                 new RamProviderStore(), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         builder2 = builder2.addProtocol(node2Http);
         Host node2 = builder2.build();
