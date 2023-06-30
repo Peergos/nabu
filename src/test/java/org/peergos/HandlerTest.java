@@ -39,7 +39,7 @@ public class HandlerTest {
     public void codecTest() {
         HttpServer apiServer = null;
         try {
-            MultiAddress apiAddress = new MultiAddress("/ip4/127.0.0.1/tcp/8456");
+            MultiAddress apiAddress = new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort());
             InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
             apiServer = HttpServer.create(localAPIAddress, 500);

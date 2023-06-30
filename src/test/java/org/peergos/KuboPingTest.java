@@ -20,7 +20,7 @@ public class KuboPingTest {
     public void runPingOverYamux() throws IOException {
         Host node1 = new HostBuilder()
                 .generateIdentity()
-                .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + 11001)))
+                .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + TestPorts.getPort())))
                 .addProtocols(List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true)))))
                 .addMuxers(List.of(StreamMuxerProtocol.getYamux()))
                 .build();

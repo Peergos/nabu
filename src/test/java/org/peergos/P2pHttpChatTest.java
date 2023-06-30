@@ -24,7 +24,7 @@ public class P2pHttpChatTest {
             printBody(req);
             h.accept(replyOk.retain());
         });
-        HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
+        HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
                 new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
                 .addProtocol(node1Http);
         Host node1 = builder1.build();
@@ -33,7 +33,7 @@ public class P2pHttpChatTest {
             printBody(req);
             h.accept(replyOk);
         });
-        HostBuilder builder2 = HostBuilder.create(10000 + new Random().nextInt(50000),
+        HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
                 .addProtocol(node2Http);
         Host node2 = builder2.build();
