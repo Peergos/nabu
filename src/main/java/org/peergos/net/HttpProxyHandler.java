@@ -12,20 +12,29 @@ import java.io.*;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class HttpProxyHandler extends Handler {
-	private static final Logger LOG = Logging.LOG();
+    private static final Logger LOG = Logging.LOG();
 
     private static final boolean LOGGING = true;
 
     private final HttpProxyService service;
+    private final Function<String, Multihash> peerIdToMultiHashConverter;
 
     private static final String HTTP_REQUEST = "/http/";
+    private static final Function<String, Multihash> defaultPeerIdToMultiHashConverter = (peerIdStr) ->
+         Multihash.deserialize(PeerId.fromBase58(peerIdStr).getBytes());
 
     public HttpProxyHandler(HttpProxyService service) {
+        this(service, defaultPeerIdToMultiHashConverter);
+    }
+
+    public HttpProxyHandler(HttpProxyService service, Function<String, Multihash> peerIdToMultiHashConverter) {
         this.service = service;
+        this.peerIdToMultiHashConverter = peerIdToMultiHashConverter;
     }
 
 
@@ -41,7 +50,8 @@ public class HttpProxyHandler extends Handler {
                     throw new IllegalStateException("Expecting p2p request to include path in url");
                 }
                 String peerId = path.substring(0, streamPathIndex);
-                Multihash targetNodeId = Multihash.deserialize(PeerId.fromBase58(peerId).getBytes());
+                //Multihash targetNodeId = Multihash.deserialize(PeerId.fromBase58(peerId).getBytes());
+                Multihash targetNodeId = peerIdToMultiHashConverter.apply(peerId);
                 String targetPath = path.substring(streamPathIndex);
                 if (!targetPath.startsWith(HTTP_REQUEST)) {
                     throw new IllegalStateException("Expecting path to be a http request");

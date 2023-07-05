@@ -48,7 +48,10 @@ public class HttpProxyService {
             Multiaddr[] addrs = peer.getPublicAddresses().stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
             targetAddressesOpt = Optional.of(addrs[0]);
         }
-        HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, targetAddressesOpt.get()).getController().join();
+        Multiaddr finalAddress = targetAddressesOpt.get().toString().contains("/ipfs/") ? targetAddressesOpt.get()
+                : new Multiaddr(targetAddressesOpt.get() + "/ipfs/" + targetNodeId);
+
+        HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, finalAddress).getController().join();
         String urlParams = constructQueryParamString(request.queryParams);
         FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1,
                 HttpMethod.valueOf(request.method.name()),
