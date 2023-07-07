@@ -41,11 +41,15 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
 
         @Override
-        public void onMessage(@NotNull Stream stream, FullHttpResponse msg) {
-            queue.poll().complete(msg.copy());
+        public synchronized void onMessage(@NotNull Stream stream, FullHttpResponse msg) {
+            CompletableFuture<FullHttpResponse> req = queue.poll();
+            if (req != null)
+                req.complete(msg.copy());
+            else
+                msg.release();
         }
 
-        public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
+        public synchronized CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
             CompletableFuture<FullHttpResponse> res = new CompletableFuture<>();
             queue.add(res);
             req.headers().set(HttpHeaderNames.HOST, stream.remotePeerId());
@@ -99,16 +103,20 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     public static void proxyRequest(HttpRequest msg,
                                     SocketAddress proxyTarget,
                                     Consumer<HttpObject> replyHandler) {
-        Bootstrap b = new Bootstrap();
-        b.group(pool)
+        Bootstrap b = new Bootstrap()
+                .group(pool)
                 .channel(NioSocketChannel.class)
-                .handler(new LoggingHandler(LogLevel.TRACE));
+                .handler(new ChannelInitializer<>() {
+                    @Override
+                    protected void initChannel(Channel ch) throws Exception {
+                        ch.pipeline().addLast(new HttpRequestEncoder());
+                        ch.pipeline().addLast(new HttpResponseDecoder());
+                        ch.pipeline().addLast(new ResponseWriter(replyHandler));
+                    }
+                });
 
         ChannelFuture fut = b.connect(proxyTarget);
         Channel ch = fut.channel();
-        ch.pipeline().addLast(new HttpRequestEncoder());
-        ch.pipeline().addLast(new HttpResponseDecoder());
-        ch.pipeline().addLast(new ResponseWriter(replyHandler));
 
         HttpRequest retained = retain(msg);
         fut.addListener(x -> ch.writeAndFlush(retained));
@@ -120,7 +128,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         return req;
     }
 
-    private static final int TRAFFIC_LIMIT = 2*1024*1024;
+    private static final long TRAFFIC_LIMIT = Long.MAX_VALUE; // This is the total inbound or outbound traffic allowed, not a rate
     private final HttpRequestProcessor handler;
 
     public HttpProtocol(HttpRequestProcessor handler) {

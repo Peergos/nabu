@@ -39,7 +39,7 @@ public class HttpProxyTest {
             ex.sendResponseHeaders(200, httpReply.length);
             ex.getResponseBody().write(httpReply);
             ex.getResponseBody().close();
-            System.out.println("Target http server responded");
+            //System.out.println("Target http server responded");
         });
         localhostServer.setExecutor(Executors.newSingleThreadExecutor());
         localhostServer.start();
@@ -56,11 +56,12 @@ public class HttpProxyTest {
                 long t1 = System.currentTimeMillis();
                 FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
                 long t2 = System.currentTimeMillis();
-                System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
+                System.out.println(i + ": P2P HTTP request took " + (t2 - t1) + "ms");
                 totalTime += t2 - t1;
 
                 ByteArrayOutputStream bout = new ByteArrayOutputStream();
                 resp.content().readBytes(bout, resp.headers().getInt("content-length"));
+                resp.release();
                 byte[] replyBody = bout.toByteArray();
                 if (!Arrays.equals(replyBody, httpReply))
                     throw new IllegalStateException("Different http response!");
