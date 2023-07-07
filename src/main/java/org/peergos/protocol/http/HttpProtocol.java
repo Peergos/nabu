@@ -41,7 +41,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
 
         @Override
-        public synchronized void onMessage(@NotNull Stream stream, FullHttpResponse msg) {
+        public void onMessage(@NotNull Stream stream, FullHttpResponse msg) {
             CompletableFuture<FullHttpResponse> req = queue.poll();
             if (req != null)
                 req.complete(msg.copy());
@@ -49,7 +49,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                 msg.release();
         }
 
-        public synchronized CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
+        public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
             CompletableFuture<FullHttpResponse> res = new CompletableFuture<>();
             queue.add(res);
             req.headers().set(HttpHeaderNames.HOST, stream.remotePeerId());
@@ -95,7 +95,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Cannot send form a receiver!"));
+            return CompletableFuture.failedFuture(new IllegalStateException("Cannot send from a receiver!"));
         }
     }
 
@@ -111,6 +111,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                     protected void initChannel(Channel ch) throws Exception {
                         ch.pipeline().addLast(new HttpRequestEncoder());
                         ch.pipeline().addLast(new HttpResponseDecoder());
+                        ch.pipeline().addLast(new HttpObjectAggregator(2*1024*1024));
                         ch.pipeline().addLast(new ResponseWriter(replyHandler));
                     }
                 });
@@ -153,6 +154,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         stream.pushHandler(new HttpResponseDecoder());
         stream.pushHandler(new HttpObjectAggregator(1024*1024));
         stream.pushHandler(replyPropagator);
+        stream.pushHandler(new LoggingHandler(LogLevel.TRACE));
         return CompletableFuture.completedFuture(replyPropagator);
     }
 
