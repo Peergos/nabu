@@ -45,8 +45,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             CompletableFuture<FullHttpResponse> req = queue.poll();
             if (req != null)
                 req.complete(msg.copy());
-            else
-                msg.release();
+            msg.release();
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
@@ -58,21 +57,21 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
     }
 
-    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpObject> {
-        private final Consumer<HttpObject> replyProcessor;
+    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpContent> {
+        private final Consumer<HttpContent> replyProcessor;
 
-        public ResponseWriter(Consumer<HttpObject> replyProcessor) {
+        public ResponseWriter(Consumer<HttpContent> replyProcessor) {
             this.replyProcessor = replyProcessor;
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) {
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpContent reply) {
             replyProcessor.accept(reply);
         }
     }
 
     public interface HttpRequestProcessor {
-        void handle(Stream stream, HttpRequest msg, Consumer<HttpObject> replyHandler);
+        void handle(Stream stream, HttpRequest msg, Consumer<HttpContent> replyHandler);
     }
 
     public static class Receiver implements ProtocolMessageHandler<HttpRequest>, HttpController {
@@ -82,11 +81,8 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             this.requestHandler = requestHandler;
         }
 
-        private void sendReply(HttpObject reply, Stream p2pstream) {
-            if (reply instanceof HttpContent)
-                p2pstream.writeAndFlush(((HttpContent) reply).retain());
-            else
-                p2pstream.writeAndFlush(reply);
+        private void sendReply(HttpContent reply, Stream p2pstream) {
+            p2pstream.writeAndFlush(reply.copy());
         }
 
         @Override
@@ -102,7 +98,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     private static final NioEventLoopGroup pool = new NioEventLoopGroup();
     public static void proxyRequest(HttpRequest msg,
                                     SocketAddress proxyTarget,
-                                    Consumer<HttpObject> replyHandler) {
+                                    Consumer<HttpContent> replyHandler) {
         Bootstrap b = new Bootstrap()
                 .group(pool)
                 .channel(NioSocketChannel.class)
