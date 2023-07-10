@@ -71,10 +71,10 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     }
 
     public interface HttpRequestProcessor {
-        void handle(Stream stream, HttpRequest msg, Consumer<HttpContent> replyHandler);
+        void handle(Stream stream, FullHttpRequest msg, Consumer<HttpContent> replyHandler);
     }
 
-    public static class Receiver implements ProtocolMessageHandler<HttpRequest>, HttpController {
+    public static class Receiver implements ProtocolMessageHandler<FullHttpRequest>, HttpController {
         private final HttpRequestProcessor requestHandler;
 
         public Receiver(HttpRequestProcessor requestHandler) {
@@ -86,7 +86,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
 
         @Override
-        public void onMessage(@NotNull Stream stream, HttpRequest msg) {
+        public void onMessage(@NotNull Stream stream, FullHttpRequest msg) {
             requestHandler.handle(stream, msg, reply -> sendReply(reply, stream));
         }
 
@@ -96,7 +96,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     }
 
     private static final NioEventLoopGroup pool = new NioEventLoopGroup();
-    public static void proxyRequest(HttpRequest msg,
+    public static void proxyRequest(FullHttpRequest msg,
                                     SocketAddress proxyTarget,
                                     Consumer<HttpContent> replyHandler) {
         Bootstrap b = new Bootstrap()
@@ -115,14 +115,8 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         ChannelFuture fut = b.connect(proxyTarget);
         Channel ch = fut.channel();
 
-        HttpRequest retained = retain(msg);
+        FullHttpRequest retained = msg.retain();
         fut.addListener(x -> ch.writeAndFlush(retained));
-    }
-
-    private static HttpRequest retain(HttpRequest req) {
-        if (req instanceof FullHttpRequest)
-            return ((FullHttpRequest) req).retain();
-        return req;
     }
 
     private static final long TRAFFIC_LIMIT = Long.MAX_VALUE; // This is the total inbound or outbound traffic allowed, not a rate
@@ -133,7 +127,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         this.handler = (s, req, replyHandler) -> handler.handle(s, setHost(req, s), replyHandler);
     }
 
-    public static HttpRequest setHost(HttpRequest req, Stream source) {
+    public static FullHttpRequest setHost(FullHttpRequest req, Stream source) {
         req.headers().set(HttpHeaderNames.HOST,source.remotePeerId().toBase58());
         return req;
     }
