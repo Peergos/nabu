@@ -33,13 +33,14 @@ public class HttpProxyTest {
         node2.start().join();
 
         // start local server with fixed HTTP response
-        byte[] httpReply = "G'day from Java P2P HTTP proxy!".getBytes(StandardCharsets.UTF_8);
+        byte[] httpReply = new byte[577*1024];
+        new Random(42).nextBytes(httpReply);
         HttpServer localhostServer = HttpServer.create(proxyTarget, 20);
         localhostServer.createContext("/", ex -> {
             ex.sendResponseHeaders(200, httpReply.length);
             ex.getResponseBody().write(httpReply);
             ex.getResponseBody().close();
-            System.out.println("Target http server responded");
+            //System.out.println("Target http server responded");
         });
         localhostServer.setExecutor(Executors.newSingleThreadExecutor());
         localhostServer.start();
@@ -56,19 +57,33 @@ public class HttpProxyTest {
                 long t1 = System.currentTimeMillis();
                 FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
                 long t2 = System.currentTimeMillis();
-                System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
+                System.out.println(i + ": P2P HTTP request took " + (t2 - t1) + "ms");
                 totalTime += t2 - t1;
 
                 ByteArrayOutputStream bout = new ByteArrayOutputStream();
                 resp.content().readBytes(bout, resp.headers().getInt("content-length"));
+                resp.release();
                 byte[] replyBody = bout.toByteArray();
-                if (!Arrays.equals(replyBody, httpReply))
-                    throw new IllegalStateException("Different http response!");
+                equal(replyBody, httpReply);
             }
             System.out.println("Average: " + totalTime / count);
         } finally {
             node1.stop();
             node2.stop();
         }
+    }
+
+    private static void equal(byte[] a, byte[] b) {
+        if (a.length != b.length)
+            throw new IllegalStateException("different lengths!");
+        for (int i = 0; i < a.length; i++)
+            if (a[i] != b[i]) {
+                byte[] diff = Arrays.copyOfRange(a, i, i + 24);
+                int j=0;
+                for (;j < b.length-2;j++)
+                    if (b[j] == diff[0] && b[j+1] == diff[1]&& b[j+2] == diff[2])
+                        break;
+                throw new IllegalStateException("bytes differ at " + i + " " + a[i] + " != " + b[i]);
+            }
     }
 }
