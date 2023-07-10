@@ -265,7 +265,12 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         List<PeerAddresses> closestPeers = findClosestPeers(block, 20, us);
         List<CompletableFuture<Boolean>> provides = closestPeers.stream()
                 .parallel()
-                .map(p -> dialPeer(p, us).join().provide(block, ourAddrs))
+                .map(p -> dialPeer(p, us)
+                        .thenCompose(contr -> contr.provide(block, ourAddrs))
+                        .exceptionally(t -> {
+                            LOG.log(Level.FINE, t, t::getMessage);
+                            return true;
+                        }))
                 .collect(Collectors.toList());
         return CompletableFuture.allOf(provides.toArray(new CompletableFuture[0]));
     }
