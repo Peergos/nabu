@@ -62,6 +62,7 @@ public class HttpProxyHandler extends Handler {
                 }
                 httpExchange.sendResponseHeaders(response.statusCode, response.body.length);
                 httpExchange.getResponseBody().write(response.body);
+                httpExchange.getResponseBody().flush();
             } else {
                 throw new IllegalStateException("Unsupported request");
             }
