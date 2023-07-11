@@ -8,7 +8,6 @@ import io.netty.channel.*;
 import io.netty.channel.nio.*;
 import io.netty.channel.socket.nio.*;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.logging.*;
 import org.jetbrains.annotations.*;
 
@@ -17,6 +16,7 @@ import java.util.concurrent.*;
 import java.util.function.*;
 
 public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
+    private static final int MAX_BODY_SIZE = 2 * 1024 * 1024; // TODO remove this and make it fully streaming
 
     public static class Binding extends StrictProtocolBinding<HttpController> {
         public Binding(SocketAddress proxyTarget) {
@@ -107,7 +107,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                     protected void initChannel(Channel ch) throws Exception {
                         ch.pipeline().addLast(new HttpRequestEncoder());
                         ch.pipeline().addLast(new HttpResponseDecoder());
-                        ch.pipeline().addLast(new HttpObjectAggregator(2*1024*1024));
+                        ch.pipeline().addLast(new HttpObjectAggregator(MAX_BODY_SIZE));
                         ch.pipeline().addLast(new ResponseWriter(replyHandler));
                     }
                 });
@@ -142,7 +142,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         Sender replyPropagator = new Sender(stream);
         stream.pushHandler(new HttpRequestEncoder());
         stream.pushHandler(new HttpResponseDecoder());
-        stream.pushHandler(new HttpObjectAggregator(1024*1024));
+        stream.pushHandler(new HttpObjectAggregator(MAX_BODY_SIZE));
         stream.pushHandler(replyPropagator);
         stream.pushHandler(new LoggingHandler(LogLevel.TRACE));
         return CompletableFuture.completedFuture(replyPropagator);
@@ -153,7 +153,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     protected CompletableFuture<HttpController> onStartResponder(@NotNull Stream stream) {
         Receiver proxier = new Receiver(handler);
         stream.pushHandler(new HttpRequestDecoder());
-        stream.pushHandler(new HttpObjectAggregator(2*1024*1024));
+        stream.pushHandler(new HttpObjectAggregator(MAX_BODY_SIZE));
         stream.pushHandler(proxier);
         stream.pushHandler(new HttpResponseEncoder());
         return CompletableFuture.completedFuture(proxier);
