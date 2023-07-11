@@ -33,19 +33,22 @@ public class KademliaEngine {
         this.addressBook = addrs;
     }
 
-    public void addOutgoingConnection(PeerId peer, Multiaddr addr) {
+    public synchronized void addOutgoingConnection(PeerId peer, Multiaddr addr) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
         addressBook.addAddrs(peer, 0, addr);
     }
 
-    public void addIncomingConnection(PeerId peer, Multiaddr addr) {
+    public synchronized void addIncomingConnection(PeerId peer, Multiaddr addr) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
         addressBook.addAddrs(peer, 0, addr);
     }
 
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
         int k = 20;
-        List<Node> nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
+        List<Node> nodes;
+        synchronized (this) {
+            nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
+        }
         System.out.println("Nodes: " + nodes.size());
         return nodes.stream()
                 .map(n -> {
