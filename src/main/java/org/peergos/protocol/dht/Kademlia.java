@@ -257,7 +257,9 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     }
 
     private CompletableFuture<? extends KademliaController> dialPeer(PeerAddresses target, Host us) {
-        Multiaddr[] multiaddrs = getPublic(target);
+        Multiaddr[] multiaddrs = target.addresses.stream()
+                .map(a -> Multiaddr.fromString(a.toString()))
+                .collect(Collectors.toList()).toArray(new Multiaddr[0]);
         return dial(us, PeerId.fromBase58(target.peerId.toBase58()), multiaddrs).getController();
     }
 
