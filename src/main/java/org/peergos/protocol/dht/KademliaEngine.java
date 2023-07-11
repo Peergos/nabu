@@ -109,12 +109,14 @@ public class KademliaEngine {
             case GET_PROVIDERS: {
                 Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
                 Set<PeerAddresses> providers = providersStore.getProviders(hash);
-                if (blocks.hasAny(hash).join())
+                if (blocks.hasAny(hash).join()) {
+                    providers = new HashSet<>(providers);
                     providers.add(new PeerAddresses(ourPeerId, addressBook.getAddrs(PeerId.fromBase58(ourPeerId.toBase58()))
                             .join()
                             .stream()
                             .map(a -> new MultiAddress(a.toString()))
                             .collect(Collectors.toList())));
+                }
                 Dht.Message.Builder builder = msg.toBuilder();
                 builder = builder.addAllProviderPeers(providers.stream()
                         .map(PeerAddresses::toProtobuf)
