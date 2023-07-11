@@ -9,6 +9,7 @@ import io.libp2p.core.*;
 import io.libp2p.core.Stream;
 import io.libp2p.core.multiformats.*;
 import org.peergos.*;
+import org.peergos.blockstore.*;
 import org.peergos.protocol.dht.pb.*;
 import org.peergos.protocol.ipns.*;
 
@@ -22,11 +23,15 @@ public class KademliaEngine {
     private final RecordStore ipnsStore;
     public final Router router;
     private AddressBook addressBook;
+    private final Multihash ourPeerId;
+    private final Blockstore blocks;
 
-    public KademliaEngine(Multihash ourPeerId, ProviderStore providersStore, RecordStore ipnsStore) {
+    public KademliaEngine(Multihash ourPeerId, ProviderStore providersStore, RecordStore ipnsStore, Blockstore blocks) {
         this.providersStore = providersStore;
         this.ipnsStore = ipnsStore;
+        this.ourPeerId = ourPeerId;
         this.router = new Router(Id.create(ourPeerId.bareMultihash().toBytes(), 256), 2, 2, 2);
+        this.blocks = blocks;
     }
 
     public void setAddressBook(AddressBook addrs) {
@@ -104,6 +109,12 @@ public class KademliaEngine {
             case GET_PROVIDERS: {
                 Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
                 Set<PeerAddresses> providers = providersStore.getProviders(hash);
+                if (blocks.hasAny(hash).join())
+                    providers.add(new PeerAddresses(ourPeerId, addressBook.getAddrs(PeerId.fromBase58(ourPeerId.toBase58()))
+                            .join()
+                            .stream()
+                            .map(a -> new MultiAddress(a.toString()))
+                            .collect(Collectors.toList())));
                 Dht.Message.Builder builder = msg.toBuilder();
                 builder = builder.addAllProviderPeers(providers.stream()
                         .map(PeerAddresses::toProtobuf)

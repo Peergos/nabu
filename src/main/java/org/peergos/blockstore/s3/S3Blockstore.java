@@ -20,6 +20,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.*;
 
 public class S3Blockstore implements Blockstore {
 
@@ -162,6 +163,12 @@ public class S3Blockstore implements Blockstore {
     @Override
     public CompletableFuture<Boolean> has(Cid cid) {
             return getWithBackoff(() -> getSizeWithoutRetry(cid)).thenApply(optSize -> optSize.isPresent());
+    }
+
+    @Override
+    public CompletableFuture<Boolean> hasAny(Multihash h) {
+        return Futures.of(Stream.of(Cid.Codec.DagCbor, Cid.Codec.Raw, Cid.Codec.DagProtobuf)
+                .anyMatch(c -> has(new Cid(1, c, h.getType(), h.getHash())).join()));
     }
 
     private CompletableFuture<Optional<Integer>> getSizeWithoutRetry(Cid cid) {

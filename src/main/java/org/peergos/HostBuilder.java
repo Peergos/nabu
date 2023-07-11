@@ -112,7 +112,7 @@ public class HostBuilder {
                 .generateIdentity()
                 .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)));
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blocks), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
         return builder.addProtocols(List.of(

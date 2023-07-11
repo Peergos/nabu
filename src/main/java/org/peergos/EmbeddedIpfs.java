@@ -131,7 +131,7 @@ public class EmbeddedIpfs {
         }
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
 
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blockstore), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         Bitswap bitswap = new Bitswap(new BitswapEngine(blockstore, authoriser));
