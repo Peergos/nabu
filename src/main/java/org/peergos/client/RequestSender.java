@@ -23,14 +23,16 @@ public class RequestSender {
     public static FullHttpResponse proxy(MultiAddress proxyTargetAddress, FullHttpRequest request) throws IOException {
         HttpMethod method = request.method();
         String uri = request.uri();
-        ByteBuf content = request.content();
+        ByteArrayOutputStream bout = new ByteArrayOutputStream();
+        int contentLength = request.headers().getInt("content-length");
+        request.content().readBytes(bout, contentLength);
         HttpHeaders headers = request.headers();
         Map<String, String> reqHeaders = new HashMap<>();
         for(Map.Entry<String, String> entry : headers.entries()) {
             reqHeaders.put(entry.getKey(), entry.getValue());
         }
         URL target = new URL("http", proxyTargetAddress.getHost(), proxyTargetAddress.getPort(), uri);
-        Response reply = send(target, method.name(), content.array(), reqHeaders);
+        Response reply = send(target, method.name(), bout.toByteArray(), reqHeaders);
 
         FullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(reply.statusCode),
                 reply.body.length > 0 ?
