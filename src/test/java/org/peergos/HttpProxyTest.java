@@ -36,7 +36,10 @@ public class HttpProxyTest {
         byte[] httpReply = new byte[1024*1024];
         new Random(42).nextBytes(httpReply);
         HttpServer localhostServer = HttpServer.create(proxyTarget, 20);
+        String headerName = "Random-Header";
+        String headerValue = "bananas";
         localhostServer.createContext("/", ex -> {
+            ex.getResponseHeaders().set(headerName, headerValue);
             ex.sendResponseHeaders(200, httpReply.length);
             ex.getResponseBody().write(httpReply);
             ex.getResponseBody().close();
@@ -62,6 +65,7 @@ public class HttpProxyTest {
 
                 ByteArrayOutputStream bout = new ByteArrayOutputStream();
                 resp.content().readBytes(bout, resp.headers().getInt("content-length"));
+                Assert.assertTrue(resp.headers().get(headerName).equals(headerValue));
                 resp.release();
                 byte[] replyBody = bout.toByteArray();
                 equal(replyBody, httpReply);
