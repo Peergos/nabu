@@ -70,7 +70,10 @@ public class HttpProxyService {
         resp.content().readBytes(bout, contentLength);
         Map<String, String> headers = new HashMap<>();
         for (Map.Entry<String, String> entry: resp.headers().entries()) {
-            headers.put(entry.getKey(), entry.getValue());
+            String key = entry.getKey();
+            if (key != null) {
+                headers.put(key, entry.getValue());
+            }
         }
         int code = resp.status().code();
         resp.release();

@@ -58,7 +58,7 @@ public class HttpProxyHandler extends Handler {
                 ProxyResponse response = service.proxyRequest(targetNodeId, request);
                 Headers reponseHeaders = httpExchange.getResponseHeaders();
                 for (Map.Entry<String, String> entry : response.headers.entrySet()) {
-                    reponseHeaders.replace(entry.getKey(), List.of(entry.getValue()));
+                    reponseHeaders.set(entry.getKey(), entry.getValue());
                 }
                 httpExchange.sendResponseHeaders(response.statusCode, response.body.length);
                 httpExchange.getResponseBody().write(response.body);

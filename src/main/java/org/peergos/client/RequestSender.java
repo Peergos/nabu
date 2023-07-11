@@ -13,6 +13,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,15 +35,22 @@ public class RequestSender {
         FullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(reply.statusCode),
                 reply.body.length > 0 ?
                         Unpooled.wrappedBuffer(reply.body) : Unpooled.buffer(0));
-        httpResponse.headers().set(HttpHeaderNames.CONTENT_LENGTH, reply.body.length);
+        for (Map.Entry<String, List<String>> entry : reply.responseHeaders.entrySet()) {
+            String key = entry.getKey();
+            if (key != null) {
+                httpResponse.headers().set(key, entry.getValue());
+            }
+        }
         return httpResponse;
     }
     public static class Response {
         public final byte[] body;
+        public final Map<String, List<String>> responseHeaders;
         public final int statusCode;
 
-        public Response(byte[] body, int statusCode) {
+        public Response(byte[] body, Map<String, List<String>> responseHeaders, int statusCode) {
             this.body = body;
+            this.responseHeaders = responseHeaders;
             this.statusCode = statusCode;
         }
     }
@@ -65,6 +73,7 @@ public class RequestSender {
         int r;
         while ((r = in.read(buf)) >= 0)
             resp.write(buf, 0, r);
-        return new Response(resp.toByteArray(), conn.getResponseCode());
+        Map<String, List<String>> map = Collections.unmodifiableMap(conn.getHeaderFields());
+        return new Response(resp.toByteArray(), map, conn.getResponseCode());
     }
 }
