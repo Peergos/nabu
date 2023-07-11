@@ -2,17 +2,15 @@ package org.peergos.net;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
+import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
-import io.libp2p.core.PeerId;
 import org.peergos.*;
 import org.peergos.util.HttpUtil;
 import org.peergos.util.Logging;
 
-import java.io.*;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -22,21 +20,12 @@ public class HttpProxyHandler extends Handler {
     private static final boolean LOGGING = true;
 
     private final HttpProxyService service;
-    private final Function<String, Multihash> peerIdToMultiHashConverter;
 
     private static final String HTTP_REQUEST = "/http/";
-    private static final Function<String, Multihash> defaultPeerIdToMultiHashConverter = (peerIdStr) ->
-         Multihash.deserialize(PeerId.fromBase58(peerIdStr).getBytes());
 
     public HttpProxyHandler(HttpProxyService service) {
-        this(service, defaultPeerIdToMultiHashConverter);
-    }
-
-    public HttpProxyHandler(HttpProxyService service, Function<String, Multihash> peerIdToMultiHashConverter) {
         this.service = service;
-        this.peerIdToMultiHashConverter = peerIdToMultiHashConverter;
     }
-
 
     public void handleCallToAPI(HttpExchange httpExchange) {
         long t1 = System.currentTimeMillis();
@@ -51,7 +40,7 @@ public class HttpProxyHandler extends Handler {
                 }
                 String peerId = path.substring(0, streamPathIndex);
                 //Multihash targetNodeId = Multihash.deserialize(PeerId.fromBase58(peerId).getBytes());
-                Multihash targetNodeId = peerIdToMultiHashConverter.apply(peerId);
+                Multihash targetNodeId = Cid.decode(peerId);
                 String targetPath = path.substring(streamPathIndex);
                 if (!targetPath.startsWith(HTTP_REQUEST)) {
                     throw new IllegalStateException("Expecting path to be a http request");

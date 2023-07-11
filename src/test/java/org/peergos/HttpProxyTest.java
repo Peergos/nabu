@@ -1,6 +1,7 @@
 package org.peergos;
 
 import com.sun.net.httpserver.*;
+import io.ipfs.cid.Cid;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.netty.handler.codec.http.*;
@@ -16,6 +17,13 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class HttpProxyTest {
+
+    @Test
+    public void peerid() {
+        String peerS = "z5AanNVJCxnFLuYe3Zz35BKv1noBKLToJexw29wQ8cXunqmoDi2sjRB";
+        Cid decoded = Cid.decode(peerS);
+        System.out.println(decoded);
+    }
 
     @Test
     public void p2pProxyRequest() throws IOException {

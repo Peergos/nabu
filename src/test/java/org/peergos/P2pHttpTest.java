@@ -1,7 +1,9 @@
 package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
+import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.Host;
 import io.libp2p.core.PeerId;
 import io.libp2p.core.multiformats.Multiaddr;
@@ -86,7 +88,8 @@ public class P2pHttpTest {
 
         Multiaddr node2Address = node2.listenAddresses().get(0);
         PeerId peerId2 = node2Address.getPeerId();
-
+        Multihash multihash2 = Multihash.fromBase58(peerId2.toBase58());
+        Cid peerAsCid = new Cid(1, Cid.Codec.Libp2pKey, multihash2.getType(), multihash2.getHash());
         node1.getAddressBook().setAddrs(peerId2, 0, node2Address).join();
 
         HttpServer apiServer1 = null;
@@ -118,7 +121,7 @@ public class P2pHttpTest {
             server2.start();
 
             URL target = new URL("http", "localhost", port,
-                    "/p2p/" + peerId2.toBase58() + "/http/message" + urlParam);
+                    "/p2p/" + peerAsCid + "/http/message" + urlParam);
             RequestSender.Response reply = RequestSender.send(target, "POST", requestBody.getBytes(), requestHeaders);
             Assert.assertTrue("reply", responseText.equals(new String(reply.body)));
         } catch (IOException ioe) {
