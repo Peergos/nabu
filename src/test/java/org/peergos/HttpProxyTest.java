@@ -33,7 +33,7 @@ public class HttpProxyTest {
         node2.start().join();
 
         // start local server with fixed HTTP response
-        byte[] httpReply = new byte[577*1024];
+        byte[] httpReply = new byte[1024*1024];
         new Random(42).nextBytes(httpReply);
         HttpServer localhostServer = HttpServer.create(proxyTarget, 20);
         localhostServer.createContext("/", ex -> {
