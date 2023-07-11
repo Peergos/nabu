@@ -183,6 +183,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         byte[] key = block.bareMultihash().toBytes();
         Id keyId = Id.create(key, 256);
         List<PeerAddresses> providers = new ArrayList<>();
+        providers.addAll(engine.getProviders(block));
 
         SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> b.key.getSharedPrefixLength(keyId) - a.key.getSharedPrefixLength(keyId));
         toQuery.addAll(engine.getKClosestPeers(key).stream()

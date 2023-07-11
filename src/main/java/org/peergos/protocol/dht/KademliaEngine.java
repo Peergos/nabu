@@ -43,6 +43,10 @@ public class KademliaEngine {
         addressBook.addAddrs(peer, 0, addr);
     }
 
+    public Set<PeerAddresses> getProviders(Multihash h) {
+        return providersStore.getProviders(h);
+    }
+
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
         int k = 20;
         List<Node> nodes;
