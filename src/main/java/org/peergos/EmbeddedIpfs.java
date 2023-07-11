@@ -47,7 +47,7 @@ public class EmbeddedIpfs {
         this.bitswap = bitswap;
         this.p2pHttp = p2pHttp;
         this.bootstrap = bootstrap;
-        this.blocks = new BitswapBlockService(node, bitswap);
+        this.blocks = new BitswapBlockService(node, bitswap, dht);
     }
 
     public List<HashedBlock> getBlocks(List<Want> wants, Set<PeerId> peers, boolean addToLocal) {
