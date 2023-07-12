@@ -150,7 +150,7 @@ public class BitswapEngine {
             }
         }
 
-        LOG.info("Bitswap received " + msg.getWantlist().getEntriesCount() + " wants, " + msg.getPayloadCount() +
+        LOG.fine("Bitswap received " + msg.getWantlist().getEntriesCount() + " wants, " + msg.getPayloadCount() +
                 " blocks and " + msg.getBlockPresencesCount() + " presences from " + sourcePeerId);
         for (MessageOuterClass.Message.Block block : msg.getPayloadList()) {
             byte[] cidPrefix = block.getPrefix().toByteArray();
@@ -186,7 +186,7 @@ public class BitswapEngine {
             }
         }
         if (! localWants.isEmpty())
-            LOG.info("Remaining: " + localWants.size());
+            LOG.fine("Remaining: " + localWants.size());
         for (MessageOuterClass.Message.BlockPresence blockPresence : msg.getBlockPresencesList()) {
             Cid c = Cid.cast(blockPresence.getCid().toByteArray());
             Optional<String> auth = blockPresence.getAuth().isEmpty() ?
