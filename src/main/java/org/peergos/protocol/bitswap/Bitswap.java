@@ -1,7 +1,6 @@
 package org.peergos.protocol.bitswap;
 
 import com.google.protobuf.*;
-import io.ipfs.cid.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
@@ -75,7 +74,7 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
                                 MessageOuterClass.Message.Wantlist.WantType.Block :
                                 MessageOuterClass.Message.Wantlist.WantType.Have)
                         .setBlock(ByteString.copyFrom(want.cid.toBytes()))
-                        .setAuth(ByteString.copyFrom(ArrayOps.hexToBytes(want.auth.orElse(""))))
+                        .setAuth(ByteString.copyFrom(ArrayOps.hexToBytes(want.authHex.orElse(""))))
                         .build())
                 .collect(Collectors.toList());
         engine.buildAndSendMessages(wantsProto, Collections.emptyList(), Collections.emptyList(),
