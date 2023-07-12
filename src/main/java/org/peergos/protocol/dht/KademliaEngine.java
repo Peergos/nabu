@@ -58,7 +58,6 @@ public class KademliaEngine {
         synchronized (this) {
             nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
         }
-        System.out.println("Nodes: " + nodes.size());
         return nodes.stream()
                 .map(n -> {
                     List<MultiAddress> addrs = addressBook.getAddrs(PeerId.fromBase58(n.getLink())).join()
@@ -71,7 +70,6 @@ public class KademliaEngine {
     }
 
     public void receiveRequest(Dht.Message msg, PeerId source, Stream stream) {
-        System.out.println("Received: " + msg.getType());
         switch (msg.getType()) {
             case PUT_VALUE: {
                 Optional<IpnsMapping> mapping = IPNS.validateIpnsEntry(msg);
