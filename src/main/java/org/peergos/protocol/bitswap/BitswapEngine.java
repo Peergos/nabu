@@ -11,6 +11,7 @@ import org.peergos.blockstore.*;
 import org.peergos.protocol.bitswap.pb.*;
 
 import java.io.*;
+import java.nio.charset.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
@@ -106,6 +107,7 @@ public class BitswapEngine {
                     if (block.isPresent() && authoriser.allowRead(c, block.get(), sourcePeerId, auth.orElse("")).join()) {
                         MessageOuterClass.Message.Block blockP = MessageOuterClass.Message.Block.newBuilder()
                                 .setPrefix(ByteString.copyFrom(prefixBytes(c)))
+                                .setAuth(ByteString.copyFrom(auth.orElse("").getBytes(StandardCharsets.UTF_8)))
                                 .setData(ByteString.copyFrom(block.get()))
                                 .build();
                         int blockSize = blockP.getSerializedSize();
