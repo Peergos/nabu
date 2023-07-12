@@ -240,7 +240,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         try {
             return dialPeer(target, us).orTimeout(2, TimeUnit.SECONDS).join().closerPeers(peerIDKey);
         } catch (Exception e) {
-            if (e.getCause() instanceof NothingToCompleteException)
+            if (e.getCause() instanceof NothingToCompleteException || e.getCause() instanceof NonCompleteException)
                 LOG.info("Couldn't dial " + peerIDKey + " addrs: " + target.addresses);
             else if (e.getCause() instanceof TimeoutException)
                 LOG.info("Timeout dialing " + peerIDKey + " addrs: " + target.addresses);
