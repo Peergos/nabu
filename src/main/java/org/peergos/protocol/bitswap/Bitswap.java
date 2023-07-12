@@ -66,19 +66,19 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
         Set<Want> wants = engine.getWants();
         LOG.info("Broadcast wants: " + wants.size());
         Map<Want, PeerId> haves = engine.getHaves();
+        // broadcast to all connected peers if none are supplied
+        Set<PeerId> audience = peers.isEmpty() ? engine.getConnected() : peers;
         List<MessageOuterClass.Message.Wantlist.Entry> wantsProto = wants.stream()
                 .map(want -> MessageOuterClass.Message.Wantlist.Entry.newBuilder()
-                        .setWantType(haves.containsKey(want) ?
+                        .setWantType(audience.size() <= 2 || haves.containsKey(want) ?
                                 MessageOuterClass.Message.Wantlist.WantType.Block :
                                 MessageOuterClass.Message.Wantlist.WantType.Have)
                         .setBlock(ByteString.copyFrom(want.cid.toBytes()))
                         .setAuth(ByteString.copyFrom(want.auth.orElse("").getBytes()))
                         .build())
                 .collect(Collectors.toList());
-        // broadcast to all connected peers if none are supplied
-        Set<PeerId> connected = peers.isEmpty() ? engine.getConnected() : peers;
         engine.buildAndSendMessages(wantsProto, Collections.emptyList(), Collections.emptyList(),
-                msg -> connected.forEach(peer -> dialPeer(us, peer, c -> {
+                msg -> audience.forEach(peer -> dialPeer(us, peer, c -> {
                     c.send(msg);
                 })));
     }
