@@ -271,6 +271,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 .map(p -> dialPeer(p, us)
                         .thenCompose(contr -> contr.provide(block, ourAddrs))
                         .exceptionally(t -> {
+                            if (t.getCause() instanceof NonCompleteException)
+                                return true;
                             LOG.log(Level.FINE, t, t::getMessage);
                             return true;
                         }))
