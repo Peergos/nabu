@@ -40,7 +40,6 @@ public class BitswapEngine {
 
     public synchronized void addConnection(PeerId peer, Multiaddr addr) {
         connections.add(peer);
-        addressBook.addAddrs(peer, 0, addr);
     }
 
     public CompletableFuture<HashedBlock> getWant(Want w, boolean addToBlockstore) {
