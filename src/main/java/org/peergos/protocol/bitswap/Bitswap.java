@@ -8,6 +8,7 @@ import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
 import org.peergos.*;
 import org.peergos.protocol.bitswap.pb.*;
+import org.peergos.util.*;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -74,7 +75,7 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
                                 MessageOuterClass.Message.Wantlist.WantType.Block :
                                 MessageOuterClass.Message.Wantlist.WantType.Have)
                         .setBlock(ByteString.copyFrom(want.cid.toBytes()))
-                        .setAuth(ByteString.copyFrom(want.auth.orElse("").getBytes()))
+                        .setAuth(ByteString.copyFrom(ArrayOps.hexToBytes(want.auth.orElse(""))))
                         .build())
                 .collect(Collectors.toList());
         engine.buildAndSendMessages(wantsProto, Collections.emptyList(), Collections.emptyList(),

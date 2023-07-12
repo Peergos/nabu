@@ -9,6 +9,7 @@ import io.libp2p.core.multiformats.*;
 import org.peergos.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.bitswap.pb.*;
+import org.peergos.util.*;
 
 import java.io.*;
 import java.nio.charset.*;
@@ -98,7 +99,7 @@ public class BitswapEngine {
         if (msg.hasWantlist()) {
             for (MessageOuterClass.Message.Wantlist.Entry e : msg.getWantlist().getEntriesList()) {
                 Cid c = Cid.cast(e.getBlock().toByteArray());
-                Optional<String> auth = e.getAuth().isEmpty() ? Optional.empty() : Optional.of(e.getAuth().toStringUtf8());
+                Optional<String> auth = e.getAuth().isEmpty() ? Optional.empty() : Optional.of(ArrayOps.bytesToHex(e.getAuth().toByteArray()));
                 boolean isCancel = e.getCancel();
                 boolean sendDontHave = e.getSendDontHave();
                 boolean wantBlock = e.getWantType().getNumber() == 0;
@@ -155,7 +156,7 @@ public class BitswapEngine {
             byte[] cidPrefix = block.getPrefix().toByteArray();
             Optional<String> auth = block.getAuth().isEmpty() ?
                     Optional.empty() :
-                    Optional.of(block.getAuth().toStringUtf8());
+                    Optional.of(ArrayOps.bytesToHex(block.getAuth().toByteArray()));
             byte[] data = block.getData().toByteArray();
             ByteArrayInputStream bin = new ByteArrayInputStream(cidPrefix);
             try {
@@ -188,7 +189,9 @@ public class BitswapEngine {
             LOG.info("Remaining: " + localWants.size());
         for (MessageOuterClass.Message.BlockPresence blockPresence : msg.getBlockPresencesList()) {
             Cid c = Cid.cast(blockPresence.getCid().toByteArray());
-            Optional<String> auth = blockPresence.getAuth().isEmpty() ? Optional.empty() : Optional.of(blockPresence.getAuth().toStringUtf8());
+            Optional<String> auth = blockPresence.getAuth().isEmpty() ?
+                    Optional.empty() :
+                    Optional.of(ArrayOps.bytesToHex(blockPresence.getAuth().toByteArray()));
             Want w = new Want(c, auth);
             boolean have = blockPresence.getType().getNumber() == 0;
             if (have && localWants.containsKey(w)) {
