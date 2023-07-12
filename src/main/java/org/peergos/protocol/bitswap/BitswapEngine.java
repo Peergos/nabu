@@ -108,7 +108,7 @@ public class BitswapEngine {
                     if (block.isPresent() && authoriser.allowRead(c, block.get(), sourcePeerId, auth.orElse("")).join()) {
                         MessageOuterClass.Message.Block blockP = MessageOuterClass.Message.Block.newBuilder()
                                 .setPrefix(ByteString.copyFrom(prefixBytes(c)))
-                                .setAuth(ByteString.copyFrom(auth.orElse("").getBytes(StandardCharsets.UTF_8)))
+                                .setAuth(ByteString.copyFrom(ArrayOps.hexToBytes(auth.orElse(""))))
                                 .setData(ByteString.copyFrom(block.get()))
                                 .build();
                         int blockSize = blockP.getSerializedSize();
