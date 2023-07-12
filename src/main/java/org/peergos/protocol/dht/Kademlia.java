@@ -84,7 +84,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             new Identify().dial(us, PeerId.fromBase58(peer.peerId.toBase58()), getPublic(peer)).getController().join().id().join();
             return true;
         } catch (Exception e) {
-            if (e.getCause() instanceof NothingToCompleteException)
+            if (e.getCause() instanceof NothingToCompleteException || e.getCause() instanceof NonCompleteException)
                 LOG.info("Couldn't connect to " + peer.peerId);
             else
                 e.printStackTrace();
