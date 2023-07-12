@@ -146,8 +146,8 @@ public class HostBuilder {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             b.getTransports().add(TcpTransport::new);
-            b.getSecureChannels().add((k, m) -> new NoiseXXSecureChannel(k, m));
-            b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, m));
+            b.getSecureChannels().add(TlsSecureChannel::new);
+            b.getSecureChannels().add(NoiseXXSecureChannel::new);
 
             b.getMuxers().addAll(muxers);
             RamAddressBook addrs = new RamAddressBook();
@@ -177,12 +177,16 @@ public class HostBuilder {
 
             // Send an identify req on all new connections
             b.getConnectionHandlers().add(connection -> {
-                IdentifyOuterClass.Identify remoteId = connection.muxerSession()
-                        .createStream(new IdentifyBinding(new IdentifyProtocol())).getController().join().id().join();
-                addrs.setAddrs(connection.remoteAddress().getPeerId(), 0, remoteId.getListenAddrsList()
-                        .stream()
-                        .map(bytes -> Multiaddr.deserialize(bytes.toByteArray()))
-                        .toArray(Multiaddr[]::new));
+                if (connection.isInitiator())
+                    return;
+                StreamPromise<IdentifyController> stream = connection.muxerSession()
+                        .createStream(new IdentifyBinding(new IdentifyProtocol()));
+                stream.getController()
+                        .thenCompose(IdentifyController::id)
+                        .thenApply(remoteId -> addrs.setAddrs(connection.remoteAddress().getPeerId(), 0, remoteId.getListenAddrsList()
+                                .stream()
+                                .map(bytes -> Multiaddr.deserialize(bytes.toByteArray()))
+                                .toArray(Multiaddr[]::new)));
             });
 
             for (String listenAddr : listenAddrs) {
