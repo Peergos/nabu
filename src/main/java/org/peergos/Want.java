@@ -9,7 +9,7 @@ public class Want {
     public final Optional<String> auth;
     public Want(Cid cid, Optional<String> auth) {
         this.cid = cid;
-        this.auth = auth;
+        this.auth = auth.flatMap(a -> a.isEmpty() ? Optional.empty() : Optional.of(a));
     }
 
     public Want(Cid h) {
