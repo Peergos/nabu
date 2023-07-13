@@ -16,13 +16,14 @@ import io.libp2p.security.noise.*;
 import io.libp2p.security.tls.*;
 import io.libp2p.transport.tcp.*;
 import io.libp2p.core.crypto.KeyKt;
-import org.jetbrains.annotations.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
 import java.util.stream.*;
 
 public class HostBuilder {
@@ -158,22 +159,8 @@ public class HostBuilder {
             for (ProtocolBinding<?> protocol : protocols) {
                 b.getProtocols().add(protocol);
                 if (protocol instanceof AddressBookConsumer)
-                    ((AddressBookConsumer) protocol).setAddressBook(b.getAddressBook().getImpl());
+                    ((AddressBookConsumer) protocol).setAddressBook(addrs);
             }
-
-            IdentifyOuterClass.Identify.Builder identifyBuilder = IdentifyOuterClass.Identify.newBuilder()
-                    .setProtocolVersion("ipfs/0.1.0")
-                    .setAgentVersion("nabu/v0.1.0")
-                    .setPublicKey(ByteArrayExtKt.toProtobuf(privKey.publicKey().bytes()))
-                    .addAllListenAddrs(listenAddrs.stream()
-                            .map(Multiaddr::fromString)
-                            .map(Multiaddr::serialize)
-                            .map(ByteArrayExtKt::toProtobuf)
-                            .collect(Collectors.toList()));
-            for (ProtocolBinding<?> protocol : protocols) {
-                identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());
-            }
-            b.getProtocols().add(new Identify(identifyBuilder.build()));
 
             // Send an identify req on all new connections
             b.getConnectionHandlers().add(connection -> {

@@ -1,9 +1,13 @@
 package org.peergos;
 
+import identify.pb.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.*;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
+import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
+import io.libp2p.etc.types.*;
 import io.libp2p.protocol.*;
 import org.peergos.blockstore.*;
 import org.peergos.blockstore.s3.S3Blockstore;
@@ -75,6 +79,20 @@ public class EmbeddedIpfs {
 
     public void start() {
         node.start().join();
+        IdentifyOuterClass.Identify.Builder identifyBuilder = IdentifyOuterClass.Identify.newBuilder()
+                .setProtocolVersion("ipfs/0.1.0")
+                .setAgentVersion("nabu/v0.1.0")
+                .setPublicKey(ByteArrayExtKt.toProtobuf(node.getPrivKey().publicKey().bytes()))
+                .addAllListenAddrs(node.listenAddresses().stream()
+                        .map(Multiaddr::serialize)
+                        .map(ByteArrayExtKt::toProtobuf)
+                        .collect(Collectors.toList()));
+
+        for (ProtocolBinding<?> protocol : node.getProtocols()) {
+            identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());
+        }
+        Identify identify = new Identify(identifyBuilder.build());
+        node.addProtocolHandler(identify);
         LOG.info("Node started and listening on " + node.listenAddresses());
         LOG.info("Starting bootstrap process");
         int connections = dht.bootstrapRoutingTable(node, bootstrap, addr -> !addr.contains("/wss/"));
