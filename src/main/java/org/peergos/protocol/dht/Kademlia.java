@@ -54,7 +54,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 .collect(Collectors.toList());
         List<? extends CompletableFuture<? extends KademliaController>> futures = resolved.stream()
                 .parallel()
-                .map(addr -> dial(host, Multiaddr.fromString(addr)).getController())
+                .map(addr -> {
+                    Multiaddr addrWithPeer = Multiaddr.fromString(addr);
+                    addressBook.setAddrs(addrWithPeer.getPeerId(), 0, addrWithPeer);
+                    return dial(host, addrWithPeer).getController();
+                })
                 .collect(Collectors.toList());
         int successes = 0;
         for (CompletableFuture<? extends KademliaController> future : futures) {

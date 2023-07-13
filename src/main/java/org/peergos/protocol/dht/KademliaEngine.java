@@ -40,7 +40,6 @@ public class KademliaEngine {
 
     public synchronized void addOutgoingConnection(PeerId peer, Multiaddr addr) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
-        addressBook.addAddrs(peer, 0, addr);
     }
 
     public synchronized void addIncomingConnection(PeerId peer, Multiaddr addr) {
