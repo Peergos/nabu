@@ -162,15 +162,18 @@ public class HostBuilder {
                     ((AddressBookConsumer) protocol).setAddressBook(addrs);
             }
 
-            // Send an identify req on all new connections
+            // Send an identify req on all new incoming connections
             b.getConnectionHandlers().add(connection -> {
+                PeerId remotePeer = connection.secureSession().getRemoteId();
+                Multiaddr remote = connection.remoteAddress().withP2P(remotePeer);
+                addrs.addAddrs(remotePeer, 0, remote);
                 if (connection.isInitiator())
                     return;
                 StreamPromise<IdentifyController> stream = connection.muxerSession()
                         .createStream(new IdentifyBinding(new IdentifyProtocol()));
                 stream.getController()
                         .thenCompose(IdentifyController::id)
-                        .thenApply(remoteId -> addrs.setAddrs(connection.remoteAddress().getPeerId(), 0, remoteId.getListenAddrsList()
+                        .thenApply(remoteId -> addrs.addAddrs(remotePeer, 0, remoteId.getListenAddrsList()
                                 .stream()
                                 .map(bytes -> Multiaddr.deserialize(bytes.toByteArray()))
                                 .toArray(Multiaddr[]::new)));

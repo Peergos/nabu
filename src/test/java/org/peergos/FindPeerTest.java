@@ -45,7 +45,7 @@ public class FindPeerTest {
                 .filter(p -> p.peerId.equals(toFind))
                 .findFirst();
         if (matching.isEmpty())
-            throw new IllegalStateException("Couldn't find node2 from kubo!");
+            throw new IllegalStateException("Couldn't find peer!");
         PeerAddresses peer = matching.get();
         Multiaddr[] addrs = peer.getPublicAddresses().stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
         dht1.dial(node1, PeerId.fromBase58(peer.peerId.toBase58()), addrs)
