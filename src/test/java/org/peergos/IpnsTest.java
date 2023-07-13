@@ -8,6 +8,7 @@ import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.ipns.*;
 
@@ -26,6 +27,7 @@ public class IpnsTest {
                 new RamProviderStore(), new RamRecordStore(), blockstore1, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
         Multihash node1Id = Multihash.deserialize(node1.getPeerId().getBytes());
 
         try {
@@ -71,6 +73,7 @@ public class IpnsTest {
                 new RamProviderStore(), new RamRecordStore(), blockstore1, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
 
         try {
             IPFS kubo = new IPFS("localhost", 5001);
