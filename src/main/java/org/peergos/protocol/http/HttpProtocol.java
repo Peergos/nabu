@@ -1,5 +1,8 @@
 package org.peergos.protocol.http;
 
+import io.ipfs.cid.*;
+import io.ipfs.multibase.*;
+import io.ipfs.multihash.*;
 import io.libp2p.core.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
@@ -46,13 +49,14 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             if (req != null)
                 req.complete(msg.copy());
             msg.release();
+            stream.close();
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
             CompletableFuture<FullHttpResponse> res = new CompletableFuture<>();
             queue.add(res);
-            req.headers().set(HttpHeaderNames.HOST, stream.remotePeerId());
-            stream.writeAndFlush(req);
+            stream.writeAndFlush(setHost(req, stream.remotePeerId()));
+            stream.closeWrite();
             return res;
         }
     }
@@ -124,16 +128,19 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
     public HttpProtocol(HttpRequestProcessor handler) {
         super(TRAFFIC_LIMIT, TRAFFIC_LIMIT);
-        this.handler = (s, req, replyHandler) -> handler.handle(s, setHost(req, s), replyHandler);
+        this.handler = handler;
     }
 
-    public static FullHttpRequest setHost(FullHttpRequest req, Stream source) {
-        req.headers().set(HttpHeaderNames.HOST,source.remotePeerId().toBase58());
+    public static FullHttpRequest setHost(FullHttpRequest req, PeerId us) {
+        Multihash barePeerId = Multihash.deserialize(us.getBytes());
+        Cid peer = new Cid(1, Cid.Codec.Libp2pKey, barePeerId.getType(), barePeerId.getHash());
+        String encoded = Multibase.encode(Multibase.Base.Base58BTC, peer.toBytes());
+        req.headers().set(HttpHeaderNames.HOST, encoded);
         return req;
     }
 
     public HttpProtocol(SocketAddress proxyTarget) {
-        this((s, req, replyHandler) -> proxyRequest(setHost(req, s), proxyTarget, replyHandler));
+        this((s, req, replyHandler) -> proxyRequest(req, proxyTarget, replyHandler));
     }
 
     @NotNull
