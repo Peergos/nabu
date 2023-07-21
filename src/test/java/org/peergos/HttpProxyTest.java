@@ -56,12 +56,13 @@ public class HttpProxyTest {
         try {
             Multiaddr address2 = node2.listenAddresses().get(0);
             // send a p2p http request which should get proxied to the handler above by node2
-            HttpProtocol.HttpController proxier = new HttpProtocol.Binding(unusedProxyTarget).dial(node1, address2)
-                    .getController().join();
+
             FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
             long totalTime = 0;
             int count = 2000;
             for (int i = 0; i < count; i++) {
+                HttpProtocol.HttpController proxier = new HttpProtocol.Binding(unusedProxyTarget).dial(node1, address2)
+                        .getController().join();
                 long t1 = System.currentTimeMillis();
                 FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
                 long t2 = System.currentTimeMillis();
