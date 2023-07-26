@@ -3,6 +3,7 @@ package org.peergos.blockstore;
 import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
 import org.peergos.Hash;
+import org.peergos.util.*;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -58,6 +59,12 @@ public class FileBlockstore implements Blockstore {
         Path path = getFilePath(cid);
         File file = blocksRoot.resolve(path).toFile();
         return CompletableFuture.completedFuture(file.exists());
+    }
+
+    @Override
+    public CompletableFuture<Boolean> hasAny(Multihash h) {
+        return Futures.of(Stream.of(Cid.Codec.DagCbor, Cid.Codec.Raw, Cid.Codec.DagProtobuf)
+                .anyMatch(c -> has(new Cid(1, c, h.getType(), h.getHash())).join()));
     }
 
     @Override

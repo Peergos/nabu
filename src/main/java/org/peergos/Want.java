@@ -6,10 +6,10 @@ import java.util.*;
 
 public class Want {
     public final Cid cid;
-    public final Optional<String> auth;
-    public Want(Cid cid, Optional<String> auth) {
+    public final Optional<String> authHex;
+    public Want(Cid cid, Optional<String> authHex) {
         this.cid = cid;
-        this.auth = auth;
+        this.authHex = authHex.flatMap(a -> a.isEmpty() ? Optional.empty() : Optional.of(a));
     }
 
     public Want(Cid h) {
@@ -21,11 +21,11 @@ public class Want {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Want want = (Want) o;
-        return cid.equals(want.cid) && auth.equals(want.auth);
+        return cid.equals(want.cid) && authHex.equals(want.authHex);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(cid, auth);
+        return Objects.hash(cid, authHex);
     }
 }

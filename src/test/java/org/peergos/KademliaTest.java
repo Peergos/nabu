@@ -4,6 +4,7 @@ import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.dht.*;
 
 import java.util.*;
@@ -18,11 +19,13 @@ public class KademliaTest {
                 new RamProviderStore(), new RamRecordStore(), blockstore1, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
 
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
                 new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node2 = builder2.build();
         node2.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node2);
 
         try {
             // bootstrap node 2

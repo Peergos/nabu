@@ -47,7 +47,7 @@ public class HttpUtil {
         try {
             Logging.LOG().log(Level.WARNING, t.getMessage(), t);
             Throwable cause = t.getCause();
-            if (cause != null)
+            if (cause != null && cause.getMessage() != null)
                 exchange.getResponseHeaders().set("Trailer", URLEncoder.encode(cause.getMessage(), "UTF-8"));
             else
                 exchange.getResponseHeaders().set("Trailer", URLEncoder.encode(t.getMessage(), "UTF-8"));

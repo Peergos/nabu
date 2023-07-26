@@ -3,9 +3,11 @@ package org.peergos.blockstore;
 import io.ipfs.cid.*;
 import io.ipfs.multihash.*;
 import org.peergos.*;
+import org.peergos.util.*;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.*;
 
 public class RamBlockstore implements Blockstore {
 
@@ -14,6 +16,12 @@ public class RamBlockstore implements Blockstore {
     @Override
     public CompletableFuture<Boolean> has(Cid c) {
         return CompletableFuture.completedFuture(blocks.containsKey(c));
+    }
+
+    @Override
+    public CompletableFuture<Boolean> hasAny(Multihash h) {
+        return Futures.of(Stream.of(Cid.Codec.DagCbor, Cid.Codec.Raw, Cid.Codec.DagProtobuf)
+                .anyMatch(c -> has(new Cid(1, c, h.getType(), h.getHash())).join()));
     }
 
     @Override

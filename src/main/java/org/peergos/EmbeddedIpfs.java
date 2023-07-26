@@ -1,13 +1,18 @@
 package org.peergos;
 
+import identify.pb.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.*;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
+import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
+import io.libp2p.etc.types.*;
 import io.libp2p.protocol.*;
 import org.peergos.blockstore.*;
 import org.peergos.blockstore.s3.S3Blockstore;
 import org.peergos.config.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
@@ -47,7 +52,7 @@ public class EmbeddedIpfs {
         this.bitswap = bitswap;
         this.p2pHttp = p2pHttp;
         this.bootstrap = bootstrap;
-        this.blocks = new BitswapBlockService(node, bitswap);
+        this.blocks = new BitswapBlockService(node, bitswap, dht);
     }
 
     public List<HashedBlock> getBlocks(List<Want> wants, Set<PeerId> peers, boolean addToLocal) {
@@ -75,6 +80,7 @@ public class EmbeddedIpfs {
 
     public void start() {
         node.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node);
         LOG.info("Node started and listening on " + node.listenAddresses());
         LOG.info("Starting bootstrap process");
         int connections = dht.bootstrapRoutingTable(node, bootstrap, addr -> !addr.contains("/wss/"));
@@ -131,7 +137,7 @@ public class EmbeddedIpfs {
         }
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
 
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blockstore), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         Bitswap bitswap = new Bitswap(new BitswapEngine(blockstore, authoriser));

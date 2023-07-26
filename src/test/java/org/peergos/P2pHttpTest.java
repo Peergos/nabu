@@ -1,7 +1,9 @@
 package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
+import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.Host;
 import io.libp2p.core.PeerId;
 import io.libp2p.core.multiformats.Multiaddr;
@@ -12,15 +14,13 @@ import io.netty.util.CharsetUtil;
 import org.junit.Assert;
 import org.junit.Test;
 import org.peergos.blockstore.RamBlockstore;
-import org.peergos.client.RequestSender;
 import org.peergos.net.HttpProxyHandler;
 import org.peergos.protocol.dht.RamProviderStore;
 import org.peergos.protocol.dht.RamRecordStore;
 import org.peergos.protocol.http.HttpProtocol;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URL;
+import java.io.*;
+import java.net.*;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -57,7 +57,7 @@ public class P2pHttpTest {
         HttpProtocol.Binding node2Http = new HttpProtocol.Binding((s, req, h) -> {
             System.out.println("Node 2 received: " + req);
             printBody(req);
-            FullHttpRequest fullRequest = (FullHttpRequest)req;
+            FullHttpRequest fullRequest = req;
             String uri = req.uri();
             QueryStringDecoder queryStringDecoder = new QueryStringDecoder(uri);
             Map<String, List<String>> params = queryStringDecoder.parameters();
@@ -70,13 +70,7 @@ public class P2pHttpTest {
             ByteBuf content = fullRequest.content();
             String bodyContent = content.toString(CharsetUtil.UTF_8);
             Assert.assertTrue("body content", requestBody.equals(bodyContent));
-            MultiAddress proxyTargetAddress = new MultiAddress("/ip4/127.0.0.1/tcp/" + localPort);
-            try {
-                FullHttpResponse reply = RequestSender.proxy(proxyTargetAddress, (FullHttpRequest) req);
-                h.accept(reply.retain());
-            } catch (IOException ioe) {
-                Assert.assertTrue("Unexpected exception: " + ioe.toString(), false);
-            }
+            HttpProtocol.proxyRequest(req, new InetSocketAddress("127.0.0.1", localPort), h);
         });
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
                 new RamProviderStore(), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true));
@@ -86,7 +80,8 @@ public class P2pHttpTest {
 
         Multiaddr node2Address = node2.listenAddresses().get(0);
         PeerId peerId2 = node2Address.getPeerId();
-
+        Multihash multihash2 = Multihash.fromBase58(peerId2.toBase58());
+        Cid peerAsCid = new Cid(1, Cid.Codec.Libp2pKey, multihash2.getType(), multihash2.getHash());
         node1.getAddressBook().setAddrs(peerId2, 0, node2Address).join();
 
         HttpServer apiServer1 = null;
@@ -118,8 +113,8 @@ public class P2pHttpTest {
             server2.start();
 
             URL target = new URL("http", "localhost", port,
-                    "/p2p/" + peerId2.toBase58() + "/http/message" + urlParam);
-            RequestSender.Response reply = RequestSender.send(target, "POST", requestBody.getBytes(), requestHeaders);
+                    "/p2p/" + peerAsCid + "/http/message" + urlParam);
+            Response reply = send(target, "POST", requestBody.getBytes(), requestHeaders);
             Assert.assertTrue("reply", responseText.equals(new String(reply.body)));
         } catch (IOException ioe) {
             ioe.printStackTrace();
@@ -134,6 +129,40 @@ public class P2pHttpTest {
                 server2.stop(1);
             }
         }
+    }
+
+    public static class Response {
+        public final byte[] body;
+        public final Map<String, List<String>> responseHeaders;
+        public final int statusCode;
+
+        public Response(byte[] body, Map<String, List<String>> responseHeaders, int statusCode) {
+            this.body = body;
+            this.responseHeaders = responseHeaders;
+            this.statusCode = statusCode;
+        }
+    }
+    public static Response send(URL target, String method, byte[] body, Map<String, String> headers) throws IOException {
+        HttpURLConnection conn = (HttpURLConnection) target.openConnection();
+        conn.setDoOutput(true);
+        conn.setRequestMethod(method);
+        for (Map.Entry<String, String> entry: headers.entrySet()) {
+            conn.setRequestProperty(entry.getKey(), entry.getValue());
+        }
+        if (body.length > 0) {
+            OutputStream out = conn.getOutputStream();
+            out.write(body);
+            out.flush();
+            out.close();
+        }
+        InputStream in = conn.getInputStream();
+        ByteArrayOutputStream resp = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int r;
+        while ((r = in.read(buf)) >= 0)
+            resp.write(buf, 0, r);
+        Map<String, List<String>> map = Collections.unmodifiableMap(conn.getHeaderFields());
+        return new Response(resp.toByteArray(), map, conn.getResponseCode());
     }
 
     public static void printBody(HttpRequest req) {

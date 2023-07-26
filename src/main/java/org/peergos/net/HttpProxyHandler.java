@@ -2,13 +2,12 @@ package org.peergos.net;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
+import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
-import io.libp2p.core.PeerId;
 import org.peergos.*;
 import org.peergos.util.HttpUtil;
 import org.peergos.util.Logging;
 
-import java.io.*;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +15,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class HttpProxyHandler extends Handler {
-	private static final Logger LOG = Logging.LOG();
+    private static final Logger LOG = Logging.LOG();
 
     private static final boolean LOGGING = true;
 
@@ -27,7 +26,6 @@ public class HttpProxyHandler extends Handler {
     public HttpProxyHandler(HttpProxyService service) {
         this.service = service;
     }
-
 
     public void handleCallToAPI(HttpExchange httpExchange) {
         long t1 = System.currentTimeMillis();
@@ -41,7 +39,8 @@ public class HttpProxyHandler extends Handler {
                     throw new IllegalStateException("Expecting p2p request to include path in url");
                 }
                 String peerId = path.substring(0, streamPathIndex);
-                Multihash targetNodeId = Multihash.deserialize(PeerId.fromBase58(peerId).getBytes());
+                //Multihash targetNodeId = Multihash.deserialize(PeerId.fromBase58(peerId).getBytes());
+                Multihash targetNodeId = Cid.decode(peerId);
                 String targetPath = path.substring(streamPathIndex);
                 if (!targetPath.startsWith(HTTP_REQUEST)) {
                     throw new IllegalStateException("Expecting path to be a http request");
@@ -59,10 +58,11 @@ public class HttpProxyHandler extends Handler {
                 ProxyResponse response = service.proxyRequest(targetNodeId, request);
                 Headers reponseHeaders = httpExchange.getResponseHeaders();
                 for (Map.Entry<String, String> entry : response.headers.entrySet()) {
-                    reponseHeaders.replace(entry.getKey(), List.of(entry.getValue()));
+                    reponseHeaders.set(entry.getKey(), entry.getValue());
                 }
                 httpExchange.sendResponseHeaders(response.statusCode, response.body.length);
                 httpExchange.getResponseBody().write(response.body);
+                httpExchange.getResponseBody().flush();
             } else {
                 throw new IllegalStateException("Unsupported request");
             }

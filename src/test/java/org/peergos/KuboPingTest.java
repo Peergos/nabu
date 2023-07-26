@@ -8,6 +8,7 @@ import io.libp2p.core.mux.*;
 import io.libp2p.protocol.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.bitswap.*;
 
 import java.io.*;
@@ -25,6 +26,7 @@ public class KuboPingTest {
                 .addMuxers(List.of(StreamMuxerProtocol.getYamux()))
                 .build();
         node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
         try {
             IPFS kubo = new IPFS("localhost", 5001);
             Multiaddr address2 = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kubo.id().get("ID"));

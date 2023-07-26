@@ -1,6 +1,8 @@
 package org.peergos.blockstore;
 
 import io.ipfs.cid.Cid;
+import io.ipfs.multihash.*;
+import org.peergos.util.*;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +24,15 @@ public class TypeLimitedBlockstore implements Blockstore {
             return blocks.bloomAdd(cid);
         }
         throw new IllegalArgumentException("Unsupported codec: " + cid.codec);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> hasAny(Multihash h) {
+        for (Cid.Codec codec : allowedCodecs) {
+            if (has(new Cid(1, codec, h.getType(), h.getHash())).join())
+                return Futures.of(true);
+        }
+        return Futures.of(false);
     }
 
     @Override

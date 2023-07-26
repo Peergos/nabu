@@ -6,6 +6,7 @@ import io.libp2p.core.multiformats.*;
 import io.libp2p.protocol.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.bitswap.*;
 
 import java.util.*;
@@ -39,7 +40,9 @@ public class PingTest {
         Host node1 = HostBuilder.build(TestPorts.getPort(), List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true)))));
         Host node2 = HostBuilder.build(TestPorts.getPort(), List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true)))));
         node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
         node2.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node2);
         try {
             // ping from 1 to 2
             Multiaddr address2 = node2.listenAddresses().get(0);

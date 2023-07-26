@@ -22,6 +22,8 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
 import java.util.stream.*;
 
 public class HostBuilder {
@@ -112,7 +114,7 @@ public class HostBuilder {
                 .generateIdentity()
                 .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)));
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blocks), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
         return builder.addProtocols(List.of(
@@ -145,32 +147,37 @@ public class HostBuilder {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             b.getTransports().add(TcpTransport::new);
-            b.getSecureChannels().add((k, m) -> new NoiseXXSecureChannel(k, m));
-            b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, m));
+            b.getSecureChannels().add(NoiseXXSecureChannel::new);
+            b.getSecureChannels().add(TlsSecureChannel::new);
+
             b.getMuxers().addAll(muxers);
-            b.getAddressBook().setImpl(new RamAddressBook());
+            RamAddressBook addrs = new RamAddressBook();
+            b.getAddressBook().setImpl(addrs);
             // Uncomment to add mux debug logging
 //            b.getDebug().getMuxFramesHandler().addLogger(LogLevel.INFO, "MUX");
 
             for (ProtocolBinding<?> protocol : protocols) {
                 b.getProtocols().add(protocol);
                 if (protocol instanceof AddressBookConsumer)
-                    ((AddressBookConsumer) protocol).setAddressBook(b.getAddressBook().getImpl());
+                    ((AddressBookConsumer) protocol).setAddressBook(addrs);
             }
 
-            IdentifyOuterClass.Identify.Builder identifyBuilder = IdentifyOuterClass.Identify.newBuilder()
-                    .setProtocolVersion("ipfs/0.1.0")
-                    .setAgentVersion("nabu/v0.1.0")
-                    .setPublicKey(ByteArrayExtKt.toProtobuf(privKey.publicKey().bytes()))
-                    .addAllListenAddrs(listenAddrs.stream()
-                            .map(Multiaddr::fromString)
-                            .map(Multiaddr::serialize)
-                            .map(ByteArrayExtKt::toProtobuf)
-                            .collect(Collectors.toList()));
-            for (ProtocolBinding<?> protocol : protocols) {
-                identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());
-            }
-            b.getProtocols().add(new Identify(identifyBuilder.build()));
+            // Send an identify req on all new incoming connections
+            b.getConnectionHandlers().add(connection -> {
+                PeerId remotePeer = connection.secureSession().getRemoteId();
+                Multiaddr remote = connection.remoteAddress().withP2P(remotePeer);
+                addrs.addAddrs(remotePeer, 0, remote);
+                if (connection.isInitiator())
+                    return;
+                StreamPromise<IdentifyController> stream = connection.muxerSession()
+                        .createStream(new IdentifyBinding(new IdentifyProtocol()));
+                stream.getController()
+                        .thenCompose(IdentifyController::id)
+                        .thenApply(remoteId -> addrs.addAddrs(remotePeer, 0, remoteId.getListenAddrsList()
+                                .stream()
+                                .map(bytes -> Multiaddr.deserialize(bytes.toByteArray()))
+                                .toArray(Multiaddr[]::new)));
+            });
 
             for (String listenAddr : listenAddrs) {
                 b.getNetwork().listen(listenAddr);

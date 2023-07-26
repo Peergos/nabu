@@ -1,6 +1,7 @@
 package org.peergos;
 
 import com.sun.net.httpserver.*;
+import io.ipfs.cid.Cid;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.netty.handler.codec.http.*;
@@ -16,6 +17,13 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class HttpProxyTest {
+
+    @Test
+    public void peerid() {
+        String peerS = "z5AanNVJCxnFLuYe3Zz35BKv1noBKLToJexw29wQ8cXunqmoDi2sjRB";
+        Cid decoded = Cid.decode(peerS);
+        System.out.println(decoded);
+    }
 
     @Test
     public void p2pProxyRequest() throws IOException {
@@ -51,16 +59,17 @@ public class HttpProxyTest {
         try {
             Multiaddr address2 = node2.listenAddresses().get(0);
             // send a p2p http request which should get proxied to the handler above by node2
-            HttpProtocol.HttpController proxier = new HttpProtocol.Binding(unusedProxyTarget).dial(node1, address2)
-                    .getController().join();
+
             FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
             long totalTime = 0;
-            int count = 200;
+            int count = 2000;
             for (int i = 0; i < count; i++) {
+                HttpProtocol.HttpController proxier = new HttpProtocol.Binding(unusedProxyTarget).dial(node1, address2)
+                        .getController().join();
                 long t1 = System.currentTimeMillis();
                 FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
                 long t2 = System.currentTimeMillis();
-                System.out.println(i + ": P2P HTTP request took " + (t2 - t1) + "ms");
+                //System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
                 totalTime += t2 - t1;
 
                 ByteArrayOutputStream bout = new ByteArrayOutputStream();

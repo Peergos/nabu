@@ -66,7 +66,9 @@ public class APIHandler extends Handler {
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"ipfs-path\" is required");
                     }
-                    Optional<String> auth = Optional.ofNullable(params.get("auth")).map(a -> a.get(0));
+                    Optional<String> auth = Optional.ofNullable(params.get("auth"))
+                            .map(a -> a.get(0))
+                            .flatMap(a -> a.isEmpty() ? Optional.empty() : Optional.of(a));
                     Set<PeerId> peers = Optional.ofNullable(params.get("peers"))
                             .map(p -> p.stream().map(PeerId::fromBase58).collect(Collectors.toSet()))
                             .orElse(Collections.emptySet());

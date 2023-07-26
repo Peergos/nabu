@@ -31,15 +31,7 @@ public class Nabu {
     private static final Logger LOG = Logger.getLogger(Nabu.class.getName());
 
     private static HttpProtocol.HttpRequestProcessor proxyHandler(MultiAddress target) {
-        return (s, req, h) -> {
-            try {
-                FullHttpResponse reply = RequestSender.proxy(target, (FullHttpRequest) req);
-                h.accept(reply.retain());
-            } catch (IOException ioe) {
-                FullHttpResponse exceptionReply = HttpUtil.replyError(ioe);
-                h.accept(exceptionReply.retain());
-            }
-        };
+        return (s, req, h) -> HttpProtocol.proxyRequest(req, new InetSocketAddress(target.getHost(), target.getPort()), h);
     }
 
     public Nabu(Args args) throws Exception {

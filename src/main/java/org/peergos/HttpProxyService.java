@@ -37,7 +37,9 @@ public class HttpProxyService {
     public ProxyResponse proxyRequest(Multihash targetNodeId, ProxyRequest request) throws IOException, ProxyException {
 
         AddressBook addressBook = node.getAddressBook();
-        Optional<Multiaddr> targetAddressesOpt = addressBook.get(PeerId.fromBase58(targetNodeId.bareMultihash().toBase58())).join().stream().findFirst();
+        PeerId peerId = PeerId.fromBase58(targetNodeId.bareMultihash().toBase58());
+        Optional<Multiaddr> targetAddressesOpt = addressBook.get(peerId).join().stream().findFirst();
+        Multiaddr[] allAddresses = null;
         if (targetAddressesOpt.isEmpty()) {
             List<PeerAddresses> closestPeers = dht.findClosestPeers(targetNodeId, 20, node);
             Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetNodeId)).findFirst();
@@ -45,10 +47,12 @@ public class HttpProxyService {
                 throw new ProxyException("Target not found: " + targetNodeId);
             }
             PeerAddresses peer = matching.get();
-            Multiaddr[] addrs = peer.getPublicAddresses().stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
-            targetAddressesOpt = Optional.of(addrs[0]);
+            allAddresses = peer.getPublicAddresses().stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
         }
-        HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, targetAddressesOpt.get()).getController().join();
+        Multiaddr[] addressesToDial = targetAddressesOpt.isPresent() ?
+                Arrays.asList(targetAddressesOpt.get()).toArray(Multiaddr[]::new)
+                : allAddresses;
+        HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
         String urlParams = constructQueryParamString(request.queryParams);
         FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1,
                 HttpMethod.valueOf(request.method.name()),
@@ -66,9 +70,14 @@ public class HttpProxyService {
         resp.content().readBytes(bout, contentLength);
         Map<String, String> headers = new HashMap<>();
         for (Map.Entry<String, String> entry: resp.headers().entries()) {
-            headers.put(entry.getKey(), entry.getValue());
+            String key = entry.getKey();
+            if (key != null) {
+                headers.put(key, entry.getValue());
+            }
         }
-        return new ProxyResponse(bout.toByteArray(), headers, resp.status().code());
+        int code = resp.status().code();
+        resp.release();
+        return new ProxyResponse(bout.toByteArray(), headers, code);
     }
     private String constructQueryParamString(Map<String, List<String>> queryParams) {
         StringBuilder sb = new StringBuilder();

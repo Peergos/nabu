@@ -8,6 +8,7 @@ import io.libp2p.core.multiformats.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
 import org.peergos.cbor.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.dht.*;
 
@@ -25,6 +26,7 @@ public class BitswapMirrorTest {
                 new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
         IPFS kubo = new IPFS("localhost", 5001);
         Multiaddr kuboAddress = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kubo.id().get("ID"));
 //        Multiaddr kuboAddress = Multiaddr.fromString("/ip4/172.104.157.121/tcp/4001/p2p/QmVdFZgHnEgcedCS2G2ZNiEN59LuVrnRm7z3yXtEBv2XiF");
