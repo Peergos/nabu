@@ -16,10 +16,13 @@ LABEL org.opencontainers.image.licenses="MIT license"
 
 ENV IPFS_PATH=/opt/nabu/.ipfs
 
+VOLUMES /opt/nabu/.ipfs
+
 WORKDIR /opt/nabu
 RUN mkdir -p /opt/nabu/.ipfs
 COPY --from=build /opt/nabu/target /opt/nabu
 
-ENTRYPOINT ["java", "-cp", "/opt/nabu/nabu-v0.0.1-SNAPSHOT-jar-with-dependencies.jar", "org.peergos.Nabu", "Addresses.API", "/ip4/0.0.0.0/tcp/5001"]
+# ENTRYPOINT ["java", "-cp", "/opt/nabu/nabu-v0.0.1-SNAPSHOT-jar-with-dependencies.jar", "org.peergos.Nabu"]
+ENTRYPOINT ["java", "-cp", "/opt/nabu/nabu-v0.1.0-SNAPSHOT-jar-with-dependencies.jar", "org.peergos.client.InteropTestClient"]
 
-EXPOSE 4001 5001 8080 8000
+EXPOSE 4001 5001 8080 8003 8002
