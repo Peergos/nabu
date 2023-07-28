@@ -16,8 +16,6 @@ LABEL org.opencontainers.image.licenses="MIT license"
 
 ENV IPFS_PATH=/opt/nabu/.ipfs
 
-VOLUMES /opt/nabu/.ipfs
-
 WORKDIR /opt/nabu
 RUN mkdir -p /opt/nabu/.ipfs
 COPY --from=build /opt/nabu/target /opt/nabu
