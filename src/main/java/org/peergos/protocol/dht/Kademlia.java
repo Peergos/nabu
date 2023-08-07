@@ -106,11 +106,10 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         // lookup our own peer id to keep our nearest neighbours up-to-date,
         // and connect to all of them, so they know about our addresses
         List<PeerAddresses> closestToUs = findClosestPeers(Multihash.deserialize(us.getPeerId().getBytes()), 20, us);
-        int connectedClosest = 0;
-        for (PeerAddresses peer : closestToUs) {
-            if (connectTo(us, peer))
-                connectedClosest++;
-        }
+        int connectedClosest = closestToUs.stream()
+                .parallel()
+                .mapToInt(peer -> connectTo(us, peer) ? 1 : 0)
+                .sum();
         LOG.info("Bootstrap connected to " + connectedClosest + " nodes close to us.");
     }
 

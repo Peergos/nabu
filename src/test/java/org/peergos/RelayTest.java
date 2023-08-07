@@ -1,11 +1,14 @@
 package org.peergos;
 
 import io.ipfs.multiaddr.*;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.circuit.*;
+import org.peergos.protocol.circuit.pb.*;
 import org.peergos.protocol.dht.*;
 
 import java.util.*;
@@ -16,32 +19,35 @@ import java.util.stream.*;
 public class RelayTest {
 
     @Test
-    @Ignore // needs fixed find providers
     public void relay() {
         HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
                 new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
+
         HostBuilder builder2 = HostBuilder.create(10000 + new Random().nextInt(50000),
                 new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node2 = builder2.build();
         node2.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node2);
 
         try {
             bootstrapNode(builder1, node1);
             bootstrapNode(builder2, node2);
 
             // set up node 2 to listen via a relay
-            List<PeerAddresses> relays = Relay.findRelays(builder2.getWanDht().get(), node2);
-            Assert.assertFalse("Relays found", relays.isEmpty());
-            PeerAddresses relay = relays.get(0);
-            Multiaddr relayAddr = Multiaddr.fromString(relay.getPublicAddresses().get(0).toString())
+            PeerAddresses relay = Relay.findRelay(builder2.getWanDht().get(), node2);
+            Multiaddr relayAddr = Multiaddr.fromString(relay.getPublicAddresses().stream().filter(a -> !a.toString().contains("/quic")).findFirst().get().toString())
                     .withP2P(PeerId.fromBase58(relay.peerId.toBase58()));
             CircuitHopProtocol.HopController hop = builder2.getRelayHop().get().dial(node2, relayAddr).getController().join();
-//            hop.reserve()
+            CircuitHopProtocol.Reservation reservation = hop.reserve().join();
 
             // connect to node2 from node1 via a relay
-
+            System.out.println("Using relay " + relay);
+            CircuitHopProtocol.HopController node1Hope = builder1.getRelayHop().get().dial(node1, relayAddr).getController().join();
+            Circuit.HopMessage connectReply = node1Hope.connect(Multihash.deserialize(node2.getPeerId().getBytes())).join();
+            System.out.println(connectReply);
         } finally {
             node1.stop();
         }

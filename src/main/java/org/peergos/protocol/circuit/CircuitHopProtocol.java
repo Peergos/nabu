@@ -40,10 +40,6 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
         public void setHost(Host us) {
             hop.setHost(us);
         }
-
-        public CircuitHopProtocol getHop() {
-            return hop;
-        }
     }
 
     public static byte[] createVoucher(PrivKey priv,
@@ -118,7 +114,7 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                     LocalDateTime now = LocalDateTime.now();
                     LocalDateTime expiry = now.plusHours(1);
                     byte[] voucher = createVoucher(priv, relayPeerId, requestor, now);
-                    Reservation resv = new Reservation(expiry, 3600, 4096, voucher);
+                    Reservation resv = new Reservation(expiry, 120, 4096, voucher);
                     reservations.put(requestor, resv);
                     return Optional.of(resv);
                 }
@@ -134,10 +130,18 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
     public interface HopController {
         CompletableFuture<Circuit.HopMessage> rpc(Circuit.HopMessage req);
 
-        default CompletableFuture<Circuit.HopMessage> reserve(PeerAddresses us) {
+        default CompletableFuture<Reservation> reserve() {
             return rpc(Circuit.HopMessage.newBuilder()
                     .setType(Circuit.HopMessage.Type.RESERVE)
-                    .build());
+                    .build())
+                    .thenApply(msg -> {
+                        if (msg.getStatus() == Circuit.Status.OK) {
+                            long expiry = msg.getReservation().getExpire();
+                            return new Reservation(LocalDateTime.ofEpochSecond(expiry, 0, ZoneOffset.UTC),
+                                    msg.getLimit().getDuration(), msg.getLimit().getData(), msg.getReservation().getVoucher().toByteArray());
+                        }
+                        throw new IllegalStateException(msg.getStatus().name());
+                    });
         }
 
         default CompletableFuture<Circuit.HopMessage> connect(Multihash targetPeerId) {

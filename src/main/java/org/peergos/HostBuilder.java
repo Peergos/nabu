@@ -129,6 +129,7 @@ public class HostBuilder {
         return builder.addProtocols(List.of(
                 new Ping(),
                 new AutonatProtocol.Binding(),
+                stop,
                 new CircuitHopProtocol.Binding(relayManager, stop),
                 new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
                 dht));

@@ -70,10 +70,15 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
 
         @Override
         public void onMessage(@NotNull Stream stream, Circuit.StopMessage msg) {
-            switch (msg.getType()) {
-                case CONNECT: {
-                    Multihash targetPeerId = Multihash.deserialize(msg.getPeer().getId().toByteArray());
-                }
+            if (msg.getType() == Circuit.StopMessage.Type.CONNECT) {
+                Multihash targetPeerId = Multihash.deserialize(msg.getPeer().getId().toByteArray());
+                int durationSeconds = msg.getLimit().getDuration();
+                long limitBytes = msg.getLimit().getData();
+                stream.writeAndFlush(Circuit.StopMessage.newBuilder()
+                        .setType(Circuit.StopMessage.Type.STATUS).setStatus(Circuit.Status.OK)
+                        .build());
+                // TODO: now upgrade connection with security and muxer protocol
+
             }
         }
 
@@ -103,8 +108,8 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
     @NotNull
     @Override
     protected CompletableFuture<StopController> onStartResponder(@NotNull Stream stream) {
-        Receiver dialer = new Receiver(stream);
-        stream.pushHandler(dialer);
-        return CompletableFuture.completedFuture(dialer);
+        Receiver acceptor = new Receiver(stream);
+        stream.pushHandler(acceptor);
+        return CompletableFuture.completedFuture(acceptor);
     }
 }
