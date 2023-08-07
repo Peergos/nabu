@@ -144,12 +144,7 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                     });
         }
 
-        default CompletableFuture<Circuit.HopMessage> connect(Multihash targetPeerId) {
-            return rpc(Circuit.HopMessage.newBuilder()
-                    .setType(Circuit.HopMessage.Type.CONNECT)
-                    .setPeer(Circuit.Peer.newBuilder().setId(ByteString.copyFrom(targetPeerId.toBytes())))
-                    .build());
-        }
+        CompletableFuture<Stream> connect(Multihash targetPeerId);
     }
 
     public static class Sender implements ProtocolMessageHandler<Circuit.HopMessage>, HopController {
@@ -170,6 +165,18 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
             queue.add(res);
             stream.writeAndFlush(req);
             return res;
+        }
+
+        @Override
+        public CompletableFuture<Stream> connect(Multihash targetPeerId) {
+            return rpc(Circuit.HopMessage.newBuilder()
+                    .setType(Circuit.HopMessage.Type.CONNECT)
+                    .setPeer(Circuit.Peer.newBuilder().setId(ByteString.copyFrom(targetPeerId.toBytes())))
+                    .build()).thenApply(msg -> {
+                        if (msg.getType() == Circuit.HopMessage.Type.STATUS && msg.getStatus() == Circuit.Status.OK)
+                            return stream;
+                        throw new IllegalStateException("Circuit dial returned " + msg.getStatus().name());
+            });
         }
     }
 
@@ -256,8 +263,13 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
             }
         }
 
+        @Override
+        public CompletableFuture<Stream> connect(Multihash targetPeerId) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Cannot send from a receiver!"));
+        }
+
         public CompletableFuture<Circuit.HopMessage> rpc(Circuit.HopMessage msg) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Cannot send form a receiver!"));
+            return CompletableFuture.failedFuture(new IllegalStateException("Cannot send from a receiver!"));
         }
     }
 

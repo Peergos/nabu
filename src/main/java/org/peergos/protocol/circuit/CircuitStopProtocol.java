@@ -108,6 +108,7 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
     @NotNull
     @Override
     protected CompletableFuture<StopController> onStartResponder(@NotNull Stream stream) {
+        System.out.println("circuit.stop::onStartResponder");
         Receiver acceptor = new Receiver(stream);
         stream.pushHandler(acceptor);
         return CompletableFuture.completedFuture(acceptor);

@@ -3,6 +3,7 @@ package org.peergos;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
+import io.libp2p.core.Stream;
 import io.libp2p.core.multiformats.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
@@ -45,9 +46,9 @@ public class RelayTest {
 
             // connect to node2 from node1 via a relay
             System.out.println("Using relay " + relay);
-            CircuitHopProtocol.HopController node1Hope = builder1.getRelayHop().get().dial(node1, relayAddr).getController().join();
-            Circuit.HopMessage connectReply = node1Hope.connect(Multihash.deserialize(node2.getPeerId().getBytes())).join();
-            System.out.println(connectReply);
+            CircuitHopProtocol.HopController node1Hop = builder1.getRelayHop().get().dial(node1, relayAddr).getController().join();
+            Stream stream = node1Hop.connect(Multihash.deserialize(node2.getPeerId().getBytes())).join();
+            System.out.println();
         } finally {
             node1.stop();
         }
