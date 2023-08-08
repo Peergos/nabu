@@ -38,6 +38,9 @@ public class Nabu {
         Path ipfsPath = getIPFSPath(args);
         Logging.init(ipfsPath, args.getBoolean("logToConsole", false));
         Config config = readConfig(ipfsPath, args);
+        if (config.metrics.enabled) {
+            AggregatedMetrics.startExporter(config.metrics.address, config.metrics.port);
+        }
         LOG.info("Starting Nabu version: " + APIHandler.CURRENT_VERSION);
         BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
 

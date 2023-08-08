@@ -3,7 +3,6 @@ package org.peergos.config;
 import io.ipfs.multiaddr.MultiAddress;
 import io.libp2p.core.PeerId;
 import io.libp2p.core.crypto.PrivKey;
-import org.peergos.Args;
 import org.peergos.HostBuilder;
 import org.peergos.util.JSONParser;
 import org.peergos.util.JsonHelper;
@@ -18,6 +17,7 @@ public class Config {
     public final BootstrapSection bootstrap;
     public final DatastoreSection datastore;
     public final IdentitySection identity;
+    public final MetricsSection metrics;
 
     public static final List<MultiAddress> defaultBootstrapNodes = List.of(
             "/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
@@ -35,6 +35,7 @@ public class Config {
         this.bootstrap = config.bootstrap;
         this.datastore = config.datastore;
         this.identity = config.identity;
+        this.metrics = config.metrics;
     }
     public Config(Supplier<Mount> dataStoreSupplier) {
         Config config = defaultConfig(Optional.of(dataStoreSupplier));
@@ -42,12 +43,15 @@ public class Config {
         this.bootstrap = config.bootstrap;
         this.datastore = config.datastore;
         this.identity = config.identity;
+        this.metrics = config.metrics;
     }
-    public Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore, IdentitySection identity) {
+    public Config(AddressesSection addresses, BootstrapSection bootstrap, DatastoreSection datastore,
+                  IdentitySection identity, MetricsSection metrics) {
         this.addresses = addresses;
         this.bootstrap = bootstrap;
         this.datastore = datastore;
         this.identity = identity;
+        this.metrics = metrics;
         validate(this);
     }
 
@@ -57,7 +61,8 @@ public class Config {
         BootstrapSection bootstrapSection = Jsonable.parse(json, p -> BootstrapSection.fromJson(p));
         DatastoreSection datastoreSection = Jsonable.parse(json, p -> DatastoreSection.fromJson(p));
         IdentitySection identitySection = Jsonable.parse(json, p -> IdentitySection.fromJson(p));
-        return new Config(addressesSection, bootstrapSection, datastoreSection, identitySection);
+        MetricsSection metricsSection = Jsonable.parse(json, p -> MetricsSection.fromJson(p));
+        return new Config(addressesSection, bootstrapSection, datastoreSection, identitySection, metricsSection);
     }
 
     @Override
@@ -66,6 +71,7 @@ public class Config {
         configMap.putAll(addresses.toJson());
         configMap.putAll(bootstrap.toJson());
         configMap.putAll(datastore.toJson());
+        configMap.putAll(metrics.toJson());
         configMap.putAll(identity.toJson());
         return JsonHelper.pretty(configMap);
     }
@@ -105,8 +111,9 @@ public class Config {
         CodecSet codecSet = CodecSet.empty();
         DatastoreSection datastoreSection = new DatastoreSection(blockMount, rootMount, filter, codecSet);
         BootstrapSection bootstrapSection = new BootstrapSection(bootstrapNodes);
-        IdentitySection identity = new IdentitySection(privKey.bytes(), peerId);
-        return new Config(addressesSection, bootstrapSection, datastoreSection, identity);
+        IdentitySection identitySection = new IdentitySection(privKey.bytes(), peerId);
+        MetricsSection metricsSection = MetricsSection.defaultConfig();
+        return new Config(addressesSection, bootstrapSection, datastoreSection, identitySection, metricsSection);
     }
 
     public void validate(Config config) {
@@ -140,6 +147,16 @@ public class Config {
         String rootType = (String) rootParams.get("type");
         if (!(rootPath.equals("datastore") && rootCompression.equals("none") && rootType.equals("h2"))) {
             throw new IllegalStateException("Expecting flatfs mount at /");
+        }
+
+        MetricsSection metricsSection = config.metrics;
+        if (metricsSection.enabled) {
+            if (metricsSection.address.trim().length() == 0) {
+                throw new IllegalStateException("Expecting metrics address to be set");
+            }
+            if (metricsSection.port < 1024) {
+                throw new IllegalStateException("Expecting metrics port to be >= 1024");
+            }
         }
     }
 }
