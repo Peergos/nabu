@@ -50,6 +50,7 @@ public class APIHandler extends Handler {
 
             switch (path) {
                 case ID: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-id
+                    AggregatedMetrics.API_ID.inc();
                     PeerId peerId = ipfs.node.getPeerId();
                     Map res = new HashMap<>();
                     res.put("ID",  peerId.toBase58());
@@ -57,12 +58,14 @@ public class APIHandler extends Handler {
                     break;
                 }
                 case VERSION: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-version
+                    AggregatedMetrics.API_VERSION.inc();
                     Map res = new HashMap<>();
                     res.put("Version", CURRENT_VERSION.toString());
                     replyJson(httpExchange, JSONParser.toString(res));
                     break;
                 }
                 case GET: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-get
+                    AggregatedMetrics.API_BLOCK_GET.inc();
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"ipfs-path\" is required");
                     }
@@ -88,6 +91,7 @@ public class APIHandler extends Handler {
                     break;
                 }
                 case PUT: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-put
+                    AggregatedMetrics.API_BLOCK_PUT.inc();
                     List<String> format = params.get("format");
                     Optional<String> formatOpt = format !=null && format.size() == 1 ? Optional.of(format.get(0)) : Optional.empty();
                     if (formatOpt.isEmpty()) {
@@ -115,6 +119,7 @@ public class APIHandler extends Handler {
                     break;
                 }
                 case RM: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-rm
+                    AggregatedMetrics.API_BLOCK_RM.inc();
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
                     }
@@ -135,6 +140,7 @@ public class APIHandler extends Handler {
                     break;
                 }
                 case STAT: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-stat
+                    AggregatedMetrics.API_BLOCK_STAT.inc();
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
                     }
@@ -154,6 +160,7 @@ public class APIHandler extends Handler {
                     break;
                 }
                 case REFS_LOCAL: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-refs-local
+                    AggregatedMetrics.API_REFS_LOCAL.inc();
                     List<Cid> refs = ipfs.blockstore.refs().join();
                     StringBuilder sb = new StringBuilder();
                     for (Cid cid : refs) {
@@ -166,6 +173,7 @@ public class APIHandler extends Handler {
                     break;
                 }
                 case HAS: {
+                    AggregatedMetrics.API_BLOCK_HAS.inc();
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"ipfs-path\" is required");
                     }
@@ -174,6 +182,7 @@ public class APIHandler extends Handler {
                     break;
                 }
                 case BLOOM_ADD: {
+                    AggregatedMetrics.API_BLOOM_ADD.inc();
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
                     }
@@ -182,6 +191,7 @@ public class APIHandler extends Handler {
                     break;
                 }
                 case FIND_PROVS: {
+                    AggregatedMetrics.API_FIND_PROVS.inc();
                     if (args == null || args.size() != 1) {
                         throw new APIException("argument \"cid\" is required\n");
                     }

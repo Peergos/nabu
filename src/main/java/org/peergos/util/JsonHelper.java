@@ -28,6 +28,20 @@ public class JsonHelper {
         }
         return (Integer)currentMap.get(lastProperty);
     }
+
+    public static Boolean getBooleanProperty(Map<String, Object> kvMap, String... propNames) {
+        Map<String, Object> currentMap = traverseProperties(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
+        String lastProperty = propNames[propNames.length -1];
+        if(! currentMap.containsKey(lastProperty)) {
+            throw new IllegalStateException("Property not found: " + lastProperty);
+        }
+        Object obj = currentMap.get(lastProperty);
+        if (! (obj instanceof Boolean)) {
+            throw new IllegalStateException("Not a Boolean property: " + lastProperty);
+        }
+        return (Boolean)currentMap.get(lastProperty);
+    }
+
     public static List<Object> getPropertyList(Map<String, Object> kvMap, String... propNames) {
         Map<String, Object> currentMap = traverseProperties(kvMap, Arrays.stream(propNames).limit(propNames.length -1).collect(Collectors.toList()));
         String lastProperty = propNames[propNames.length -1];
