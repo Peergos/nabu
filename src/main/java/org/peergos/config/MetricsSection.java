@@ -19,7 +19,7 @@ public class MetricsSection implements Jsonable {
     }
 
     public static MetricsSection defaultConfig() {
-        return new MetricsSection(true, "localhost", 8101); //what should be the default port?
+        return new MetricsSection(true, "localhost", 9100);
     }
 
     public Map<String, Object> toJson() {
