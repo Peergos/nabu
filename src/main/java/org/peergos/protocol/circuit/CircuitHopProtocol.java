@@ -8,7 +8,10 @@ import io.libp2p.core.Stream;
 import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
+import io.libp2p.etc.util.netty.*;
 import io.libp2p.protocol.*;
+import io.netty.buffer.*;
+import io.netty.channel.*;
 import org.jetbrains.annotations.*;
 import org.peergos.*;
 import org.peergos.protocol.circuit.pb.*;
@@ -17,6 +20,8 @@ import org.peergos.protocol.crypto.pb.*;
 import java.io.*;
 import java.nio.charset.*;
 import java.time.*;
+import java.time.Duration;
+import java.time.temporal.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
@@ -241,9 +246,13 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                                     .setStatus(Circuit.Status.OK));
                                 Stream toTarget = stop.getStream();
                                 Stream fromRequestor = stream;
-                                // TODO connect these streams with time + bytes enforcement
-//                                toTarget.pushHandler();
-//                                fromRequestor.pushHandler();
+                                // connect these streams with time + bytes enforcement
+                                fromRequestor.pushHandler(new InboundTrafficLimitHandler(resv.maxBytes));
+                                fromRequestor.pushHandler(new TotalTimeoutHandler(Duration.of(resv.durationSeconds, ChronoUnit.SECONDS)));
+                                toTarget.pushHandler(new InboundTrafficLimitHandler(resv.maxBytes));
+                                toTarget.pushHandler(new TotalTimeoutHandler(Duration.of(resv.durationSeconds, ChronoUnit.SECONDS)));
+                                fromRequestor.pushHandler(new ProxyHandler(toTarget));
+                                toTarget.pushHandler(new ProxyHandler(fromRequestor));
                             } else {
                                 stream.writeAndFlush(Circuit.HopMessage.newBuilder()
                                     .setType(Circuit.HopMessage.Type.STATUS)
@@ -270,6 +279,23 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
 
         public CompletableFuture<Circuit.HopMessage> rpc(Circuit.HopMessage msg) {
             return CompletableFuture.failedFuture(new IllegalStateException("Cannot send from a receiver!"));
+        }
+    }
+
+    private static class ProxyHandler extends ChannelInboundHandlerAdapter {
+
+        private final Stream target;
+
+        public ProxyHandler(Stream target) {
+            this.target = target;
+        }
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            if (msg instanceof ByteBuf) {
+                target.writeAndFlush(msg);
+                ((ByteBuf) msg).release();
+            }
         }
     }
 
