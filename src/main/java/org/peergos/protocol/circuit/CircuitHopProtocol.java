@@ -221,7 +221,7 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                             .setType(Circuit.HopMessage.Type.STATUS)
                             .setStatus(Circuit.Status.OK)
                             .setReservation(Circuit.Reservation.newBuilder()
-                                    .setExpire(resv.expiry.toEpochSecond(ZoneOffset.UTC) * 1_000_000_000L)
+                                    .setExpire(resv.expiry.toEpochSecond(ZoneOffset.UTC))
                                     .addAllAddrs(publicAddresses.get().stream()
                                             .map(a -> ByteString.copyFrom(a.getBytes()))
                                             .collect(Collectors.toList()))
@@ -237,26 +237,33 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                         if (res.isPresent()) {
                             Reservation resv = res.get();
                             PeerId target = PeerId.fromBase58(targetPeerId.toBase58());
-                            CircuitStopProtocol.StopController stop = this.stop.dial(us, target,
-                                    addressBook.getAddrs(target).join().toArray(new Multiaddr[0])).getController().join();
-                            Circuit.StopMessage reply = stop.connect(initiator, resv.durationSeconds, resv.maxBytes).join();
-                            if (reply.getStatus().equals(Circuit.Status.OK)) {
-                                stream.writeAndFlush(Circuit.StopMessage.newBuilder()
-                                    .setType(Circuit.StopMessage.Type.STATUS)
-                                    .setStatus(Circuit.Status.OK));
-                                Stream toTarget = stop.getStream();
-                                Stream fromRequestor = stream;
-                                // connect these streams with time + bytes enforcement
-                                fromRequestor.pushHandler(new InboundTrafficLimitHandler(resv.maxBytes));
-                                fromRequestor.pushHandler(new TotalTimeoutHandler(Duration.of(resv.durationSeconds, ChronoUnit.SECONDS)));
-                                toTarget.pushHandler(new InboundTrafficLimitHandler(resv.maxBytes));
-                                toTarget.pushHandler(new TotalTimeoutHandler(Duration.of(resv.durationSeconds, ChronoUnit.SECONDS)));
-                                fromRequestor.pushHandler(new ProxyHandler(toTarget));
-                                toTarget.pushHandler(new ProxyHandler(fromRequestor));
-                            } else {
+                            try {
+                                CircuitStopProtocol.StopController stop = this.stop.dial(us, target,
+                                                addressBook.getAddrs(target).join().toArray(new Multiaddr[0])).getController()
+                                        .orTimeout(15, TimeUnit.SECONDS).join();
+                                Circuit.StopMessage reply = stop.connect(initiator, resv.durationSeconds, resv.maxBytes).join();
+                                if (reply.getStatus().equals(Circuit.Status.OK)) {
+                                    stream.writeAndFlush(Circuit.StopMessage.newBuilder()
+                                            .setType(Circuit.StopMessage.Type.STATUS)
+                                            .setStatus(Circuit.Status.OK));
+                                    Stream toTarget = stop.getStream();
+                                    Stream fromRequestor = stream;
+                                    // connect these streams with time + bytes enforcement
+                                    fromRequestor.pushHandler(new InboundTrafficLimitHandler(resv.maxBytes));
+                                    fromRequestor.pushHandler(new TotalTimeoutHandler(Duration.of(resv.durationSeconds, ChronoUnit.SECONDS)));
+                                    toTarget.pushHandler(new InboundTrafficLimitHandler(resv.maxBytes));
+                                    toTarget.pushHandler(new TotalTimeoutHandler(Duration.of(resv.durationSeconds, ChronoUnit.SECONDS)));
+                                    fromRequestor.pushHandler(new ProxyHandler(toTarget));
+                                    toTarget.pushHandler(new ProxyHandler(fromRequestor));
+                                } else {
+                                    stream.writeAndFlush(Circuit.HopMessage.newBuilder()
+                                            .setType(Circuit.HopMessage.Type.STATUS)
+                                            .setStatus(reply.getStatus()));
+                                }
+                            } catch (Exception e) {
                                 stream.writeAndFlush(Circuit.HopMessage.newBuilder()
-                                    .setType(Circuit.HopMessage.Type.STATUS)
-                                    .setStatus(reply.getStatus()));
+                                        .setType(Circuit.HopMessage.Type.STATUS)
+                                        .setStatus(Circuit.Status.CONNECTION_FAILED));
                             }
                         } else {
                             stream.writeAndFlush(Circuit.HopMessage.newBuilder()

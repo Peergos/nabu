@@ -20,7 +20,7 @@ import java.util.stream.*;
 public class RelayTest {
 
     @Test
-    public void relay() {
+    public void remoteRelay() {
         HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
                 new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
@@ -51,6 +51,45 @@ public class RelayTest {
             System.out.println();
         } finally {
             node1.stop();
+            node2.stop();
+        }
+    }
+
+    @Test
+    public void localRelay() {
+        HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+        Host node1 = builder1.build();
+        node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
+
+        HostBuilder builder2 = HostBuilder.create(10000 + new Random().nextInt(50000),
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+        Host node2 = builder2.build();
+        node2.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node2);
+
+        HostBuilder builder3 = HostBuilder.create(10000 + new Random().nextInt(50000),
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+        Host relay = builder3.build();
+        relay.start().join();
+        IdentifyBuilder.addIdentifyProtocol(relay);
+
+        try {
+            // set up node 2 to listen via a relay
+            Multiaddr relayAddr = relay.listenAddresses().get(0).withP2P(relay.getPeerId());
+            CircuitHopProtocol.HopController hop = builder2.getRelayHop().get().dial(node2, relayAddr).getController().join();
+            CircuitHopProtocol.Reservation reservation = hop.reserve().join();
+
+            // connect to node2 from node1 via a relay
+            System.out.println("Using relay " + relay.getPeerId());
+            CircuitHopProtocol.HopController node1Hop = builder1.getRelayHop().get().dial(node1, relayAddr).getController().join();
+            Stream stream = node1Hop.connect(Multihash.deserialize(node2.getPeerId().getBytes())).join();
+            System.out.println();
+        } finally {
+            node1.stop();
+            node2.stop();
+            relay.stop();
         }
     }
 
