@@ -41,7 +41,7 @@ public class HttpProxyService {
         Optional<Multiaddr> targetAddressesOpt = addressBook.get(peerId).join().stream().findFirst();
         Multiaddr[] allAddresses = null;
         if (targetAddressesOpt.isEmpty()) {
-            List<PeerAddresses> closestPeers = dht.findClosestPeers(targetNodeId, 20, node);
+            List<PeerAddresses> closestPeers = dht.findClosestPeers(targetNodeId, 1, node);
             Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetNodeId)).findFirst();
             if (matching.isEmpty()) {
                 throw new ProxyException("Target not found: " + targetNodeId);

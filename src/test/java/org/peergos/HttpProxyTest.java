@@ -2,19 +2,24 @@ package org.peergos;
 
 import com.sun.net.httpserver.*;
 import io.ipfs.cid.Cid;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.netty.handler.codec.http.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
+import org.peergos.util.*;
+import org.peergos.util.HttpUtil;
 
 import java.io.*;
 import java.net.*;
 import java.nio.charset.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.zip.*;
 
 public class HttpProxyTest {
 
@@ -84,6 +89,67 @@ public class HttpProxyTest {
             node1.stop();
             node2.stop();
         }
+    }
+
+    @Test
+    @Ignore
+    public void p2pProxyClientTest() throws IOException {
+        InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
+        HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
+                        new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
+                .addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
+        Host node1 = builder1.build();
+        node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
+        Kademlia dht = builder1.getWanDht().get();
+        dht.bootstrapRoutingTable(node1, BootstrapTest.BOOTSTRAP_NODES, a -> true);
+        dht.bootstrap(node1);
+
+        try {
+            String peerId = "QmUUv85Z8fq5VMBDVRZfSVVrNKss5J5M2j17mB3CWVxK78";
+//            String peerId = "QmVdFZgHnEgcedCS2G2ZNiEN59LuVrnRm7z3yXtEBv2XiF";
+            List<PeerAddresses> closestPeers = dht.findClosestPeers(Multihash.fromBase58(peerId), 1, node1);
+//            Multiaddr address2 = new Multiaddr("/ip4/50.116.48.246/tcp/4001/p2p/QmUUv85Z8fq5VMBDVRZfSVVrNKss5J5M2j17mB3CWVxK78");
+            Multiaddr[] addrs = closestPeers.get(0).addresses.stream().map(a -> new Multiaddr(a.toString())).toArray(Multiaddr[]::new);
+            // send a p2p http request which should get proxied to the handler above by node2
+
+            FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/peergos/v0/core/getUsernamesGzip/");
+            long totalTime = 0;
+            int count = 200;
+            for (int i = 0; i < count; i++) {
+                HttpProtocol.HttpController proxier = new HttpProtocol.Binding(unusedProxyTarget)
+                        .dial(node1, PeerId.fromBase58(peerId), addrs)
+                        .getController()
+                        .orTimeout(10, TimeUnit.SECONDS).join();
+                long t1 = System.currentTimeMillis();
+                FullHttpResponse resp = proxier.send(httpRequest.retain())
+                        .orTimeout(10, TimeUnit.SECONDS).join();
+                long t2 = System.currentTimeMillis();
+                System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
+                totalTime += t2 - t1;
+
+                ByteArrayOutputStream bout = new ByteArrayOutputStream();
+                resp.content().readBytes(bout, resp.headers().getInt("content-length"));
+                resp.release();
+                GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(bout.toByteArray()));
+
+                Object reply = JSONParser.parse(new String(readFully(gzip)));
+                System.out.println();
+            }
+            System.out.println("Average: " + totalTime / count);
+        } finally {
+            node1.stop();
+        }
+    }
+
+    public static byte[] readFully(InputStream in) throws IOException {
+        ByteArrayOutputStream bout =  new ByteArrayOutputStream();
+        byte[] b =  new  byte[0x1000];
+        int nRead;
+        while ((nRead = in.read(b, 0, b.length)) != -1 )
+            bout.write(b, 0, nRead);
+        in.close();
+        return bout.toByteArray();
     }
 
     private static void equal(byte[] a, byte[] b) {
