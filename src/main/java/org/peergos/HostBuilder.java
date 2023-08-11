@@ -183,9 +183,9 @@ public class HostBuilder {
                 b.getNetwork().listen(listenAddr);
             }
 
-            b.getConnectionHandlers().add(conn -> System.out.println(conn.localAddress() +
-                    " received connection from " + conn.remoteAddress() +
-                    " on transport " + conn.transport()));
+//            b.getConnectionHandlers().add(conn -> System.out.println(conn.localAddress() +
+//                    " received connection from " + conn.remoteAddress() +
+//                    " on transport " + conn.transport()));
         });
         for (ProtocolBinding protocol : protocols) {
             if (protocol instanceof HostConsumer)
