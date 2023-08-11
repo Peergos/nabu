@@ -155,6 +155,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             toQuery.removeAll(queryThisRound);
             queryThisRound.forEach(r -> queried.add(r.addresses.peerId));
             List<CompletableFuture<List<PeerAddresses>>> futures = queryThisRound.stream()
+                    .parallel()
                     .map(r -> getCloserPeers(peerIdkey, r.addresses, us))
                     .collect(Collectors.toList());
             boolean foundCloser = false;
