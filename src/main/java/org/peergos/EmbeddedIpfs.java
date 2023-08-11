@@ -79,11 +79,13 @@ public class EmbeddedIpfs {
     }
 
     public void start() {
+        LOG.info("Starting IPFS...");
         node.start().join();
         IdentifyBuilder.addIdentifyProtocol(node);
         LOG.info("Node started and listening on " + node.listenAddresses());
-        LOG.info("Starting bootstrap process");
+        LOG.info("Bootstrapping IPFS routing table");
         int connections = dht.bootstrapRoutingTable(node, bootstrap, addr -> !addr.contains("/wss/"));
+        LOG.info("Bootstrapping IPFS kademlia");
         dht.bootstrap(node);
 
         PeriodicBlockProvider blockProvider = new PeriodicBlockProvider(22 * 3600_000L,

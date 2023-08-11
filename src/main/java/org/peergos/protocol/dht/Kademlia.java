@@ -159,19 +159,23 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     .collect(Collectors.toList());
             boolean foundCloser = false;
             for (CompletableFuture<List<PeerAddresses>> future : futures) {
-                List<PeerAddresses> result = future.join();
-                for (PeerAddresses peer : result) {
-                    if (! queried.contains(peer.peerId)) {
-                        // exit early if we are looking for the specific node
-                        if (maxCount == 1 && peer.peerId.equals(peerIdkey))
-                            return Collections.singletonList(peer);
-                        queried.add(peer.peerId);
-                        Id peerKey = Id.create(Hash.sha256(peer.peerId.toBytes()), 256);
-                        RoutingEntry e = new RoutingEntry(peerKey, peer);
-                        toQuery.add(e);
-                        closest.add(e);
-                        foundCloser = true;
+                try {
+                    List<PeerAddresses> result = future.join();
+                    for (PeerAddresses peer : result) {
+                        if (!queried.contains(peer.peerId)) {
+                            // exit early if we are looking for the specific node
+                            if (maxCount == 1 && peer.peerId.equals(peerIdkey))
+                                return Collections.singletonList(peer);
+                            queried.add(peer.peerId);
+                            Id peerKey = Id.create(Hash.sha256(peer.peerId.toBytes()), 256);
+                            RoutingEntry e = new RoutingEntry(peerKey, peer);
+                            toQuery.add(e);
+                            closest.add(e);
+                            foundCloser = true;
+                        }
                     }
+                } catch (Exception e) {
+                    // couldn't contact peer
                 }
             }
             // if no new peers in top k were returned we are done
@@ -247,10 +251,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             // we can't dial quic only nodes until it's implemented
             if (target.addresses.stream().allMatch(a -> a.toString().contains("quic")))
                 return CompletableFuture.completedFuture(Collections.emptyList());
-            if (e.getCause() instanceof NothingToCompleteException || e.getCause() instanceof NonCompleteException)
-                LOG.info("Couldn't dial " + peerIDKey + " addrs: " + target.addresses);
-            else if (e.getCause() instanceof TimeoutException)
-                LOG.info("Timeout dialing " + peerIDKey + " addrs: " + target.addresses);
+            if (e.getCause() instanceof NothingToCompleteException || e.getCause() instanceof NonCompleteException) {
+                LOG.fine("Couldn't dial " + peerIDKey + " addrs: " + target.addresses);
+            }  else if (e.getCause() instanceof TimeoutException)
+                LOG.fine("Timeout dialing " + peerIDKey + " addrs: " + target.addresses);
+            else if (e.getCause() instanceof ConnectionClosedException) {}
             else
                 e.printStackTrace();
         }
