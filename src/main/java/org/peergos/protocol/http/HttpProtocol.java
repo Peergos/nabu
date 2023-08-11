@@ -55,7 +55,8 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
             CompletableFuture<FullHttpResponse> res = new CompletableFuture<>();
             queue.add(res);
-            stream.writeAndFlush(setHost(req, stream.remotePeerId()));
+            FullHttpRequest withTargetHost = setHost(req, stream.remotePeerId());
+            stream.writeAndFlush(withTargetHost);
             stream.closeWrite();
             return res;
         }
@@ -132,10 +133,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     }
 
     public static FullHttpRequest setHost(FullHttpRequest req, PeerId us) {
-        Multihash barePeerId = Multihash.deserialize(us.getBytes());
-        Cid peer = new Cid(1, Cid.Codec.Libp2pKey, barePeerId.getType(), barePeerId.getHash());
-        String encoded = Multibase.encode(Multibase.Base.Base58BTC, peer.toBytes());
-        req.headers().set(HttpHeaderNames.HOST, encoded);
+        req.headers().set(HttpHeaderNames.HOST, us.toBase58());
         return req;
     }
 
