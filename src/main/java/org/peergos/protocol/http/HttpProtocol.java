@@ -57,7 +57,6 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             queue.add(res);
             FullHttpRequest withTargetHost = setHost(req, stream.remotePeerId());
             stream.writeAndFlush(withTargetHost);
-            stream.closeWrite();
             return res;
         }
     }

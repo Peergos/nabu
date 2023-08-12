@@ -92,8 +92,7 @@ public class HttpProxyTest {
     }
 
     @Test
-    @Ignore
-    public void p2pProxyClientTest() throws IOException {
+    public void p2pProxyClientTest() throws Exception {
         InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
                         new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
@@ -118,7 +117,7 @@ public class HttpProxyTest {
             FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST,
                     "/peergos/v0/core/getUsernamesGzip/");
             long totalTime = 0;
-            int count = 200;
+            int count = 20;
             for (int i = 0; i < count; i++) {
                 HttpProtocol.HttpController proxier = new HttpProtocol.Binding(unusedProxyTarget)
                         .dial(node1, PeerId.fromBase58(peerId), addrs)
@@ -135,8 +134,10 @@ public class HttpProxyTest {
                 resp.content().readBytes(bout, resp.headers().getInt("content-length"));
                 resp.release();
 
-                Object reply = JSONParser.parse(new String(bout.toByteArray()));
-                System.out.println();
+                GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(bout.toByteArray()));
+
+                List<String> reply = (List)JSONParser.parse(new String(readFully(gzip)));
+                Assert.assertTrue(reply.contains("peergos"));
             }
             System.out.println("Average: " + totalTime / count);
         } finally {
