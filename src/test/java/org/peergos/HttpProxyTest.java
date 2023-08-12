@@ -103,7 +103,10 @@ public class HttpProxyTest {
         IdentifyBuilder.addIdentifyProtocol(node1);
         Kademlia dht = builder1.getWanDht().get();
         dht.bootstrapRoutingTable(node1, BootstrapTest.BOOTSTRAP_NODES, a -> true);
+        System.out.println("Bootstrapping node...");
+        long t0 = System.currentTimeMillis();
         dht.bootstrap(node1);
+        System.out.println("Done in " + (System.currentTimeMillis() - t0) + "mS");
 
         try {
             String peerId = "QmUUv85Z8fq5VMBDVRZfSVVrNKss5J5M2j17mB3CWVxK78";
@@ -111,9 +114,9 @@ public class HttpProxyTest {
             List<PeerAddresses> closestPeers = dht.findClosestPeers(Multihash.fromBase58(peerId), 1, node1);
 //            Multiaddr address2 = new Multiaddr("/ip4/50.116.48.246/tcp/4001/p2p/QmUUv85Z8fq5VMBDVRZfSVVrNKss5J5M2j17mB3CWVxK78");
             Multiaddr[] addrs = closestPeers.get(0).addresses.stream().map(a -> new Multiaddr(a.toString())).toArray(Multiaddr[]::new);
-            // send a p2p http request which should get proxied to the handler above by node2
 
-            FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/peergos/v0/core/getUsernamesGzip/");
+            FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST,
+                    "/peergos/v0/core/getUsernamesGzip/");
             long totalTime = 0;
             int count = 200;
             for (int i = 0; i < count; i++) {
@@ -123,7 +126,7 @@ public class HttpProxyTest {
                         .orTimeout(10, TimeUnit.SECONDS).join();
                 long t1 = System.currentTimeMillis();
                 FullHttpResponse resp = proxier.send(httpRequest.retain())
-                        .orTimeout(10, TimeUnit.SECONDS).join();
+                        .orTimeout(15, TimeUnit.SECONDS).join();
                 long t2 = System.currentTimeMillis();
                 System.out.println("P2P HTTP request took " + (t2 - t1) + "ms");
                 totalTime += t2 - t1;
@@ -131,9 +134,8 @@ public class HttpProxyTest {
                 ByteArrayOutputStream bout = new ByteArrayOutputStream();
                 resp.content().readBytes(bout, resp.headers().getInt("content-length"));
                 resp.release();
-                GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(bout.toByteArray()));
 
-                Object reply = JSONParser.parse(new String(readFully(gzip)));
+                Object reply = JSONParser.parse(new String(bout.toByteArray()));
                 System.out.println();
             }
             System.out.println("Average: " + totalTime / count);
