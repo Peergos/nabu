@@ -47,10 +47,6 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         this.addressBook = addrs;
     }
 
-    public AddressBook getAddressBook() {
-        return addressBook;
-    }
-
     public int bootstrapRoutingTable(Host host, List<MultiAddress> addrs, Predicate<String> filter) {
         List<String> resolved = addrs.stream()
                 .parallel()
@@ -65,7 +61,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 .collect(Collectors.toList());
         List<? extends CompletableFuture<? extends KademliaController>> futures = resolved.stream()
                 .parallel()
-                .map(addr -> dial(host, Multiaddr.fromString(addr)).getController())
+                .map(addr -> {
+                    Multiaddr addrWithPeer = Multiaddr.fromString(addr);
+                    addressBook.setAddrs(addrWithPeer.getPeerId(), 0, addrWithPeer);
+                    return dial(host, addrWithPeer).getController();
+                })
                 .collect(Collectors.toList());
         int successes = 0;
         for (CompletableFuture<? extends KademliaController> future : futures) {
@@ -177,25 +177,30 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             // Send each a FIND_NODE(Key) request, and mark it as queried in Pq.
             queryThisRound.forEach(r -> queried.add(r.addresses.peerId));
             List<CompletableFuture<List<PeerAddresses>>> futures = queryThisRound.stream()
+                    .parallel()
                     .map(r -> getCloserPeers(peerIdkey, r.addresses, us))
                     .collect(Collectors.toList());
 
             boolean foundCloser = false;
             for (CompletableFuture<List<PeerAddresses>> future : futures) {
-                // If successful the response will contain the k closest nodes the peer knows to the key
-                List<PeerAddresses> result = future.join();
-                for (PeerAddresses peer : result) {
-                    if (! queried.contains(peer.peerId)) {
-                        // exit early if we are looking for the specific node
-                        if (maxCount == 1 && peer.peerId.equals(peerIdkey))
-                            return Collections.singletonList(peer);
-                        queried.add(peer.peerId);
-                        Id peerKey = Id.create(Hash.sha256(peer.peerId.toBytes()), 256);
-                        RoutingEntry e = new RoutingEntry(peerKey, peer);
-                        toQuery.add(e);
-                        closest.add(e);
-                        foundCloser = true;
+                try {
+                    // If successful the response will contain the k closest nodes the peer knows to the key
+                    List<PeerAddresses> result = future.join();
+                    for (PeerAddresses peer : result) {
+                        if (!queried.contains(peer.peerId)) {
+                            // exit early if we are looking for the specific node
+                            if (maxCount == 1 && peer.peerId.equals(peerIdkey))
+                                return Collections.singletonList(peer);
+                            queried.add(peer.peerId);
+                            Id peerKey = Id.create(Hash.sha256(peer.peerId.toBytes()), 256);
+                            RoutingEntry e = new RoutingEntry(peerKey, peer);
+                            toQuery.add(e);
+                            closest.add(e);
+                            foundCloser = true;
+                        }
                     }
+                } catch (Exception e) {
+                // couldn't contact peer
                 }
             }
 
@@ -212,6 +217,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         byte[] key = block.bareMultihash().toBytes();
         Id keyId = Id.create(key, 256);
         List<PeerAddresses> providers = new ArrayList<>();
+        providers.addAll(engine.getProviders(block));
 
         SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> b.key.getSharedPrefixLength(keyId) - a.key.getSharedPrefixLength(keyId));
         toQuery.addAll(engine.getKClosestPeers(key).stream()
@@ -268,10 +274,14 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         try {
             return dialPeer(target, us).orTimeout(2, TimeUnit.SECONDS).join().closerPeers(peerIDKey);
         } catch (Exception e) {
-            if (e.getCause() instanceof NothingToCompleteException)
+            // we can't dial quic only nodes until it's implemented
+            if (target.addresses.stream().allMatch(a -> a.toString().contains("quic")))
+                return CompletableFuture.completedFuture(Collections.emptyList());
+            if (e.getCause() instanceof NothingToCompleteException || e.getCause() instanceof NonCompleteException) {
                 LOG.fine("Couldn't dial " + peerIDKey + " addrs: " + target.addresses);
-            else if (e.getCause() instanceof TimeoutException)
+            }  else if (e.getCause() instanceof TimeoutException)
                 LOG.fine("Timeout dialing " + peerIDKey + " addrs: " + target.addresses);
+            else if (e.getCause() instanceof ConnectionClosedException) {}
             else
                 LOG.fine("Unknown error: " + e.getMessage());
         }
@@ -286,7 +296,9 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     }
 
     private CompletableFuture<? extends KademliaController> dialPeer(PeerAddresses target, Host us) {
-        Multiaddr[] multiaddrs = getPublic(target);
+        Multiaddr[] multiaddrs = target.addresses.stream()
+                .map(a -> Multiaddr.fromString(a.toString()))
+                .collect(Collectors.toList()).toArray(new Multiaddr[0]);
         return dial(us, PeerId.fromBase58(target.peerId.toBase58()), multiaddrs).getController();
     }
 
@@ -294,7 +306,14 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         List<PeerAddresses> closestPeers = findClosestPeers(block, replication, us);
         List<CompletableFuture<Boolean>> provides = closestPeers.stream()
                 .parallel()
-                .map(p -> dialPeer(p, us).join().provide(block, ourAddrs))
+                .map(p -> dialPeer(p, us)
+                        .thenCompose(contr -> contr.provide(block, ourAddrs))
+                        .exceptionally(t -> {
+                            if (t.getCause() instanceof NonCompleteException)
+                                return true;
+                            LOG.log(Level.FINE, t, t::getMessage);
+                            return true;
+                        }))
                 .collect(Collectors.toList());
         return CompletableFuture.allOf(provides.toArray(new CompletableFuture[0]));
     }

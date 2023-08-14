@@ -5,6 +5,7 @@ import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.dht.*;
 
 import java.util.*;
@@ -35,10 +36,11 @@ public class BootstrapTest {
 
     @Test
     public void bootstrap() {
-        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true), false);
+        HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
         Multihash node1Id = Multihash.deserialize(node1.getPeerId().getBytes());
 
         try {
@@ -51,7 +53,7 @@ public class BootstrapTest {
 
             // lookup ourselves in DHT to find our nearest nodes
             List<PeerAddresses> closestPeers = dht.findClosestPeers(node1Id, 20, node1);
-            if (closestPeers.size() < connections / 2)
+            if (closestPeers.size() < connections/2)
                 throw new IllegalStateException("Didn't find more close peers after bootstrap: " +
                         closestPeers.size() + " < " + connections);
         } finally {

@@ -8,6 +8,7 @@ import io.libp2p.core.multiformats.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
 import org.peergos.cbor.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.dht.*;
 
@@ -21,17 +22,18 @@ public class BitswapMirrorTest {
     @Test
     //@Ignore // Local testing only for now - run this prior: ./ipfs pin add zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg
     public void mirrorTree() throws IOException {
-        HostBuilder builder1 = HostBuilder.build(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true), false);
+        HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
+                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
         IPFS kubo = new IPFS("localhost", 5001);
         Multiaddr kuboAddress = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kubo.id().get("ID"));
 //        Multiaddr kuboAddress = Multiaddr.fromString("/ip4/172.104.157.121/tcp/4001/p2p/QmVdFZgHnEgcedCS2G2ZNiEN59LuVrnRm7z3yXtEBv2XiF");
         node1.getAddressBook().setAddrs(kuboAddress.getPeerId(), 0, kuboAddress).join();
         Kademlia dht1 = builder1.getWanDht().get();
         dht1.bootstrapRoutingTable(node1, BootstrapTest.BOOTSTRAP_NODES, addr -> !addr.contains("/wss/"));
-        dht1.bootstrap(node1);
+            dht1.bootstrap(node1);
         List<PeerAddresses> closestPeers = dht1.findClosestPeers(Multihash.deserialize(kuboAddress.getPeerId().getBytes()), 2, node1);
         Optional<PeerAddresses> matching = closestPeers.stream()
                 .filter(p -> p.peerId.equals(kuboAddress.getPeerId()))
@@ -59,7 +61,7 @@ public class BitswapMirrorTest {
                 rawToGet.clear();
                 cborBlocks.stream()
                         .flatMap(b -> b.links().stream())
-                        .map(h -> (Cid) h)
+                        .map(h -> (Cid)h)
                         .map(c -> c.codec == Cid.Codec.Raw ?
                                 rawToGet.add(new Want(c)) :
                                 c.getType() == Multihash.Type.id || toGet.add(new Want(c)))
@@ -69,7 +71,7 @@ public class BitswapMirrorTest {
                     break;
             }
             long t2 = System.currentTimeMillis();
-            System.out.println("Mirror took " + (t2 - t1) + "mS");
+            System.out.println("Mirror took " + (t2-t1) + "mS");
         } finally {
             node1.stop();
         }

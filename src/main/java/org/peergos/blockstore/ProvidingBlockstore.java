@@ -1,6 +1,7 @@
 package org.peergos.blockstore;
 
 import io.ipfs.cid.*;
+import io.ipfs.multihash.*;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -17,6 +18,11 @@ public class ProvidingBlockstore implements Blockstore {
     @Override
     public CompletableFuture<Boolean> has(Cid c) {
         return target.has(c);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> hasAny(Multihash h) {
+        return target.hasAny(h);
     }
 
     @Override

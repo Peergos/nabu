@@ -1,10 +1,13 @@
 package org.peergos.blockstore;
 
 import io.ipfs.cid.Cid;
+import io.ipfs.multihash.*;
+import org.peergos.util.*;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.*;
 
 public class FilteredBlockstore implements Blockstore {
 
@@ -26,6 +29,12 @@ public class FilteredBlockstore implements Blockstore {
         if (filter.has(c))
             return blocks.has(c);
         return CompletableFuture.completedFuture(false);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> hasAny(Multihash h) {
+        return Futures.of(Stream.of(Cid.Codec.DagCbor, Cid.Codec.Raw, Cid.Codec.DagProtobuf)
+                .anyMatch(c -> has(new Cid(1, c, h.getType(), h.getHash())).join()));
     }
 
     @Override

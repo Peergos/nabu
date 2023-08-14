@@ -3,6 +3,7 @@ package org.peergos.blockstore;
 import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
 import org.peergos.Hash;
+import org.peergos.util.*;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -22,22 +23,25 @@ public class FileBlockstore implements Blockstore {
 
     private static final Logger LOG = Logger.getLogger(FileBlockstore.class.getName());
 
-    private final Path root;
+    private final Path blocksRoot;
     private final String BLOCKS = "blocks";
     private final String BLOCK_FILE_SUFFIX = ".data";
 
     public FileBlockstore(Path root) {
-        this.root = root;
         if (root == null || !root.toFile().isDirectory()) {
             throw new IllegalStateException("Path must be a directory! " + root);
         }
-        if (!root.toFile().exists()) {
-            boolean mkdirs = root.toFile().mkdirs();
-            if (!mkdirs) {
-                throw new IllegalStateException("Unable to create directory");
+        Path blocksPath = root.resolve(BLOCKS);
+        File blocksDirectory = blocksPath.toFile();
+        if (!blocksDirectory.exists()) {
+            if (!blocksDirectory.mkdirs()) {
+                throw new IllegalStateException("Unable to make blocks directory");
             }
+        } else if (blocksDirectory.isFile()) {
+            throw new IllegalStateException("Unable to create blocks directory");
         }
-        LOG.info("Using FileBlockStore at location: " + root);
+        this.blocksRoot = blocksPath;
+        LOG.info("Using FileBlockStore at location: " + blocksPath);
     }
 
     public Path getFilePath(Cid cid) {
@@ -45,8 +49,7 @@ public class FileBlockstore implements Blockstore {
         String folder = key.substring(key.length() -3, key.length()-1);
         String filename = key + BLOCK_FILE_SUFFIX;
 
-        Path path = Paths.get(BLOCKS);
-        path = path.resolve(folder);
+        Path path = Paths.get(folder);
         path = path.resolve(filename);
         return path;
     }
@@ -54,15 +57,21 @@ public class FileBlockstore implements Blockstore {
     @Override
     public CompletableFuture<Boolean> has(Cid cid) {
         Path path = getFilePath(cid);
-        File file = root.resolve(path).toFile();
+        File file = blocksRoot.resolve(path).toFile();
         return CompletableFuture.completedFuture(file.exists());
+    }
+
+    @Override
+    public CompletableFuture<Boolean> hasAny(Multihash h) {
+        return Futures.of(Stream.of(Cid.Codec.DagCbor, Cid.Codec.Raw, Cid.Codec.DagProtobuf)
+                .anyMatch(c -> has(new Cid(1, c, h.getType(), h.getHash())).join()));
     }
 
     @Override
     public CompletableFuture<Optional<byte[]>> get(Cid cid) {
         try {
             Path path = getFilePath(cid);
-            File file = root.resolve(path).toFile();
+            File file = blocksRoot.resolve(path).toFile();
             if (!file.exists()) {
                 return CompletableFuture.completedFuture(Optional.empty());
             }
@@ -84,14 +93,14 @@ public class FileBlockstore implements Blockstore {
         Cid cid = new Cid(1, codec, Multihash.Type.sha2_256, Hash.sha256(block));
         try {
             Path filePath = getFilePath(cid);
-            Path target = root.resolve(filePath);
+            Path target = blocksRoot.resolve(filePath);
             Path parent = target.getParent();
             File parentDir = parent.toFile();
 
             if (!parentDir.exists())
                 Files.createDirectories(parent);
 
-            for (Path someParent = parent; !someParent.equals(root); someParent = someParent.getParent()) {
+            for (Path someParent = parent; !someParent.equals(blocksRoot); someParent = someParent.getParent()) {
                 File someParentFile = someParent.toFile();
                 if (!someParentFile.canWrite()) {
                     final boolean b = someParentFile.setWritable(true, false);
@@ -109,7 +118,7 @@ public class FileBlockstore implements Blockstore {
     @Override
     public CompletableFuture<Boolean> rm(Cid cid) {
         Path path = getFilePath(cid);
-        File file = root.resolve(path).toFile();
+        File file = blocksRoot.resolve(path).toFile();
         if (file.exists()) {
             return CompletableFuture.completedFuture(file.delete());
         } else {
@@ -126,8 +135,8 @@ public class FileBlockstore implements Blockstore {
     @Override
     public CompletableFuture<List<Cid>> refs() {
         List<Path> result = new ArrayList<>();
-        try (Stream<Path> walk = Files.walk(root)) {
-            result = walk.filter(Files::isRegularFile)
+        try (Stream<Path> walk = Files.walk(blocksRoot)) {
+            result = walk.filter(f -> Files.isRegularFile(f) && f.getFileName().toString().endsWith(BLOCK_FILE_SUFFIX))
                     .collect(Collectors.toList());
         } catch (IOException ioe) {
             LOG.log(Level.WARNING, "Unable to retrieve local refs: " + ioe);

@@ -1,5 +1,8 @@
 package org.peergos.protocol.http;
 
+import io.ipfs.cid.*;
+import io.ipfs.multibase.*;
+import io.ipfs.multihash.*;
 import io.libp2p.core.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
@@ -8,7 +11,6 @@ import io.netty.channel.*;
 import io.netty.channel.nio.*;
 import io.netty.channel.socket.nio.*;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.logging.*;
 import org.jetbrains.annotations.*;
 
@@ -17,6 +19,7 @@ import java.util.concurrent.*;
 import java.util.function.*;
 
 public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
+    private static final int MAX_BODY_SIZE = 2 * 1024 * 1024; // TODO remove this and make it fully streaming
 
     public static class Binding extends StrictProtocolBinding<HttpController> {
         public Binding(SocketAddress proxyTarget) {
@@ -42,92 +45,99 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
         @Override
         public void onMessage(@NotNull Stream stream, FullHttpResponse msg) {
-            queue.poll().complete(msg.copy());
+            CompletableFuture<FullHttpResponse> req = queue.poll();
+            if (req != null)
+                req.complete(msg.copy());
+            msg.release();
+            stream.close();
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
             CompletableFuture<FullHttpResponse> res = new CompletableFuture<>();
             queue.add(res);
-            req.headers().set(HttpHeaderNames.HOST, stream.remotePeerId());
-            stream.writeAndFlush(req);
+            FullHttpRequest withTargetHost = setHost(req, stream.remotePeerId());
+            stream.writeAndFlush(withTargetHost);
             return res;
         }
     }
 
-    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpObject> {
-        private final Consumer<HttpObject> replyProcessor;
+    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpContent> {
+        private final Consumer<HttpContent> replyProcessor;
 
-        public ResponseWriter(Consumer<HttpObject> replyProcessor) {
+        public ResponseWriter(Consumer<HttpContent> replyProcessor) {
             this.replyProcessor = replyProcessor;
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject reply) {
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpContent reply) {
             replyProcessor.accept(reply);
         }
     }
 
     public interface HttpRequestProcessor {
-        void handle(Stream stream, HttpRequest msg, Consumer<HttpObject> replyHandler);
+        void handle(Stream stream, FullHttpRequest msg, Consumer<HttpContent> replyHandler);
     }
 
-    public static class Receiver implements ProtocolMessageHandler<HttpRequest>, HttpController {
+    public static class Receiver implements ProtocolMessageHandler<FullHttpRequest>, HttpController {
         private final HttpRequestProcessor requestHandler;
 
         public Receiver(HttpRequestProcessor requestHandler) {
             this.requestHandler = requestHandler;
         }
 
-        private void sendReply(HttpObject reply, Stream p2pstream) {
-            if (reply instanceof HttpContent)
-                p2pstream.writeAndFlush(((HttpContent) reply).retain());
-            else
-                p2pstream.writeAndFlush(reply);
+        private void sendReply(HttpContent reply, Stream p2pstream) {
+            p2pstream.writeAndFlush(reply.copy());
         }
 
         @Override
-        public void onMessage(@NotNull Stream stream, HttpRequest msg) {
+        public void onMessage(@NotNull Stream stream, FullHttpRequest msg) {
             requestHandler.handle(stream, msg, reply -> sendReply(reply, stream));
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Cannot send form a receiver!"));
+            return CompletableFuture.failedFuture(new IllegalStateException("Cannot send from a receiver!"));
         }
     }
 
-    public static void proxyRequest(Stream stream,
-                                    HttpRequest msg,
+    private static final NioEventLoopGroup pool = new NioEventLoopGroup();
+    public static void proxyRequest(FullHttpRequest msg,
                                     SocketAddress proxyTarget,
-                                    Consumer<HttpObject> replyHandler) {
-        Bootstrap b = new Bootstrap();
-        b.group(stream.eventLoop())
+                                    Consumer<HttpContent> replyHandler) {
+        Bootstrap b = new Bootstrap()
+                .group(pool)
                 .channel(NioSocketChannel.class)
-                .handler(new LoggingHandler(LogLevel.TRACE));
+                .handler(new ChannelInitializer<>() {
+                    @Override
+                    protected void initChannel(Channel ch) throws Exception {
+                        ch.pipeline().addLast(new HttpRequestEncoder());
+                        ch.pipeline().addLast(new HttpResponseDecoder());
+                        ch.pipeline().addLast(new HttpObjectAggregator(MAX_BODY_SIZE));
+                        ch.pipeline().addLast(new ResponseWriter(replyHandler));
+                    }
+                });
 
         ChannelFuture fut = b.connect(proxyTarget);
         Channel ch = fut.channel();
-        ch.pipeline().addLast(new HttpRequestEncoder());
-        ch.pipeline().addLast(new HttpResponseDecoder());
-        ch.pipeline().addLast(new ResponseWriter(replyHandler));
 
-        fut.addListener(x -> ch.writeAndFlush(msg));
+        FullHttpRequest retained = msg.retain();
+        fut.addListener(x -> ch.writeAndFlush(retained));
     }
 
-    private static final int TRAFFIC_LIMIT = 2*1024*1024;
+    private static final long TRAFFIC_LIMIT = Long.MAX_VALUE; // This is the total inbound or outbound traffic allowed, not a rate
     private final HttpRequestProcessor handler;
 
     public HttpProtocol(HttpRequestProcessor handler) {
         super(TRAFFIC_LIMIT, TRAFFIC_LIMIT);
-        this.handler = (s, req, replyHandler) -> handler.handle(s, setHost(req, s), replyHandler);
+        this.handler = handler;
     }
 
-    public static HttpRequest setHost(HttpRequest req, Stream source) {
-        req.headers().set(HttpHeaderNames.HOST,source.remotePeerId().toBase58());
+    public static FullHttpRequest setHost(FullHttpRequest req, PeerId us) {
+        req.headers().set(HttpHeaderNames.HOST, us.toBase58());
         return req;
     }
 
     public HttpProtocol(SocketAddress proxyTarget) {
-        this((s, req, replyHandler) -> proxyRequest(s, setHost(req, s), proxyTarget, replyHandler));
+        this((s, req, replyHandler) -> proxyRequest(req, proxyTarget, replyHandler));
     }
 
     @NotNull
@@ -136,8 +146,9 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         Sender replyPropagator = new Sender(stream);
         stream.pushHandler(new HttpRequestEncoder());
         stream.pushHandler(new HttpResponseDecoder());
-        stream.pushHandler(new HttpObjectAggregator(1024*1024));
+        stream.pushHandler(new HttpObjectAggregator(MAX_BODY_SIZE));
         stream.pushHandler(replyPropagator);
+        stream.pushHandler(new LoggingHandler(LogLevel.TRACE));
         return CompletableFuture.completedFuture(replyPropagator);
     }
 
@@ -146,7 +157,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     protected CompletableFuture<HttpController> onStartResponder(@NotNull Stream stream) {
         Receiver proxier = new Receiver(handler);
         stream.pushHandler(new HttpRequestDecoder());
-        stream.pushHandler(new HttpObjectAggregator(2*1024*1024));
+        stream.pushHandler(new HttpObjectAggregator(MAX_BODY_SIZE));
         stream.pushHandler(proxier);
         stream.pushHandler(new HttpResponseEncoder());
         return CompletableFuture.completedFuture(proxier);

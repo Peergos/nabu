@@ -22,6 +22,8 @@ public interface Blockstore {
 
     CompletableFuture<Boolean> has(Cid c);
 
+    CompletableFuture<Boolean> hasAny(Multihash h);
+
     CompletableFuture<Optional<byte[]>> get(Cid c);
 
     CompletableFuture<Cid> put(byte[] block, Cid.Codec codec);
