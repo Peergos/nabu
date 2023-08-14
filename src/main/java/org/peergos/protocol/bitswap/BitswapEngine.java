@@ -9,8 +9,10 @@ import io.libp2p.core.multiformats.*;
 import org.peergos.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.bitswap.pb.*;
+import org.peergos.util.*;
 
 import java.io.*;
+import java.nio.charset.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
@@ -38,7 +40,6 @@ public class BitswapEngine {
 
     public synchronized void addConnection(PeerId peer, Multiaddr addr) {
         connections.add(peer);
-        addressBook.addAddrs(peer, 0, addr);
     }
 
     public CompletableFuture<HashedBlock> getWant(Want w, boolean addToBlockstore) {
@@ -97,7 +98,7 @@ public class BitswapEngine {
         if (msg.hasWantlist()) {
             for (MessageOuterClass.Message.Wantlist.Entry e : msg.getWantlist().getEntriesList()) {
                 Cid c = Cid.cast(e.getBlock().toByteArray());
-                Optional<String> auth = e.getAuth().isEmpty() ? Optional.empty() : Optional.of(e.getAuth().toStringUtf8());
+                Optional<String> auth = e.getAuth().isEmpty() ? Optional.empty() : Optional.of(ArrayOps.bytesToHex(e.getAuth().toByteArray()));
                 boolean isCancel = e.getCancel();
                 boolean sendDontHave = e.getSendDontHave();
                 boolean wantBlock = e.getWantType().getNumber() == 0;
@@ -106,6 +107,7 @@ public class BitswapEngine {
                     if (block.isPresent() && authoriser.allowRead(c, block.get(), sourcePeerId, auth.orElse("")).join()) {
                         MessageOuterClass.Message.Block blockP = MessageOuterClass.Message.Block.newBuilder()
                                 .setPrefix(ByteString.copyFrom(prefixBytes(c)))
+                                .setAuth(ByteString.copyFrom(ArrayOps.hexToBytes(auth.orElse(""))))
                                 .setData(ByteString.copyFrom(block.get()))
                                 .build();
                         int blockSize = blockP.getSerializedSize();
@@ -147,13 +149,13 @@ public class BitswapEngine {
             }
         }
 
-        LOG.info("Bitswap received " + msg.getWantlist().getEntriesCount() + " wants, " + msg.getPayloadCount() +
+        LOG.fine("Bitswap received " + msg.getWantlist().getEntriesCount() + " wants, " + msg.getPayloadCount() +
                 " blocks and " + msg.getBlockPresencesCount() + " presences from " + sourcePeerId);
         for (MessageOuterClass.Message.Block block : msg.getPayloadList()) {
             byte[] cidPrefix = block.getPrefix().toByteArray();
             Optional<String> auth = block.getAuth().isEmpty() ?
                     Optional.empty() :
-                    Optional.of(block.getAuth().toStringUtf8());
+                    Optional.of(ArrayOps.bytesToHex(block.getAuth().toByteArray()));
             byte[] data = block.getData().toByteArray();
             ByteArrayInputStream bin = new ByteArrayInputStream(cidPrefix);
             try {
@@ -183,10 +185,12 @@ public class BitswapEngine {
             }
         }
         if (! localWants.isEmpty())
-            LOG.info("Remaining: " + localWants.size());
+            LOG.fine("Remaining: " + localWants.size());
         for (MessageOuterClass.Message.BlockPresence blockPresence : msg.getBlockPresencesList()) {
             Cid c = Cid.cast(blockPresence.getCid().toByteArray());
-            Optional<String> auth = blockPresence.getAuth().isEmpty() ? Optional.empty() : Optional.of(blockPresence.getAuth().toStringUtf8());
+            Optional<String> auth = blockPresence.getAuth().isEmpty() ?
+                    Optional.empty() :
+                    Optional.of(ArrayOps.bytesToHex(blockPresence.getAuth().toByteArray()));
             Want w = new Want(c, auth);
             boolean have = blockPresence.getType().getNumber() == 0;
             if (have && localWants.containsKey(w)) {

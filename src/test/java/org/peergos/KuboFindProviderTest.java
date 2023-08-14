@@ -8,6 +8,7 @@ import io.libp2p.core.multiformats.*;
 import io.libp2p.core.mux.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.*;
 import org.peergos.protocol.dht.*;
 
 import java.io.*;
@@ -18,12 +19,12 @@ public class KuboFindProviderTest {
 
     @Test
     public void findProviderOverYamux() throws IOException {
-        HostBuilder builder1 = HostBuilder.build(11001 + new Random().nextInt(50_000), new RamProviderStore(),
+        HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(), new RamProviderStore(),
                         new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
                 .addMuxers(List.of(StreamMuxerProtocol.getYamux()));
-        Host node1 = builder1
-                .build();
+        Host node1 = builder1.build();
         node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
         try {
             IPFS kubo = new IPFS("localhost", 5001);
             Multiaddr address2 = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kubo.id().get("ID"));

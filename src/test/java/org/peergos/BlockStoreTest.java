@@ -40,7 +40,7 @@ public class BlockStoreTest {
         FileBlockstore bs = new FileBlockstore(TMP_DATA_FOLDER.toPath());
         Cid cid  = Cid.decode("zb2rhYSxw4ZjuzgCnWSt19Q94ERaeFhu9uSqRgjSdx9bsgM6f");
         Path path = bs.getFilePath(cid);
-        String expected = "blocks/" + "SC/AFKREIA22FLID5AJ2KU7URG47MDLROZIH6YF2KALU2PWEFPVI37YLKRSCA.data";
+        String expected = "SC/AFKREIA22FLID5AJ2KU7URG47MDLROZIH6YF2KALU2PWEFPVI37YLKRSCA.data";
         Assert.assertTrue("ShardFunc does not match /repo/flatfs/shard/v1/next-to-last/2", path.toString().equals(expected));
     }
 

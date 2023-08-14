@@ -1,6 +1,7 @@
 package org.peergos;
 
 import identify.pb.*;
+import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
@@ -21,12 +22,14 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import java.util.stream.*;
 
 public class HostBuilder {
     private PrivKey privKey;
     private PeerId peerId;
     private List<String> listenAddrs = new ArrayList<>();
-    private Multiaddr advertisedAddr;
     private List<ProtocolBinding> protocols = new ArrayList<>();
     private List<StreamMuxerProtocol> muxers = new ArrayList<>();
 
@@ -81,14 +84,9 @@ public class HostBuilder {
         return this;
     }
 
-    public HostBuilder advertiseLocalhost(int listenPort) {
-        advertisedAddr = Multiaddr.fromString("/ip4/127.0.0.1/tcp/" + listenPort).withP2P(peerId);
+    public HostBuilder listen(List<MultiAddress> listenAddrs) {
+        this.listenAddrs.addAll(listenAddrs.stream().map(MultiAddress::toString).collect(Collectors.toList()));
         return this;
-    }
-
-    public HostBuilder listenLocalhost(int listenPort) {
-        listenAddrs.add("/ip4/127.0.0.1/tcp/" + listenPort);
-        return advertiseLocalhost(listenPort);
     }
 
     public HostBuilder generateIdentity() {
@@ -107,14 +105,16 @@ public class HostBuilder {
         return this;
     }
 
-    public static HostBuilder build(int listenPort,
-                                    ProviderStore providers,
-                                    RecordStore records,
-                                    Blockstore blocks,
-                                    BlockRequestAuthoriser authoriser) {
-        HostBuilder builder = new HostBuilder().generateIdentity().listenLocalhost(listenPort);
+    public static HostBuilder create(int listenPort,
+                                     ProviderStore providers,
+                                     RecordStore records,
+                                     Blockstore blocks,
+                                     BlockRequestAuthoriser authoriser) {
+        HostBuilder builder = new HostBuilder()
+                .generateIdentity()
+                .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)));
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records), false);
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blocks), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
         return builder.addProtocols(List.of(
@@ -129,7 +129,7 @@ public class HostBuilder {
                              List<ProtocolBinding> protocols) {
         return new HostBuilder()
                 .generateIdentity()
-                .listenLocalhost(listenPort)
+                .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)))
                 .addProtocols(protocols)
                 .build();
     }
@@ -137,46 +137,55 @@ public class HostBuilder {
     public Host build() {
         if (muxers.isEmpty())
             muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
-        return build(privKey, listenAddrs, advertisedAddr, protocols, muxers);
+        return build(privKey, listenAddrs, protocols, muxers);
     }
 
     public static Host build(PrivKey privKey,
                              List<String> listenAddrs,
-                             Multiaddr advertisedAddr,
                              List<ProtocolBinding> protocols,
                              List<StreamMuxerProtocol> muxers) {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             b.getTransports().add(TcpTransport::new);
-            b.getSecureChannels().add((k, m) -> new NoiseXXSecureChannel(k, (List<String>)m));
-            b.getSecureChannels().add((k, m) -> new TlsSecureChannel(k, (List<String>)m));
+            b.getSecureChannels().add(NoiseXXSecureChannel::new);
+            b.getSecureChannels().add(TlsSecureChannel::new);
+
             b.getMuxers().addAll(muxers);
-            b.getAddressBook().setImpl(new RamAddressBook());
+            RamAddressBook addrs = new RamAddressBook();
+            b.getAddressBook().setImpl(addrs);
+            // Uncomment to add mux debug logging
+//            b.getDebug().getMuxFramesHandler().addLogger(LogLevel.INFO, "MUX");
 
             for (ProtocolBinding<?> protocol : protocols) {
                 b.getProtocols().add(protocol);
                 if (protocol instanceof AddressBookConsumer)
-                    ((AddressBookConsumer) protocol).setAddressBook(b.getAddressBook().getImpl());
+                    ((AddressBookConsumer) protocol).setAddressBook(addrs);
             }
 
-            IdentifyOuterClass.Identify.Builder identifyBuilder = IdentifyOuterClass.Identify.newBuilder()
-                    .setProtocolVersion("ipfs/0.1.0")
-                    .setAgentVersion("nabu/v0.1.0")
-                    .setPublicKey(ByteArrayExtKt.toProtobuf(privKey.publicKey().bytes()))
-                    .addListenAddrs(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()))
-                    .setObservedAddr(ByteArrayExtKt.toProtobuf(advertisedAddr.serialize()));
-            for (ProtocolBinding<?> protocol : protocols) {
-                identifyBuilder = identifyBuilder.addAllProtocols(protocol.getProtocolDescriptor().getAnnounceProtocols());
-            }
-            b.getProtocols().add(new Identify(identifyBuilder.build()));
+            // Send an identify req on all new incoming connections
+            b.getConnectionHandlers().add(connection -> {
+                PeerId remotePeer = connection.secureSession().getRemoteId();
+                Multiaddr remote = connection.remoteAddress().withP2P(remotePeer);
+                addrs.addAddrs(remotePeer, 0, remote);
+                if (connection.isInitiator())
+                    return;
+                StreamPromise<IdentifyController> stream = connection.muxerSession()
+                        .createStream(new IdentifyBinding(new IdentifyProtocol()));
+                stream.getController()
+                        .thenCompose(IdentifyController::id)
+                        .thenApply(remoteId -> addrs.addAddrs(remotePeer, 0, remoteId.getListenAddrsList()
+                                .stream()
+                                .map(bytes -> Multiaddr.deserialize(bytes.toByteArray()))
+                                .toArray(Multiaddr[]::new)));
+            });
 
             for (String listenAddr : listenAddrs) {
                 b.getNetwork().listen(listenAddr);
             }
 
-            b.getConnectionHandlers().add(conn -> System.out.println(conn.localAddress() +
-                    " received connection from " + conn.remoteAddress() +
-                    " on transport " + conn.transport()));
+//            b.getConnectionHandlers().add(conn -> System.out.println(conn.localAddress() +
+//                    " received connection from " + conn.remoteAddress() +
+//                    " on transport " + conn.transport()));
         });
         for (ProtocolBinding protocol : protocols) {
             if (protocol instanceof HostConsumer)

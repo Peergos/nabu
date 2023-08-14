@@ -9,6 +9,7 @@ import io.libp2p.core.*;
 import io.libp2p.core.Stream;
 import io.libp2p.core.multiformats.*;
 import org.peergos.*;
+import org.peergos.blockstore.*;
 import org.peergos.protocol.dht.pb.*;
 import org.peergos.protocol.ipns.*;
 
@@ -22,31 +23,39 @@ public class KademliaEngine {
     private final RecordStore ipnsStore;
     public final Router router;
     private AddressBook addressBook;
+    private final Multihash ourPeerId;
+    private final Blockstore blocks;
 
-    public KademliaEngine(Multihash ourPeerId, ProviderStore providersStore, RecordStore ipnsStore) {
+    public KademliaEngine(Multihash ourPeerId, ProviderStore providersStore, RecordStore ipnsStore, Blockstore blocks) {
         this.providersStore = providersStore;
         this.ipnsStore = ipnsStore;
+        this.ourPeerId = ourPeerId;
         this.router = new Router(Id.create(ourPeerId.bareMultihash().toBytes(), 256), 2, 2, 2);
+        this.blocks = blocks;
     }
 
     public void setAddressBook(AddressBook addrs) {
         this.addressBook = addrs;
     }
 
-    public void addOutgoingConnection(PeerId peer, Multiaddr addr) {
+    public synchronized void addOutgoingConnection(PeerId peer, Multiaddr addr) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
-        addressBook.addAddrs(peer, 0, addr);
     }
 
-    public void addIncomingConnection(PeerId peer, Multiaddr addr) {
+    public synchronized void addIncomingConnection(PeerId peer, Multiaddr addr) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
-        addressBook.addAddrs(peer, 0, addr);
+    }
+
+    public Set<PeerAddresses> getProviders(Multihash h) {
+        return providersStore.getProviders(h);
     }
 
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
         int k = 20;
-        List<Node> nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
-        System.out.println("Nodes: " + nodes.size());
+        List<Node> nodes;
+        synchronized (this) {
+            nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
+        }
         return nodes.stream()
                 .map(n -> {
                     List<MultiAddress> addrs = addressBook.getAddrs(PeerId.fromBase58(n.getLink())).join()
@@ -59,7 +68,6 @@ public class KademliaEngine {
     }
 
     public void receiveRequest(Dht.Message msg, PeerId source, Stream stream) {
-        System.out.println("Received: " + msg.getType());
         switch (msg.getType()) {
             case PUT_VALUE: {
                 Optional<IpnsMapping> mapping = IPNS.validateIpnsEntry(msg);
@@ -97,6 +105,14 @@ public class KademliaEngine {
             case GET_PROVIDERS: {
                 Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
                 Set<PeerAddresses> providers = providersStore.getProviders(hash);
+                if (blocks.hasAny(hash).join()) {
+                    providers = new HashSet<>(providers);
+                    providers.add(new PeerAddresses(ourPeerId, addressBook.getAddrs(PeerId.fromBase58(ourPeerId.toBase58()))
+                            .join()
+                            .stream()
+                            .map(a -> new MultiAddress(a.toString()))
+                            .collect(Collectors.toList())));
+                }
                 Dht.Message.Builder builder = msg.toBuilder();
                 builder = builder.addAllProviderPeers(providers.stream()
                         .map(PeerAddresses::toProtobuf)
