@@ -6,6 +6,7 @@ import org.peergos.protocol.dht.*;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
 import java.util.function.*;
 import java.util.logging.*;
 import java.util.stream.*;
@@ -32,13 +33,19 @@ public class PeriodicBlockProvider {
         this.newBlocksToPublish = newBlocksToPublish;
     }
 
+    private final AtomicBoolean running = new AtomicBoolean(false);
     public void start() {
+        running.set(true);
         new Thread(this::run, "CidReprovider").start();
         new Thread(this::provideNewBlocks, "NewCidProvider").start();
     }
 
+    public void stop() {
+        running.set(false);
+    }
+
     public void run() {
-        while (true) {
+        while (running.get()) {
             try {
                 publish(getBlocks.get());
                 Thread.sleep(reprovideIntervalMillis);
@@ -49,7 +56,7 @@ public class PeriodicBlockProvider {
     }
 
     public void provideNewBlocks() {
-        while (true) {
+        while (running.get()) {
             try {
                 Cid c = newBlocksToPublish.poll();
                 if (c != null) {

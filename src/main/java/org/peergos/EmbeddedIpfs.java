@@ -37,6 +37,7 @@ public class EmbeddedIpfs {
     public final Bitswap bitswap;
     public final Optional<HttpProtocol.Binding> p2pHttp;
     private final List<MultiAddress> bootstrap;
+    private final PeriodicBlockProvider blockProvider;
 
     public EmbeddedIpfs(Host node,
                         ProvidingBlockstore blockstore,
@@ -53,6 +54,8 @@ public class EmbeddedIpfs {
         this.p2pHttp = p2pHttp;
         this.bootstrap = bootstrap;
         this.blocks = new BitswapBlockService(node, bitswap, dht);
+        this.blockProvider = new PeriodicBlockProvider(22 * 3600_000L,
+                () -> blockstore.refs().join().stream(), node, dht, blockstore.toPublish);
     }
 
     public List<HashedBlock> getBlocks(List<Want> wants, Set<PeerId> peers, boolean addToLocal) {
@@ -88,13 +91,12 @@ public class EmbeddedIpfs {
         LOG.info("Bootstrapping IPFS kademlia");
         dht.bootstrap(node);
 
-        PeriodicBlockProvider blockProvider = new PeriodicBlockProvider(22 * 3600_000L,
-                () -> blockstore.refs().join().stream(), node, dht, blockstore.toPublish);
         blockProvider.start();
     }
 
     public CompletableFuture<Void> stop() throws Exception {
         records.close();
+        blockProvider.stop();
         return node.stop();
     }
 
