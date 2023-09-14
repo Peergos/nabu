@@ -31,7 +31,7 @@ public class EmbeddedIpfs {
     public final Host node;
     public final ProvidingBlockstore blockstore;
     public final BlockService blocks;
-    public final DatabaseRecordStore records;
+    public final RecordStore records;
 
     public final Kademlia dht;
     public final Bitswap bitswap;
@@ -41,7 +41,7 @@ public class EmbeddedIpfs {
 
     public EmbeddedIpfs(Host node,
                         ProvidingBlockstore blockstore,
-                        DatabaseRecordStore records,
+                        RecordStore records,
                         Kademlia dht,
                         Bitswap bitswap,
                         Optional<HttpProtocol.Binding> p2pHttp,
@@ -123,7 +123,7 @@ public class EmbeddedIpfs {
                 blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
     }
 
-    public static EmbeddedIpfs build(Path ipfsPath,
+    public static EmbeddedIpfs build(RecordStore records,
                                      Blockstore blocks,
                                      List<MultiAddress> swarmAddresses,
                                      List<MultiAddress> bootstrap,
@@ -131,8 +131,6 @@ public class EmbeddedIpfs {
                                      BlockRequestAuthoriser authoriser,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler) {
         ProvidingBlockstore blockstore = new ProvidingBlockstore(blocks);
-        Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
-        DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toString());
         ProviderStore providers = new RamProviderStore();
 
         HostBuilder builder = new HostBuilder().setIdentity(identity.privKeyProtobuf).listen(swarmAddresses);

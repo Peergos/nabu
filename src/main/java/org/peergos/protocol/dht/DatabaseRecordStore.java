@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
 
-public class DatabaseRecordStore implements RecordStore, AutoCloseable {
+public class DatabaseRecordStore implements RecordStore {
 
     private final String connectionStringPrefix = "jdbc:h2:";//./store/records;AUTO_RECONNECT=TRUE
     private final Connection connection;

@@ -27,4 +27,7 @@ public class RamRecordStore implements RecordStore {
     public void remove(Multihash peerId) {
         records.remove(peerId);
     }
+
+    @Override
+    public void close() throws Exception {}
 }

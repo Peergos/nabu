@@ -19,7 +19,7 @@ public abstract class Handler implements HttpHandler {
 
     }
 
-    abstract void handleCallToAPI(HttpExchange httpExchange);
+    public abstract void handleCallToAPI(HttpExchange httpExchange);
 
     @Override
     public void handle(HttpExchange httpExchange) {
