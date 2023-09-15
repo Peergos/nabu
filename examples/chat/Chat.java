@@ -10,19 +10,20 @@ import io.libp2p.core.multiformats.Multiaddr;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
-import org.peergos.*;
+import io.netty.util.CharsetUtil;
+import org.peergos.BlockRequestAuthoriser;
+import org.peergos.EmbeddedIpfs;
+import org.peergos.HostBuilder;
+import org.peergos.PeerAddresses;
 import org.peergos.blockstore.Blockstore;
 import org.peergos.blockstore.RamBlockstore;
 import org.peergos.config.Config;
 import org.peergos.config.IdentitySection;
-import org.peergos.protocol.dht.Kademlia;
 import org.peergos.protocol.dht.RamRecordStore;
 import org.peergos.protocol.dht.RecordStore;
 import org.peergos.protocol.http.HttpProtocol;
 import org.peergos.util.Version;
 
-import java.io.Console;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -36,12 +37,17 @@ public class Chat {
 
     private static final Logger LOG = Logger.getGlobal();
 
+
+
     private static HttpProtocol.HttpRequestProcessor proxyHandler() {
         return (s, req, h) -> {
             ByteBuf content = ((FullHttpRequest) req).content();
             CharSequence contents = content.getCharSequence(0, content.readableBytes(), Charset.defaultCharset());
             String output = contents.toString();
             System.out.println("received msg:" + output);
+            FullHttpResponse replyOk = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.buffer(0));
+            replyOk.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+            h.accept(replyOk.retain());
         };
     }
 
@@ -84,16 +90,13 @@ public class Chat {
             throw new IllegalArgumentException("Invalid PeerId");
         }
         Multihash targetNodeId = Multihash.fromBase58(peerIdStr);
-        runChat(embeddedIpfs.node, embeddedIpfs.dht, embeddedIpfs.p2pHttp.get(), targetNodeId);
-    }
-    private void runChat(Host node, Kademlia dht, HttpProtocol.Binding p2pHttpBinding, Multihash targetNodeId) {
 
-        AddressBook addressBook = node.getAddressBook();
-        PeerId peerId = PeerId.fromBase58(targetNodeId.bareMultihash().toBase58());
-        Optional<Multiaddr> targetAddressesOpt = addressBook.get(peerId).join().stream().findFirst();
+        AddressBook addressBook = embeddedIpfs.node.getAddressBook();
+        PeerId targetPeerId = PeerId.fromBase58(targetNodeId.bareMultihash().toBase58());
+        Optional<Multiaddr> targetAddressesOpt = addressBook.get(targetPeerId).join().stream().findFirst();
         Multiaddr[] allAddresses = null;
         if (targetAddressesOpt.isEmpty()) {
-            List<PeerAddresses> closestPeers = dht.findClosestPeers(targetNodeId, 1, node);
+            List<PeerAddresses> closestPeers = embeddedIpfs.dht.findClosestPeers(targetNodeId, 1, embeddedIpfs.node);
             Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetNodeId)).findFirst();
             if (matching.isEmpty()) {
                 throw new IllegalStateException("Target not found: " + targetNodeId);
@@ -104,27 +107,19 @@ public class Chat {
         Multiaddr[] addressesToDial = targetAddressesOpt.isPresent() ?
                 Arrays.asList(targetAddressesOpt.get()).toArray(Multiaddr[]::new)
                 : allAddresses;
-        byte[] msg = "world!".getBytes();
-        FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.copiedBuffer(msg));
-        httpRequest.headers().set(HttpHeaderNames.CONTENT_LENGTH, msg.length);
-        HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, addressesToDial[0]).getController().join();
-        FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
-        int code = resp.status().code();
-        resp.release();
-        System.currentTimeMillis();
-        /*
-        HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
-        FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1,
-                HttpMethod.GET, "/", Unpooled.wrappedBuffer(msg));
 
-        HttpHeaders reqHeaders = httpRequest.headers();
-        reqHeaders.set(HttpHeaderNames.CONTENT_LENGTH, msg.length);
-        FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
-        int code = resp.status().code();
-        resp.release();
-        System.currentTimeMillis();
-
-         */
+        runChat(embeddedIpfs.node, embeddedIpfs.p2pHttp.get(), targetPeerId, addressesToDial);
+    }
+    private void runChat(Host node, HttpProtocol.Binding p2pHttpBinding, PeerId targetPeerId, Multiaddr[] addressesToDial) {
+        System.out.println("Type message:");
+        Scanner in = new Scanner(System.in);
+        while (true) {
+            byte[] msg = in.nextLine().trim().getBytes();
+            FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.copiedBuffer(msg));
+            httpRequest.headers().set(HttpHeaderNames.CONTENT_LENGTH, msg.length);
+            HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, targetPeerId, addressesToDial).getController().join();
+            proxier.send(httpRequest.retain()).join().release();
+        }
     }
 
     public static void main(String[] args) {
