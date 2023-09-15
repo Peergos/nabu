@@ -2,14 +2,11 @@ package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
 import io.ipfs.multiaddr.MultiAddress;
-import io.netty.handler.codec.http.*;
-import org.peergos.client.*;
 import org.peergos.config.*;
 import org.peergos.net.APIHandler;
 import org.peergos.net.HttpProxyHandler;
 import org.peergos.protocol.dht.DatabaseRecordStore;
 import org.peergos.protocol.http.*;
-import org.peergos.util.HttpUtil;
 import org.peergos.util.JSONParser;
 import org.peergos.util.JsonHelper;
 import org.peergos.util.Logging;
@@ -73,9 +70,8 @@ public class Nabu {
         apiServer.start();
 
         Thread shutdownHook = new Thread(() -> {
-            LOG.info("Stopping server...");
+            LOG.info("Stopping API server...");
             try {
-                ipfs.stop().join();
                 apiServer.stop(3); //wait max 3 seconds
             } catch (Exception ex) {
                 ex.printStackTrace();
