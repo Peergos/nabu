@@ -100,12 +100,20 @@ public class Chat2 {
                 throw new IllegalStateException("Target not found: " + targetNodeId);
             }
             PeerAddresses peer = matching.get();
-            allAddresses = peer.getPublicAddresses().stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
+            allAddresses = peer.addresses.stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
         }
         Multiaddr[] addressesToDial = targetAddressesOpt.isPresent() ?
                 Arrays.asList(targetAddressesOpt.get()).toArray(Multiaddr[]::new)
                 : allAddresses;
         byte[] msg = "world!".getBytes();
+        FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", Unpooled.copiedBuffer(msg));
+        httpRequest.headers().set(HttpHeaderNames.CONTENT_LENGTH, msg.length);
+        HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, addressesToDial[0]).getController().join();
+        FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
+        int code = resp.status().code();
+        resp.release();
+        System.currentTimeMillis();
+        /*
         HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
         FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1,
                 HttpMethod.GET, "/", Unpooled.wrappedBuffer(msg));
@@ -116,6 +124,8 @@ public class Chat2 {
         int code = resp.status().code();
         resp.release();
         System.currentTimeMillis();
+
+         */
     }
 
     public static void main(String[] args) {
