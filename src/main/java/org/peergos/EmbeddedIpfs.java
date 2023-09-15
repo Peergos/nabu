@@ -81,6 +81,15 @@ public class EmbeddedIpfs {
 
     public void start() {
         LOG.info("Starting IPFS...");
+        Thread shutdownHook = new Thread(() -> {
+            LOG.info("Stopping Ipfs server...");
+            try {
+                this.stop().join();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
         node.start().join();
         IdentifyBuilder.addIdentifyProtocol(node);
         LOG.info("Node started and listening on " + node.listenAddresses());
@@ -93,9 +102,13 @@ public class EmbeddedIpfs {
     }
 
     public CompletableFuture<Void> stop() throws Exception {
-        records.close();
-        blockProvider.stop();
-        return node.stop();
+        if (records != null) {
+            records.close();
+        }
+        if (blockProvider != null) {
+            blockProvider.stop();
+        }
+        return node != null ? node.stop() : CompletableFuture.completedFuture(null);
     }
 
     public static Blockstore buildBlockStore(Config config, Path ipfsPath) {
