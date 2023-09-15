@@ -1,17 +1,15 @@
 package org.peergos;
 
-import identify.pb.*;
 import io.ipfs.multiaddr.*;
-import io.ipfs.multihash.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
-import io.libp2p.etc.types.*;
 import io.libp2p.protocol.*;
 import org.peergos.blockstore.*;
 import org.peergos.blockstore.s3.S3Blockstore;
 import org.peergos.config.*;
+import org.peergos.net.ConnectionException;
 import org.peergos.protocol.*;
 import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
@@ -156,5 +154,24 @@ public class EmbeddedIpfs {
         Host node = builder.addProtocols(protocols).build();
 
         return new EmbeddedIpfs(node, blockstore, records, dht, bitswap, httpHandler, bootstrap);
+    }
+
+    public static Multiaddr[] getAddresses(Host node, Kademlia dht, Multihash targetNodeId) throws ConnectionException {
+        AddressBook addressBook = node.getAddressBook();
+        PeerId peerId = PeerId.fromBase58(targetNodeId.bareMultihash().toBase58());
+        Optional<Multiaddr> targetAddressesOpt = addressBook.get(peerId).join().stream().findFirst();
+        Multiaddr[] allAddresses = null;
+        if (targetAddressesOpt.isEmpty()) {
+            List<PeerAddresses> closestPeers = dht.findClosestPeers(targetNodeId, 1, node);
+            Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetNodeId)).findFirst();
+            if (matching.isEmpty()) {
+                throw new ConnectionException("Target not found: " + targetNodeId);
+            }
+            PeerAddresses peer = matching.get();
+            allAddresses = peer.addresses.stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
+        }
+        return targetAddressesOpt.isPresent() ?
+                Arrays.asList(targetAddressesOpt.get()).toArray(Multiaddr[]::new)
+                : allAddresses;
     }
 }

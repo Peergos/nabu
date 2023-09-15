@@ -7,7 +7,7 @@ import io.libp2p.core.PeerId;
 import io.libp2p.core.multiformats.Multiaddr;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
-import org.peergos.net.ProxyException;
+import org.peergos.net.ConnectionException;
 import org.peergos.net.ProxyRequest;
 import org.peergos.net.ProxyResponse;
 import org.peergos.protocol.dht.Kademlia;
@@ -34,24 +34,9 @@ public class HttpProxyService {
         this.p2pHttpBinding = p2pHttpBinding;
         this.dht = dht;
     }
-    public ProxyResponse proxyRequest(Multihash targetNodeId, ProxyRequest request) throws IOException, ProxyException {
-
-        AddressBook addressBook = node.getAddressBook();
+    public ProxyResponse proxyRequest(Multihash targetNodeId, ProxyRequest request) throws IOException, ConnectionException {
+        Multiaddr[] addressesToDial = EmbeddedIpfs.getAddresses(node, dht, targetNodeId);
         PeerId peerId = PeerId.fromBase58(targetNodeId.bareMultihash().toBase58());
-        Optional<Multiaddr> targetAddressesOpt = addressBook.get(peerId).join().stream().findFirst();
-        Multiaddr[] allAddresses = null;
-        if (targetAddressesOpt.isEmpty()) {
-            List<PeerAddresses> closestPeers = dht.findClosestPeers(targetNodeId, 1, node);
-            Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetNodeId)).findFirst();
-            if (matching.isEmpty()) {
-                throw new ProxyException("Target not found: " + targetNodeId);
-            }
-            PeerAddresses peer = matching.get();
-            allAddresses = peer.getPublicAddresses().stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
-        }
-        Multiaddr[] addressesToDial = targetAddressesOpt.isPresent() ?
-                Arrays.asList(targetAddressesOpt.get()).toArray(Multiaddr[]::new)
-                : allAddresses;
         HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
         String urlParams = constructQueryParamString(request.queryParams);
         FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1,
