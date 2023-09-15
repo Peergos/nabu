@@ -6,7 +6,7 @@ import org.peergos.protocol.ipns.*;
 
 import java.util.*;
 
-public interface RecordStore {
+public interface RecordStore extends AutoCloseable {
 
     void put(Multihash peerId, IpnsRecord record);
 

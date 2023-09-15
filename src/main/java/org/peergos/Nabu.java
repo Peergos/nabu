@@ -7,6 +7,7 @@ import org.peergos.client.*;
 import org.peergos.config.*;
 import org.peergos.net.APIHandler;
 import org.peergos.net.HttpProxyHandler;
+import org.peergos.protocol.dht.DatabaseRecordStore;
 import org.peergos.protocol.http.*;
 import org.peergos.util.HttpUtil;
 import org.peergos.util.JSONParser;
@@ -44,7 +45,10 @@ public class Nabu {
         LOG.info("Starting Nabu version: " + APIHandler.CURRENT_VERSION);
         BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
 
-        EmbeddedIpfs ipfs = EmbeddedIpfs.build(ipfsPath,
+        Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
+        DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toString());
+
+        EmbeddedIpfs ipfs = EmbeddedIpfs.build(records,
                 buildBlockStore(config, ipfsPath),
                 config.addresses.getSwarmAddresses(),
                 config.bootstrap.getBootstrapAddresses(),
