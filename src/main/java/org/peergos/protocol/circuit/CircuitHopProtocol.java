@@ -243,8 +243,8 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
                                         .orTimeout(15, TimeUnit.SECONDS).join();
                                 Circuit.StopMessage reply = stop.connect(initiator, resv.durationSeconds, resv.maxBytes).join();
                                 if (reply.getStatus().equals(Circuit.Status.OK)) {
-                                    stream.writeAndFlush(Circuit.StopMessage.newBuilder()
-                                            .setType(Circuit.StopMessage.Type.STATUS)
+                                    stream.writeAndFlush(Circuit.HopMessage.newBuilder()
+                                            .setType(Circuit.HopMessage.Type.STATUS)
                                             .setStatus(Circuit.Status.OK));
                                     Stream toTarget = stop.getStream();
                                     Stream fromRequestor = stream;

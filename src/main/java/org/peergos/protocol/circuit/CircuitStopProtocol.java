@@ -94,7 +94,7 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
     private static final int TRAFFIC_LIMIT = 2*1024;
 
     public CircuitStopProtocol() {
-        super(Circuit.HopMessage.getDefaultInstance(), TRAFFIC_LIMIT, TRAFFIC_LIMIT);
+        super(Circuit.StopMessage.getDefaultInstance(), TRAFFIC_LIMIT, TRAFFIC_LIMIT);
     }
 
     @NotNull
