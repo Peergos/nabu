@@ -31,7 +31,13 @@ public class BitswapBlockService implements BlockService {
                     .collect(Collectors.toSet());
             Set<HashedBlock> fromConnected = bitswap.get(hashes, us, connected, addToBlockstore)
                     .stream()
-                    .map(f -> f.orTimeout(10, TimeUnit.SECONDS).join())
+                    .flatMap(f -> {
+                        try {
+                            return java.util.stream.Stream.of(f.orTimeout(10, TimeUnit.SECONDS).join());
+                        } catch (Exception e) {
+                            return java.util.stream.Stream.empty();
+                        }
+                    })
                     .collect(Collectors.toSet());
             if (fromConnected.size() == hashes.size())
                 return new ArrayList<>(fromConnected);
