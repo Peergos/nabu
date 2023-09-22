@@ -15,43 +15,40 @@ import java.util.stream.Stream;
 public class PeriodicBlockProvider {
 
     private static final Logger LOG = Logger.getLogger(PeriodicBlockProvider.class.getName());
-    private final long reprovideIntervalMillis;
-    private final Supplier<Stream<Cid>> getBlocks;
     private final Host us;
     private final Kademlia dht;
     private final Queue<Cid> newBlocksToPublish;
+
+    private final ControlSubThread cidProvider;
+
+    private final ControlSubThread newCidProvider;
 
     public PeriodicBlockProvider(long reprovideIntervalMillis,
                                  Supplier<Stream<Cid>> getBlocks,
                                  Host us,
                                  Kademlia dht,
                                  Queue<Cid> newBlocksToPublish) {
-        this.reprovideIntervalMillis = reprovideIntervalMillis;
-        this.getBlocks = getBlocks;
         this.us = us;
         this.dht = dht;
         this.newBlocksToPublish = newBlocksToPublish;
+        this.cidProvider = new ControlSubThread(reprovideIntervalMillis, () -> publish(getBlocks.get()), "CidReprovider");
+        this.newCidProvider = new ControlSubThread(0, () -> provideNewBlocks(), "NewCidProvider");
     }
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     public void start() {
         running.set(true);
-        new Thread(this::run, "CidReprovider").start();
-        new Thread(this::provideNewBlocks, "NewCidProvider").start();
+        cidProvider.start();
+        newCidProvider.start();
     }
 
     public void stop() {
         running.set(false);
-    }
-
-    public void run() {
-        while (running.get()) {
-            try {
-                publish(getBlocks.get());
-                Thread.sleep(reprovideIntervalMillis);
-            } catch (Throwable e) {
-                LOG.log(Level.WARNING, e.getMessage(), e);
-            }
+        if (cidProvider.isRunning()) {
+            cidProvider.stop();
+        }
+        if (newCidProvider.isRunning()) {
+            newCidProvider.stop();
         }
     }
 
