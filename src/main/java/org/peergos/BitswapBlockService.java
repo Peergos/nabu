@@ -26,9 +26,7 @@ public class BitswapBlockService implements BlockService {
     public List<HashedBlock> get(List<Want> hashes, Set<PeerId> peers, boolean addToBlockstore) {
         if (peers.isEmpty()) {
             // if peers are not provided try connected peers and then fallback to finding peers from DHT
-            Set<PeerId> connected = us.getStreams().stream()
-                    .map(Stream::remotePeerId)
-                    .collect(Collectors.toSet());
+            Set<PeerId> connected = bitswap.getBroadcastAudience();
             Set<HashedBlock> fromConnected = bitswap.get(hashes, us, connected, addToBlockstore)
                     .stream()
                     .flatMap(f -> {
