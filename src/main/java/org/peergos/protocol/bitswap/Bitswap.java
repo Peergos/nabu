@@ -5,6 +5,7 @@ import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
+import org.jetbrains.annotations.*;
 import org.peergos.*;
 import org.peergos.protocol.bitswap.pb.*;
 import org.peergos.util.*;
@@ -15,11 +16,12 @@ import java.util.function.*;
 import java.util.logging.*;
 import java.util.stream.*;
 
-public class Bitswap extends StrictProtocolBinding<BitswapController> implements AddressBookConsumer {
+public class Bitswap extends StrictProtocolBinding<BitswapController> implements AddressBookConsumer, ConnectionHandler {
     private static final Logger LOG = Logger.getLogger(Bitswap.class.getName());
     public static int MAX_MESSAGE_SIZE = 2*1024*1024;
 
     private final BitswapEngine engine;
+    private final LRUCache<PeerId, Boolean> connected = new LRUCache<>(100);
     private AddressBook addrs;
 
     public Bitswap(BitswapEngine engine) {
@@ -30,6 +32,15 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
     public void setAddressBook(AddressBook addrs) {
         engine.setAddressBook(addrs);
         this.addrs = addrs;
+    }
+
+    @Override
+    public void handleConnection(@NotNull Connection connection) {
+        // add all outgoing connections to an LRU of candidates
+        if (connection.isInitiator()) {
+            PeerId remoteId = connection.secureSession().getRemoteId();
+            connected.put(remoteId, true);
+        }
     }
 
     public CompletableFuture<HashedBlock> get(Want hash,
@@ -62,12 +73,18 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
         return results;
     }
 
+    public Set<PeerId> getBroadcastAudience() {
+        HashSet<PeerId> res = new HashSet<>(engine.getConnected());
+        res.addAll(connected.keySet());
+        return res;
+    }
+
     public void sendWants(Host us, Set<PeerId> peers) {
         Set<Want> wants = engine.getWants();
         LOG.fine("Broadcast wants: " + wants.size());
         Map<Want, PeerId> haves = engine.getHaves();
-        // broadcast to all connected peers if none are supplied
-        Set<PeerId> audience = peers.isEmpty() ? engine.getConnected() : peers;
+        // broadcast to all connected bitswap peers if none are supplied
+        Set<PeerId> audience = peers.isEmpty() ? getBroadcastAudience() : peers;
         List<MessageOuterClass.Message.Wantlist.Entry> wantsProto = wants.stream()
                 .map(want -> MessageOuterClass.Message.Wantlist.Entry.newBuilder()
                         .setWantType(audience.size() <= 2 || haves.containsKey(want) ?
@@ -78,9 +95,13 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
                         .build())
                 .collect(Collectors.toList());
         engine.buildAndSendMessages(wantsProto, Collections.emptyList(), Collections.emptyList(),
-                msg -> audience.forEach(peer -> dialPeer(us, peer, c -> {
-                    c.send(msg);
-                })));
+                msg -> audience.forEach(peer -> {
+                    try {
+                        dialPeer(us, peer, c -> {
+                            c.send(msg);
+                        });
+                    } catch (Exception e) {}
+                }));
     }
 
     private void dialPeer(Host us, PeerId peer, Consumer<BitswapController> action) {
@@ -89,5 +110,18 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
             throw new IllegalStateException("No addresses known for peer " + peer);
         BitswapController controller = dial(us, peer, addr).getController().join();
         action.accept(controller);
+    }
+
+    public class LRUCache<K, V> extends LinkedHashMap<K, V> {
+        private final int cacheSize;
+
+        public LRUCache(int cacheSize) {
+            super(16, 0.75f, true);
+            this.cacheSize = cacheSize;
+        }
+
+        protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+            return size() >= cacheSize;
+        }
     }
 }

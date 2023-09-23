@@ -148,7 +148,7 @@ public class HostBuilder {
             b.getIdentity().setFactory(() -> privKey);
             b.getTransports().add(TcpTransport::new);
             b.getSecureChannels().add(NoiseXXSecureChannel::new);
-            b.getSecureChannels().add(TlsSecureChannel::new);
+//            b.getSecureChannels().add(TlsSecureChannel::new);
 
             b.getMuxers().addAll(muxers);
             RamAddressBook addrs = new RamAddressBook();
@@ -160,6 +160,8 @@ public class HostBuilder {
                 b.getProtocols().add(protocol);
                 if (protocol instanceof AddressBookConsumer)
                     ((AddressBookConsumer) protocol).setAddressBook(addrs);
+                if (protocol instanceof ConnectionHandler)
+                    b.getConnectionHandlers().add((ConnectionHandler) protocol);
             }
 
             // Send an identify req on all new incoming connections
