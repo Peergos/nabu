@@ -105,7 +105,7 @@ public class EmbeddedIpfs {
         if (records != null) {
             records.close();
         }
-        if (blockProvider != null) {
+        if (blockProvider.isRunning()) {
             blockProvider.stop();
         }
         return node != null ? node.stop() : CompletableFuture.completedFuture(null);

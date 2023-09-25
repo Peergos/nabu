@@ -42,6 +42,10 @@ public class PeriodicBlockProvider {
         newCidProvider.start();
     }
 
+    public boolean isRunning() {
+        return running.get();
+    }
+
     public void stop() {
         running.set(false);
         if (cidProvider.isRunning()) {
@@ -49,6 +53,12 @@ public class PeriodicBlockProvider {
         }
         if (newCidProvider.isRunning()) {
             newCidProvider.stop();
+        }
+        while (!cidProvider.isStopped() || !newCidProvider.isStopped()) {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException ie) {
+            }
         }
     }
 

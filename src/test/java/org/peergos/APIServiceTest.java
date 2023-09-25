@@ -64,8 +64,6 @@ public class APIServiceTest {
         wants.add(new Want(cid1, Optional.of("auth")));
         List<HashedBlock> blocks = ipfs.getBlocks(wants, Collections.emptySet(), false);
         Assert.assertTrue("blocks retrieved", blocks.size() == 1);
-        ipfs.stop().join();
-
     }
 
     @Test
