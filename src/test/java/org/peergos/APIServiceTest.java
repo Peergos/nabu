@@ -1,16 +1,23 @@
 package org.peergos;
 
 import io.ipfs.cid.Cid;
+import io.libp2p.core.Host;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.dht.Kademlia;
+import org.peergos.protocol.dht.RamProviderStore;
+import org.peergos.protocol.dht.RamRecordStore;
+import org.peergos.protocol.dht.RecordStore;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 
 public class APIServiceTest {
 
@@ -40,6 +47,25 @@ public class APIServiceTest {
     public void runAPIServiceWithFileStorageTest() {
         FileBlockstore blocks = new FileBlockstore(TMP_DATA_FOLDER.toPath());
         runAPIServiceTest(blocks);
+    }
+
+    @Test
+    public void testEmbeddedIPFS() throws Exception {
+        Blockstore blockstore = new RamBlockstore();
+        RecordStore records = new RamRecordStore();
+        HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
+                new RamProviderStore(), records, blockstore, (c, b, p, a) -> CompletableFuture.completedFuture(true));
+        Host node = builder1.build();
+        Kademlia dht = builder1.getWanDht().get();
+        EmbeddedIpfs ipfs = new EmbeddedIpfs(node, new ProvidingBlockstore(blockstore), records, dht, null, Optional.empty(), Collections.emptyList());
+        ipfs.start();
+        Cid cid1 = ipfs.blockstore.put("Hello".getBytes(), Cid.Codec.Raw).join();
+        List<Want> wants = new ArrayList<>();
+        wants.add(new Want(cid1, Optional.of("auth")));
+        List<HashedBlock> blocks = ipfs.getBlocks(wants, Collections.emptySet(), false);
+        Assert.assertTrue("blocks retrieved", blocks.size() == 1);
+        ipfs.stop().join();
+
     }
 
     @Test

@@ -31,8 +31,8 @@ public class PeriodicBlockProvider {
         this.us = us;
         this.dht = dht;
         this.newBlocksToPublish = newBlocksToPublish;
-        this.cidProvider = new ControlSubThread(reprovideIntervalMillis, () -> publish(getBlocks.get()), "CidReprovider");
-        this.newCidProvider = new ControlSubThread(0, () -> provideNewBlocks(), "NewCidProvider");
+        this.cidProvider = new ControlSubThread(reprovideIntervalMillis, () -> { publish(getBlocks.get()); return null;}, "CidReprovider");
+        this.newCidProvider = new ControlSubThread(0, () -> { provideNewBlocks(); return null;}, "NewCidProvider");
     }
 
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -54,13 +54,9 @@ public class PeriodicBlockProvider {
 
     public void provideNewBlocks() {
         while (running.get()) {
-            try {
-                Cid c = newBlocksToPublish.poll();
-                if (c != null) {
-                    publish(Stream.of(c));
-                }
-            } catch (Throwable e) {
-                LOG.log(Level.WARNING, e.getMessage(), e);
+            Cid c = newBlocksToPublish.poll();
+            if (c != null) {
+                publish(Stream.of(c));
             }
         }
     }

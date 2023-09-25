@@ -1,5 +1,6 @@
 package org.peergos;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -16,9 +17,9 @@ public class ControlSubThread {
     private AtomicBoolean stopped = new AtomicBoolean(true);
 
 
-    public ControlSubThread(long sleepInterval, Runnable runnable, String threadName) {
+    public ControlSubThread(long sleepInterval, Callable<Void> callable, String threadName) {
         interval = sleepInterval;
-        worker = new Thread(() -> run(runnable), threadName);
+        worker = new Thread(() -> run(callable), threadName);
     }
 
     public void start() {
@@ -38,13 +39,13 @@ public class ControlSubThread {
         return stopped.get();
     }
 
-    public void run(Runnable runnable) {
+    public void run(Callable<Void> callable) {
         running.set(true);
         stopped.set(false);
         while (running.get()) {
             try {
                 Thread.sleep(interval);
-                runnable.run();
+                callable.call();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 LOG.log(Level.WARNING, "Thread was interrupted, Failed to complete operation");
