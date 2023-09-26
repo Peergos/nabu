@@ -75,6 +75,7 @@ public class PeriodicBlockProvider {
         PeerAddresses ourAddrs = PeerAddresses.fromHost(us);
 
         List<CompletableFuture<Void>> published = blocks.parallel()
+                .takeWhile(b -> running.get())
                 .map(ref -> dht.provideBlock(ref, us, ourAddrs))
                 .collect(Collectors.toList());
         for (CompletableFuture<Void> fut : published) {
