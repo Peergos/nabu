@@ -34,7 +34,7 @@ public class Nabu {
 
     public Nabu(Args args) throws Exception {
         Path ipfsPath = getIPFSPath(args);
-        Logging.init(ipfsPath, args.getBoolean("logToConsole", false));
+        Logging.init(ipfsPath, args.getBoolean("log-to-console", false));
         Config config = readConfig(ipfsPath, args);
         if (config.metrics.enabled) {
             AggregatedMetrics.startExporter(config.metrics.address, config.metrics.port);
