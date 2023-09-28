@@ -19,13 +19,13 @@ public class PeriodicBlockProvider {
     private final Supplier<Stream<Cid>> getBlocks;
     private final Host us;
     private final Kademlia dht;
-    private final Queue<Cid> newBlocksToPublish;
+    private final BlockingDeque<Cid> newBlocksToPublish;
 
     public PeriodicBlockProvider(long reprovideIntervalMillis,
                                  Supplier<Stream<Cid>> getBlocks,
                                  Host us,
                                  Kademlia dht,
-                                 Queue<Cid> newBlocksToPublish) {
+                                 BlockingDeque<Cid> newBlocksToPublish) {
         this.reprovideIntervalMillis = reprovideIntervalMillis;
         this.getBlocks = getBlocks;
         this.us = us;
@@ -58,7 +58,7 @@ public class PeriodicBlockProvider {
     public void provideNewBlocks() {
         while (running.get()) {
             try {
-                Cid c = newBlocksToPublish.poll();
+                Cid c = newBlocksToPublish.takeFirst();
                 if (c != null) {
                     publish(Stream.of(c));
                 }

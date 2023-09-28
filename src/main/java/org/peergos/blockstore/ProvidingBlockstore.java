@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 public class ProvidingBlockstore implements Blockstore {
 
     private final Blockstore target;
-    public final Queue<Cid> toPublish = new LinkedBlockingDeque<>();
+    public final BlockingDeque<Cid> toPublish = new LinkedBlockingDeque<>();
 
     public ProvidingBlockstore(Blockstore target) {
         this.target = target;
