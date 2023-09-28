@@ -30,6 +30,7 @@ public class HttpProxyHandler extends Handler {
     public void handleCallToAPI(HttpExchange httpExchange) {
         long t1 = System.currentTimeMillis();
         String path = httpExchange.getRequestURI().getPath();
+        ProxyResponse response = null;
         try {
             if (path.startsWith(HttpProxyService.API_URL)) {
                 // /p2p/$target_node_id/http/$target_path
@@ -55,7 +56,7 @@ public class HttpProxyHandler extends Handler {
                 ProxyRequest request = new ProxyRequest(targetPath,
                         ProxyRequest.Method.valueOf(httpExchange.getRequestMethod()),
                         reqHeaders, reqQueryParams, body);
-                ProxyResponse response = service.proxyRequest(targetNodeId, request);
+                response = service.proxyRequest(targetNodeId, request);
                 Headers reponseHeaders = httpExchange.getResponseHeaders();
                 for (Map.Entry<String, String> entry : response.headers.entrySet()) {
                     reponseHeaders.set(entry.getKey(), entry.getValue());
@@ -72,7 +73,7 @@ public class HttpProxyHandler extends Handler {
             httpExchange.close();
             long t2 = System.currentTimeMillis();
             if (LOGGING)
-                LOG.info("API Handler handled " + path + " query in: " + (t2 - t1) + " mS");
+                LOG.info("P2P HTTP proxy handled " + path + " query in: " + (t2 - t1) + " mS" + (response != null ? (", response code http " + response.statusCode) : ""));
         }
     }
 }
