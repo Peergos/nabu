@@ -26,7 +26,7 @@ import static org.peergos.EmbeddedIpfs.buildBlockStore;
 
 public class Nabu {
 
-    private static final Logger LOG = Logger.getLogger(Nabu.class.getName());
+    private static final Logger LOG = Logging.LOG();
 
     private static HttpProtocol.HttpRequestProcessor proxyHandler(MultiAddress target) {
         return (s, req, h) -> HttpProtocol.proxyRequest(req, new InetSocketAddress(target.getHost(), target.getPort()), h);
@@ -34,7 +34,7 @@ public class Nabu {
 
     public Nabu(Args args) throws Exception {
         Path ipfsPath = getIPFSPath(args);
-        Logging.init(ipfsPath, args.getBoolean("log-to-console", false));
+        Logging.init(ipfsPath, args.getBoolean("log-to-console", true));
         Config config = readConfig(ipfsPath, args);
         if (config.metrics.enabled) {
             AggregatedMetrics.startExporter(config.metrics.address, config.metrics.port);

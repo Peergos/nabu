@@ -21,7 +21,7 @@ import java.util.stream.Stream;
 
 public class FileBlockstore implements Blockstore {
 
-    private static final Logger LOG = Logger.getLogger(FileBlockstore.class.getName());
+    private static final Logger LOG = Logging.LOG();
 
     private final Path blocksRoot;
     private final String BLOCKS = "blocks";

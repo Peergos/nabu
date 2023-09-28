@@ -19,7 +19,7 @@ import java.util.function.*;
 import java.util.logging.*;
 
 public class BitswapEngine {
-    private static final Logger LOG = Logger.getLogger(BitswapEngine.class.getName());
+    private static final Logger LOG = Logging.LOG();
 
     private final Blockstore store;
     private final ConcurrentHashMap<Want, CompletableFuture<HashedBlock>> localWants = new ConcurrentHashMap<>();
@@ -164,7 +164,7 @@ public class BitswapEngine {
                 Multihash.Type type = Multihash.Type.lookup((int)Cid.readVarint(bin));
 //                int hashSize = (int)Cid.readVarint(bin);
                 if (type != Multihash.Type.sha2_256) {
-                    Logger.getGlobal().info("Unsupported hash algorithm " + type.name());
+                    LOG.info("Unsupported hash algorithm " + type.name());
                 } else {
                     byte[] hash = Hash.sha256(data);
                     Cid c = new Cid(version, codec, type, hash);

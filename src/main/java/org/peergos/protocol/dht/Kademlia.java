@@ -12,6 +12,7 @@ import io.libp2p.protocol.*;
 import org.peergos.*;
 import org.peergos.protocol.dnsaddr.*;
 import org.peergos.protocol.ipns.*;
+import org.peergos.util.Logging;
 
 import java.time.*;
 import java.util.*;
@@ -23,7 +24,7 @@ import java.util.stream.Stream;
 
 public class Kademlia extends StrictProtocolBinding<KademliaController> implements AddressBookConsumer {
 
-    private static final Logger LOG = Logger.getLogger(Kademlia.class.getName());
+    private static final Logger LOG = Logging.LOG();
     public static final int BOOTSTRAP_PERIOD_MILLIS = 300_000;
     private final KademliaEngine engine;
     private final boolean localDht;

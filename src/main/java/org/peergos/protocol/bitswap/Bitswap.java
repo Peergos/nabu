@@ -17,7 +17,7 @@ import java.util.logging.*;
 import java.util.stream.*;
 
 public class Bitswap extends StrictProtocolBinding<BitswapController> implements AddressBookConsumer, ConnectionHandler {
-    private static final Logger LOG = Logger.getLogger(Bitswap.class.getName());
+    private static final Logger LOG = Logging.LOG();
     public static int MAX_MESSAGE_SIZE = 2*1024*1024;
 
     private final BitswapEngine engine;

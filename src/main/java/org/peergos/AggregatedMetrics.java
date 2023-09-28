@@ -2,6 +2,7 @@ package org.peergos;
 
 import io.prometheus.client.Counter;
 import io.prometheus.client.exporter.HTTPServer;
+import org.peergos.util.Logging;
 
 import java.io.IOException;
 import java.util.logging.Logger;
@@ -10,7 +11,7 @@ import java.util.logging.Logger;
  * A wrapper around the prometheus metrics and HTTP exporter.
  */
 public class AggregatedMetrics {
-    private static final Logger LOG = Logger.getLogger(Nabu.class.getName());
+    private static final Logger LOG = Logging.LOG();
 
     private static Counter build(String name, String help) {
         return Counter.build()

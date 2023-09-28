@@ -16,6 +16,7 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
+import org.peergos.util.Logging;
 
 import java.nio.file.*;
 import java.util.*;
@@ -24,7 +25,7 @@ import java.util.logging.*;
 import java.util.stream.*;
 
 public class EmbeddedIpfs {
-    private static final Logger LOG = Logger.getLogger(EmbeddedIpfs.class.getName());
+    private static final Logger LOG = Logging.LOG();
 
     public final Host node;
     public final ProvidingBlockstore blockstore;

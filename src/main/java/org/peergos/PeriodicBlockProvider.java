@@ -3,6 +3,7 @@ package org.peergos;
 import io.ipfs.cid.*;
 import io.libp2p.core.*;
 import org.peergos.protocol.dht.*;
+import org.peergos.util.Logging;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -14,7 +15,7 @@ import java.util.stream.Stream;
 
 public class PeriodicBlockProvider {
 
-    private static final Logger LOG = Logger.getLogger(PeriodicBlockProvider.class.getName());
+    private static final Logger LOG = Logging.LOG();
     private final long reprovideIntervalMillis;
     private final Supplier<Stream<Cid>> getBlocks;
     private final Host us;

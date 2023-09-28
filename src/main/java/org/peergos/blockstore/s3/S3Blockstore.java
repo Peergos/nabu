@@ -24,7 +24,7 @@ import java.util.stream.*;
 
 public class S3Blockstore implements Blockstore {
 
-    private static final Logger LOG = Logger.getLogger(S3Blockstore.class.getName());
+    private static final Logger LOG = Logging.LOG();
 
     private final String region;
     private final String bucket;
