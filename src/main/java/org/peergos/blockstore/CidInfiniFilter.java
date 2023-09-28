@@ -2,10 +2,14 @@ package org.peergos.blockstore;
 
 import io.ipfs.cid.*;
 import org.peergos.blockstore.filters.*;
+import org.peergos.util.Logging;
 
 import java.util.*;
+import java.util.logging.*;
 
 public class CidInfiniFilter implements Filter {
+
+    private static final Logger LOG = Logging.LOG();
 
     private final ChainedInfiniFilter filter;
 
@@ -34,7 +38,7 @@ public class CidInfiniFilter implements Filter {
         int nextPowerOfTwo = Math.max(17, (int) (1 + Math.log(nBlocks) / Math.log(2)));
         double expansionAlpha = 0.8;
         int bitsPerEntry = (int)(4 - Math.log(falsePositiveRate / expansionAlpha) / Math.log(2) + 1);
-        System.out.println("Using infini filter of initial size " + ((double)(bitsPerEntry * (1 << nextPowerOfTwo) / 8) / 1024 / 1024) + " MiB");
+        LOG.info("Using infini filter of initial size " + ((double)(bitsPerEntry * (1 << nextPowerOfTwo) / 8) / 1024 / 1024) + " MiB");
         ChainedInfiniFilter infini = new ChainedInfiniFilter(nextPowerOfTwo, bitsPerEntry);
         infini.set_expand_autonomously(true);
         refs.forEach(c -> infini.insert(c.toBytes(), true));
