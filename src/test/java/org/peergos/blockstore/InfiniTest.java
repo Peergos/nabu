@@ -16,7 +16,7 @@ public class InfiniTest {
         addRandomBlocks(nBlocks, bs);
 
         long t1 = System.currentTimeMillis();
-        CidInfiniFilter infini = CidInfiniFilter.build(bs);
+        CidInfiniFilter infini = CidInfiniFilter.build(bs, 0.01);
         long t2 = System.currentTimeMillis();
         System.out.println("Building filter took: " + (t2-t1)+ "ms");
         List<Cid> refs = bs.refs().join();

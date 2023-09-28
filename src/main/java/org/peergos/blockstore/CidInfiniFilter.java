@@ -29,7 +29,7 @@ public class CidInfiniFilter implements Filter {
     }
 
     public static CidInfiniFilter build(Blockstore bs) {
-        return build(bs, 0.01);
+        return build(bs, 0.0001);
     }
 
     public static CidInfiniFilter build(Blockstore bs, double falsePositiveRate) {
