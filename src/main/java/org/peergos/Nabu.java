@@ -2,6 +2,8 @@ package org.peergos;
 
 import com.sun.net.httpserver.HttpServer;
 import io.ipfs.multiaddr.MultiAddress;
+import org.peergos.blockstore.metadatadb.BlockMetadataStore;
+import org.peergos.blockstore.metadatadb.Builder;
 import org.peergos.config.*;
 import org.peergos.net.APIHandler;
 import org.peergos.net.HttpProxyHandler;
@@ -16,6 +18,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.*;
@@ -25,6 +28,10 @@ import java.util.logging.Logger;
 import static org.peergos.EmbeddedIpfs.buildBlockStore;
 
 public class Nabu {
+
+    public static final String IPFS_PATH = "IPFS_PATH";
+    public static final Path DEFAULT_IPFS_DIR_PATH =
+            Paths.get(System.getProperty("user.home"), ".ipfs");
 
     private static final Logger LOG = Logging.LOG();
 
@@ -44,9 +51,9 @@ public class Nabu {
 
         Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toAbsolutePath().toString());
-
+        BlockMetadataStore meta = Builder.buildBlockMetadata(args);
         EmbeddedIpfs ipfs = EmbeddedIpfs.build(records,
-                buildBlockStore(config, ipfsPath),
+                buildBlockStore(config, ipfsPath, meta),
                 config.addresses.getSwarmAddresses(),
                 config.bootstrap.getBootstrapAddresses(),
                 config.identity,

@@ -16,6 +16,16 @@ public interface CborObject extends Cborable {
 
     List<Multihash> links();
 
+    static List<Cid> getLinks(Cid h, byte[] data) {
+        return h.codec == Cid.Codec.Raw ?
+                Collections.emptyList() :
+                CborObject.fromByteArray(data)
+                        .links()
+                        .stream()
+                        .map(m -> (Cid) m)
+                        .collect(Collectors.toList());
+    }
+
     default byte[] toByteArray() {
         ByteArrayOutputStream bout = new ByteArrayOutputStream();
         CborEncoder encoder = new CborEncoder(bout);

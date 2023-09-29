@@ -7,6 +7,8 @@ import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
 import org.peergos.blockstore.*;
+import org.peergos.blockstore.metadatadb.BlockMetadataStore;
+import org.peergos.blockstore.metadatadb.MetadataCachingStorage;
 import org.peergos.blockstore.s3.S3Blockstore;
 import org.peergos.config.*;
 import org.peergos.net.ConnectionException;
@@ -113,12 +115,14 @@ public class EmbeddedIpfs {
         return node != null ? node.stop() : CompletableFuture.completedFuture(null);
     }
 
-    public static Blockstore buildBlockStore(Config config, Path ipfsPath) {
+    public static Blockstore buildBlockStore(Config config, Path ipfsPath, BlockMetadataStore meta) {
         Blockstore blocks = null;
         if (config.datastore.blockMount.prefix.equals("flatfs.datastore")) {
             blocks = new FileBlockstore(ipfsPath);
         }else if (config.datastore.blockMount.prefix.equals("s3.datastore")) {
-            blocks = new S3Blockstore(config.datastore.blockMount.getParams());
+            S3Blockstore s3blocks = new S3Blockstore(config.datastore.blockMount.getParams(), meta);
+            blocks = s3blocks;
+            s3blocks.updateMetadataStoreIfEmpty();
         } else {
             throw new IllegalStateException("Unrecognized datastore prefix: " + config.datastore.blockMount.prefix);
         }
@@ -132,8 +136,11 @@ public class EmbeddedIpfs {
         } else {
             throw new IllegalStateException("Unhandled filter type: " + config.datastore.filter.type);
         }
-        return config.datastore.allowedCodecs.codecs.isEmpty() ?
+        Blockstore filteredBlockStore = config.datastore.allowedCodecs.codecs.isEmpty() ?
                 blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
+
+        return config.datastore.blockMount.prefix.equals("s3.datastore") ? filteredBlockStore
+                : new MetadataCachingStorage(filteredBlockStore, meta);
     }
 
     public static EmbeddedIpfs build(RecordStore records,

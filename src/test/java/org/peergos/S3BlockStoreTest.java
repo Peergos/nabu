@@ -3,6 +3,8 @@ package org.peergos;
 import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
 import org.junit.*;
+import org.peergos.blockstore.metadatadb.BlockMetadataStore;
+import org.peergos.blockstore.metadatadb.RamBlockMetadataStore;
 import org.peergos.blockstore.s3.S3Blockstore;
 
 import java.util.*;
@@ -30,7 +32,8 @@ public class S3BlockStoreTest {
         params.put("accessKey", "test");
         params.put("secretKey", "testdslocal");
 
-        S3Blockstore bs = new S3Blockstore(params);
+        BlockMetadataStore metadata = new RamBlockMetadataStore();
+        S3Blockstore bs = new S3Blockstore(params, metadata);
         String msg = "hello world!";
         byte[] block = msg.getBytes();
         Cid.Codec codec = Cid.Codec.Raw;

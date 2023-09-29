@@ -1,5 +1,7 @@
 package org.peergos;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -10,6 +12,20 @@ public class Args {
 
     public Args(Map<String, String> params) {
         this.params = params;
+    }
+
+    public Path getIPFSDir() {
+        return hasArg(Nabu.IPFS_PATH) ? Paths.get(getArg(Nabu.IPFS_PATH)) : Nabu.DEFAULT_IPFS_DIR_PATH;
+    }
+
+    public Path fromIPFSDir(String fileName, String defaultName) {
+        Path peergosDir = getIPFSDir();
+        String fName = defaultName == null ? getArg(fileName) : getArg(fileName, defaultName);
+        return peergosDir.resolve(fName);
+    }
+
+    public Path fromIPFSDir(String fileName) {
+        return fromIPFSDir(fileName, null);
     }
 
     public List<String> getAllArgs() {

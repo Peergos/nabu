@@ -5,6 +5,9 @@ import io.ipfs.multihash.Multihash;
 import org.peergos.Hash;
 import org.peergos.blockstore.Blockstore;
 import org.peergos.blockstore.RateLimitException;
+import org.peergos.blockstore.metadatadb.BlockMetadata;
+import org.peergos.blockstore.metadatadb.BlockMetadataStore;
+import org.peergos.cbor.CborObject;
 import org.peergos.util.Hasher;
 import org.peergos.util.*;
 
@@ -16,6 +19,9 @@ import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -38,7 +44,10 @@ public class S3Blockstore implements Blockstore {
 
     private final Hasher hasher;
 
-    public S3Blockstore(Map<String, Object> params) {
+    private final BlockMetadataStore blockMetadata;
+
+    public S3Blockstore(Map<String, Object> params, BlockMetadataStore blockMetadata) {
+        this.blockMetadata = blockMetadata;
         region = getParam(params, "region");
         bucket = getParam(params, "bucket");
         regionEndpoint = getParam(params, "regionEndpoint", "");
@@ -145,6 +154,59 @@ public class S3Blockstore implements Blockstore {
         }
     }
 
+    @Override
+    public CompletableFuture<BlockMetadata> getBlockMetadata(Cid h) {
+        if (h.getType() == Multihash.Type.id)
+            return Futures.of(new BlockMetadata(0, CborObject.getLinks(h, h.getHash())));
+        Optional<BlockMetadata> cached = blockMetadata.get(h);
+        if (cached.isPresent())
+            return Futures.of(cached.get());
+        Optional<byte[]> data = get(h).join();
+        if (data.isEmpty())
+            throw new IllegalStateException("Block not present locally: " + h);
+        byte[] bloc = data.get();
+        if (h.codec == Cid.Codec.Raw) {
+            // we should avoid this by populating the metadata store, as it means two S3 calls, a ranged GET and a HEAD
+            int size = getSizeWithoutRetry(h).join().get();
+            BlockMetadata meta = new BlockMetadata(size, Collections.emptyList());
+            blockMetadata.put(h, meta);
+            return Futures.of(meta);
+        }
+        return Futures.of(blockMetadata.put(h, bloc));
+    }
+
+    public void updateMetadataStoreIfEmpty() {
+        if (blockMetadata.size() > 0)
+            return;
+        LOG.info("Updating block metadata store from S3. Listing blocks...");
+        List<Cid> all = refs().join();
+        LOG.info("Updating block metadata store from S3. Updating db with " + all.size() + " blocks...");
+
+        int updateParallelism = 10;
+        ForkJoinPool pool = new ForkJoinPool(updateParallelism);
+        int batchSize = all.size() / updateParallelism;
+        AtomicLong progress = new AtomicLong(0);
+        int tenth = batchSize/10;
+
+        List<ForkJoinTask<Optional<BlockMetadata>>> futures = IntStream.range(0, updateParallelism)
+                .mapToObj(b -> pool.submit(() -> IntStream.range(b * batchSize, (b + 1) * batchSize)
+                        .mapToObj(i -> {
+                            BlockMetadata res = getBlockMetadata(all.get(i)).join();
+                            if (i % (batchSize / 10) == 0) {
+                                long updatedProgress = progress.addAndGet(tenth);
+                                if (updatedProgress * 10 / all.size() > (updatedProgress - tenth) * 10 / all.size())
+                                    LOG.info("Populating block metadata: " + updatedProgress * 100 / all.size() + "% done");
+                            }
+                            return res;
+                        })
+                        .reduce((x, y) -> y)))
+                .collect(Collectors.toList());
+        futures.stream()
+                .map(ForkJoinTask::join)
+                .collect(Collectors.toList());
+        LOG.info("Finished updating block metadata store from S3.");
+    }
+
     private static <V> V getWithBackoff(Supplier<V> req) {
         long sleep = 100;
         for (int i=0; i < 20; i++) {
@@ -172,6 +234,11 @@ public class S3Blockstore implements Blockstore {
     }
 
     private CompletableFuture<Optional<Integer>> getSizeWithoutRetry(Cid cid) {
+        Optional<BlockMetadata> meta = blockMetadata.get(cid);
+        if (meta.isPresent())
+            return Futures.of(Optional.of(meta.get().size));
+        if (cid.getType() == Multihash.Type.id) // Identity hashes are not actually stored explicitly
+            return Futures.of(Optional.of(0));
         try {
             PresignedUrl headUrl = S3Request.preSignHead(folder + hashToKey(cid), Optional.of(60),
                     S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, region, accessKeyId, secretKey, useHttps, hasher).join();
@@ -208,6 +275,7 @@ public class S3Blockstore implements Blockstore {
                 S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, region, accessKeyId, secretKey, useHttps, hasher).join();
         try {
             byte[] block = HttpUtil.get(getUrl.base, getUrl.fields);
+            blockMetadata.put(cid, block);
             return Futures.of(Optional.of(block));
         } catch (SocketTimeoutException | SSLException e) {
             // S3 can't handle the load so treat this as a rate limit and slow down
@@ -243,6 +311,7 @@ public class S3Blockstore implements Blockstore {
             PresignedUrl putUrl = S3Request.preSignPut(s3Key, block.length, contentHash, false,
                     S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, extraHeaders, region, accessKeyId, secretKey, useHttps, hasher).join();
             HttpUtil.put(putUrl.base, putUrl.fields, block);
+            blockMetadata.put(cid, block);
             return CompletableFuture.completedFuture(cid);
         } catch (IOException e) {
             String msg = e.getMessage();
@@ -269,7 +338,6 @@ public class S3Blockstore implements Blockstore {
 
     @Override
     public CompletableFuture<Boolean> bloomAdd(Cid cid) {
-        //not implemented
         return CompletableFuture.completedFuture(false);
     }
 
