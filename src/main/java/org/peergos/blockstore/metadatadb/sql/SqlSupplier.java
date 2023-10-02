@@ -6,17 +6,10 @@ import java.sql.Statement;
 
 public interface SqlSupplier {
 
-    String listTablesCommand();
-
-    String tableExistsCommand();
-
     String getByteArrayType();
 
-    String getSerialIdType();
 
     String sqlInteger();
-
-    String ensureColumnExistsCommand(String table, String column, String type);
 
     String addMetadataCommand();
 
@@ -27,8 +20,6 @@ public interface SqlSupplier {
                 "size " + sqlInteger() + " not null, " +
                 "links " + getByteArrayType() + " not null);";
     }
-
-    String insertOrIgnoreCommand(String prefix, String suffix);
 
     default void createTable(String sqlTableCreate, Connection conn) throws SQLException {
         Statement createStmt = conn.createStatement();

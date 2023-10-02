@@ -3,7 +3,6 @@ package org.peergos;
 import com.sun.net.httpserver.HttpServer;
 import io.ipfs.multiaddr.MultiAddress;
 import org.peergos.blockstore.metadatadb.BlockMetadataStore;
-import org.peergos.blockstore.metadatadb.Builder;
 import org.peergos.config.*;
 import org.peergos.net.APIHandler;
 import org.peergos.net.HttpProxyHandler;
@@ -26,6 +25,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static org.peergos.EmbeddedIpfs.buildBlockStore;
+import static org.peergos.EmbeddedIpfs.buildBlockMetadata;
 
 public class Nabu {
 
@@ -51,7 +51,7 @@ public class Nabu {
 
         Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toAbsolutePath().toString());
-        BlockMetadataStore meta = Builder.buildBlockMetadata(args);
+        BlockMetadataStore meta = buildBlockMetadata(args);
         EmbeddedIpfs ipfs = EmbeddedIpfs.build(records,
                 buildBlockStore(config, ipfsPath, meta),
                 config.addresses.getSwarmAddresses(),

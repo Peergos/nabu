@@ -6,11 +6,13 @@ import org.junit.*;
 import org.peergos.blockstore.metadatadb.BlockMetadataStore;
 import org.peergos.blockstore.metadatadb.JdbcBlockMetadataStore;
 import org.peergos.blockstore.metadatadb.RamBlockMetadataStore;
+import org.peergos.blockstore.metadatadb.sql.H2Commands;
 import org.peergos.blockstore.metadatadb.sql.SqliteCommands;
+import org.peergos.blockstore.metadatadb.sql.UncloseableConnection;
 import org.peergos.blockstore.s3.S3Blockstore;
-import org.peergos.util.Sqlite;
 
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.util.*;
 
 /*
@@ -32,8 +34,12 @@ public class S3BlockStoreTest {
     }
     @Test
     public void testS3FileStoreWithJDBCMetaDataStore() throws Exception {
-        Connection instance = new Sqlite.UncloseableConnection(Sqlite.build(":memory:"));
-        BlockMetadataStore metadata =  new JdbcBlockMetadataStore(() -> instance, new SqliteCommands());
+        Connection h2Instance = DriverManager.getConnection("jdbc:h2:" +
+            "mem:" + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
+        Connection instance = new UncloseableConnection(h2Instance);
+
+        instance.setAutoCommit(true);
+        BlockMetadataStore metadata =  new JdbcBlockMetadataStore(() -> instance, new H2Commands());
         testFileStore(metadata);
     }
 

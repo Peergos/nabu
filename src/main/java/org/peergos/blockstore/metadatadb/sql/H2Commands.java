@@ -1,24 +1,24 @@
 package org.peergos.blockstore.metadatadb.sql;
 
-public class SqliteCommands implements SqlSupplier {
+public class H2Commands implements SqlSupplier {
 
     @Override
     public String vacuumCommand() {
-        return "VACUUM;";
+        return "";
     }
 
     @Override
     public String addMetadataCommand() {
-        return "INSERT OR IGNORE INTO blockmetadata (cid, size, links) VALUES(?, ?, ?);";
+        return "INSERT INTO blockmetadata (cid, size, links) VALUES(?, ?, ?) ON CONFLICT DO NOTHING;";
     }
 
     @Override
     public String getByteArrayType() {
-        return "blob";
+        return "OBJECT";
     }
 
     @Override
     public String sqlInteger() {
-        return "INTEGER";
+        return "BIGINT";
     }
 }
