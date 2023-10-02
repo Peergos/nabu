@@ -94,6 +94,11 @@ public class MetadataCachingStorage implements Blockstore {
 
     @Override
     public CompletableFuture<Boolean> rm(Cid c) {
-        return target.rm(c);
+        return target.rm(c).thenApply(res -> {
+            if (res) {
+                metadata.remove(c);
+            }
+            return res;
+        });
     }
 }

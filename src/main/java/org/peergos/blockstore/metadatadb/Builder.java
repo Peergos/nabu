@@ -18,7 +18,7 @@ public class Builder {
     public static Supplier<Connection> getPostgresConnector(Args a, String prefix) {
         String postgresHost = a.getArg(prefix + "postgres.host");
         int postgresPort = a.getInt(prefix + "postgres.port", 5432);
-        String databaseName = a.getArg(prefix + "postgres.database", "peergos");
+        String databaseName = a.getArg(prefix + "postgres.database", "nabu");
         String postgresUsername = a.getArg(prefix + "postgres.username");
         String postgresPassword = a.getArg(prefix + "postgres.password");
 

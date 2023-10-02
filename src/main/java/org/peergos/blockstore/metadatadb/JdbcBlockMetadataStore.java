@@ -75,10 +75,10 @@ public class JdbcBlockMetadataStore implements BlockMetadataStore {
 
     public void remove(Cid block) {
         try (Connection conn = getConnection();
-             PreparedStatement insert = conn.prepareStatement(REMOVE)) {
+             PreparedStatement remove = conn.prepareStatement(REMOVE)) {
 
-            insert.setBytes(1, block.toBytes());
-            insert.executeUpdate();
+            remove.setBytes(1, block.toBytes());
+            remove.executeUpdate();
         } catch (SQLException sqe) {
             LOG.log(Level.WARNING, sqe.getMessage(), sqe);
             throw new RuntimeException(sqe);
@@ -109,8 +109,8 @@ public class JdbcBlockMetadataStore implements BlockMetadataStore {
              PreparedStatement insert = conn.prepareStatement(commands.addMetadataCommand())) {
 
             insert.setBytes(1, block.toBytes());
-            insert.setLong(3, meta.size);
-            insert.setBytes(4, new CborObject.CborList(meta.links.stream()
+            insert.setLong(2, meta.size);
+            insert.setBytes(3, new CborObject.CborList(meta.links.stream()
                     .map(Cid::toBytes)
                     .map(CborObject.CborByteArray::new)
                     .collect(Collectors.toList()))

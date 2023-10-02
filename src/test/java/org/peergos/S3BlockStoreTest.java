@@ -4,9 +4,13 @@ import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
 import org.junit.*;
 import org.peergos.blockstore.metadatadb.BlockMetadataStore;
+import org.peergos.blockstore.metadatadb.JdbcBlockMetadataStore;
 import org.peergos.blockstore.metadatadb.RamBlockMetadataStore;
+import org.peergos.blockstore.metadatadb.sql.SqliteCommands;
 import org.peergos.blockstore.s3.S3Blockstore;
+import org.peergos.util.Sqlite;
 
+import java.sql.Connection;
 import java.util.*;
 
 /*
@@ -22,7 +26,18 @@ mc alias set minio 'http://local-s3.localhost:9000' 'test' 'testdslocal'
 public class S3BlockStoreTest {
 
     @Test
-    public void testFileStore() {
+    public void testS3FileStoreWithRamMetaDataStore() {
+        BlockMetadataStore metadata = new RamBlockMetadataStore();
+        testFileStore(metadata);
+    }
+    @Test
+    public void testS3FileStoreWithJDBCMetaDataStore() throws Exception {
+        Connection instance = new Sqlite.UncloseableConnection(Sqlite.build(":memory:"));
+        BlockMetadataStore metadata =  new JdbcBlockMetadataStore(() -> instance, new SqliteCommands());
+        testFileStore(metadata);
+    }
+
+    public void testFileStore(BlockMetadataStore metadata) {
         Map<String, Object> params = new HashMap<>();
         params.put("type", "s3ds");
         params.put("region", "local");
@@ -32,12 +47,15 @@ public class S3BlockStoreTest {
         params.put("accessKey", "test");
         params.put("secretKey", "testdslocal");
 
-        BlockMetadataStore metadata = new RamBlockMetadataStore();
         S3Blockstore bs = new S3Blockstore(params, metadata);
+
         String msg = "hello world!";
         byte[] block = msg.getBytes();
         Cid.Codec codec = Cid.Codec.Raw;
         Cid cid = new Cid(1, codec, Multihash.Type.sha2_256, Hash.sha256(block));
+
+        //clean up from any previous failed test
+        bs.rm(cid).join();
 
         boolean found = bs.has(cid).join();
         Assert.assertTrue("Found cid", !found);

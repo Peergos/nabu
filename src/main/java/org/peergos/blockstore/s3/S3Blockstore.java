@@ -330,6 +330,7 @@ public class S3Blockstore implements Blockstore {
             PresignedUrl delUrl = S3Request.preSignDelete(folder + hashToKey(cid), S3AdminRequests.asAwsDate(ZonedDateTime.now()), host,
                     region, accessKeyId, secretKey, useHttps, hasher).join();
             HttpUtil.delete(delUrl.base, delUrl.fields);
+            blockMetadata.remove(cid);
             return CompletableFuture.completedFuture(true);
         } catch (Exception e) {
             throw new RuntimeException(e);
