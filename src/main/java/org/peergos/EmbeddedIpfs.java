@@ -9,8 +9,8 @@ import io.libp2p.protocol.*;
 import org.peergos.blockstore.*;
 import org.peergos.blockstore.metadatadb.BlockMetadataStore;
 import org.peergos.blockstore.metadatadb.JdbcBlockMetadataStore;
-import org.peergos.blockstore.metadatadb.MetadataCachingStorage;
-import org.peergos.blockstore.metadatadb.sql.SqliteCommands;
+import org.peergos.blockstore.metadatadb.CachingBlockMetadataStore;
+import org.peergos.blockstore.metadatadb.sql.H2BlockMetadataCommands;
 import org.peergos.blockstore.metadatadb.sql.UncloseableConnection;
 import org.peergos.blockstore.s3.S3Blockstore;
 import org.peergos.config.*;
@@ -130,7 +130,7 @@ public class EmbeddedIpfs {
                     metadataPath.toString() + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
             Connection instance = new UncloseableConnection(h2Instance);
             instance.setAutoCommit(true);
-            return new JdbcBlockMetadataStore(() -> instance, new SqliteCommands());
+            return new JdbcBlockMetadataStore(() -> instance, new H2BlockMetadataCommands());
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -160,7 +160,7 @@ public class EmbeddedIpfs {
                 blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
 
         return config.datastore.blockMount.prefix.equals("s3.datastore") ? filteredBlockStore
-                : new MetadataCachingStorage(filteredBlockStore, meta);
+                : new CachingBlockMetadataStore(filteredBlockStore, meta);
     }
 
     public static EmbeddedIpfs build(RecordStore records,

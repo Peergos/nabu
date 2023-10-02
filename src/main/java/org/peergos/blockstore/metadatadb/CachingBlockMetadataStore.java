@@ -11,12 +11,12 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
-public class MetadataCachingStorage implements Blockstore {
+public class CachingBlockMetadataStore implements Blockstore {
 
     private final Blockstore target;
     private final BlockMetadataStore metadata;
 
-    public MetadataCachingStorage(Blockstore target, BlockMetadataStore metadata) {
+    public CachingBlockMetadataStore(Blockstore target, BlockMetadataStore metadata) {
         this.target = target;
         this.metadata = metadata;
     }

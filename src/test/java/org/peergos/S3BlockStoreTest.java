@@ -6,8 +6,7 @@ import org.junit.*;
 import org.peergos.blockstore.metadatadb.BlockMetadataStore;
 import org.peergos.blockstore.metadatadb.JdbcBlockMetadataStore;
 import org.peergos.blockstore.metadatadb.RamBlockMetadataStore;
-import org.peergos.blockstore.metadatadb.sql.H2Commands;
-import org.peergos.blockstore.metadatadb.sql.SqliteCommands;
+import org.peergos.blockstore.metadatadb.sql.H2BlockMetadataCommands;
 import org.peergos.blockstore.metadatadb.sql.UncloseableConnection;
 import org.peergos.blockstore.s3.S3Blockstore;
 
@@ -39,7 +38,7 @@ public class S3BlockStoreTest {
         Connection instance = new UncloseableConnection(h2Instance);
 
         instance.setAutoCommit(true);
-        BlockMetadataStore metadata =  new JdbcBlockMetadataStore(() -> instance, new H2Commands());
+        BlockMetadataStore metadata =  new JdbcBlockMetadataStore(() -> instance, new H2BlockMetadataCommands());
         testFileStore(metadata);
     }
 

@@ -2,7 +2,7 @@ package org.peergos.blockstore.metadatadb;
 
 
 import io.ipfs.cid.Cid;
-import org.peergos.blockstore.metadatadb.sql.SqlSupplier;
+import org.peergos.blockstore.metadatadb.sql.BlockMetadataSqlSupplier;
 import org.peergos.cbor.CborObject;
 import org.peergos.util.Logging;
 
@@ -27,9 +27,9 @@ public class JdbcBlockMetadataStore implements BlockMetadataStore {
     private static final String LIST = "SELECT cid FROM blockmetadata;";
     private static final String SIZE = "SELECT COUNT(*) FROM blockmetadata;";
     private Supplier<Connection> conn;
-    private final SqlSupplier commands;
+    private final BlockMetadataSqlSupplier commands;
 
-    public JdbcBlockMetadataStore(Supplier<Connection> conn, SqlSupplier commands) {
+    public JdbcBlockMetadataStore(Supplier<Connection> conn, BlockMetadataSqlSupplier commands) {
         this.conn = conn;
         this.commands = commands;
         init(commands);
@@ -52,7 +52,7 @@ public class JdbcBlockMetadataStore implements BlockMetadataStore {
         }
     }
 
-    private synchronized void init(SqlSupplier commands) {
+    private synchronized void init(BlockMetadataSqlSupplier commands) {
         try (Connection conn = getConnection()) {
             commands.createTable(commands.createBlockMetadataStoreTableCommand(), conn);
         } catch (Exception e) {
