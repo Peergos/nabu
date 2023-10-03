@@ -98,6 +98,7 @@ public class EmbeddedIpfs {
         int connections = dht.bootstrapRoutingTable(node, bootstrap, addr -> !addr.contains("/wss/"));
         LOG.info("Bootstrapping IPFS kademlia");
         dht.bootstrap(node);
+        dht.startBootstrapThread(node);
 
         blockProvider.start();
     }
