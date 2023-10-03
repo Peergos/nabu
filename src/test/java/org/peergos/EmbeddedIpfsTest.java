@@ -16,7 +16,7 @@ import java.util.stream.*;
 public class EmbeddedIpfsTest {
 
     @Test
-    public void test() throws Exception {
+    public void largeBlock() throws Exception {
         EmbeddedIpfs node1 = build(Collections.emptyList());
         node1.start();
         EmbeddedIpfs node2 = build(node1.node.listenAddresses()
@@ -25,9 +25,11 @@ public class EmbeddedIpfsTest {
                 .collect(Collectors.toList()));
         node2.start();
 
-        Cid block = node2.blockstore.put("G'day mate!".getBytes(), Cid.Codec.Raw).join();
+        Cid block = node2.blockstore.put(new byte[1024 * 1024], Cid.Codec.Raw).join();
         PeerId peerId2 = node2.node.getPeerId();
-        List<HashedBlock> retrieved = node1.getBlocks(List.of(new Want(block)), Set.of(peerId2), false);
+        List<HashedBlock> retrieved = ForkJoinPool.commonPool().submit(
+                () -> node1.getBlocks(List.of(new Want(block)), Set.of(peerId2), false))
+                .get(5, TimeUnit.SECONDS);
         Assert.assertTrue(retrieved.size() == 1);
 
         node1.stop();

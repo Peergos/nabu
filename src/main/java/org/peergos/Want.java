@@ -28,4 +28,9 @@ public class Want {
     public int hashCode() {
         return Objects.hash(cid, authHex);
     }
+
+    @Override
+    public String toString() {
+        return cid.toString() + "(" + authHex.orElse("") + ")";
+    }
 }
