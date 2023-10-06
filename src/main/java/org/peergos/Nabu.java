@@ -43,7 +43,7 @@ public class Nabu {
         BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
 
         Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
-        DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toString());
+        DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toAbsolutePath().toString());
 
         EmbeddedIpfs ipfs = EmbeddedIpfs.build(records,
                 buildBlockStore(config, ipfsPath),
