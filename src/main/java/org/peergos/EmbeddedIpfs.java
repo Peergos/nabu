@@ -127,7 +127,7 @@ public class EmbeddedIpfs {
             // compatibility mode. This is required for 'ON CONFLICT DO NOTHING aka INSERT OR IGNORE INTO'
             Path metadataPath = a.fromIPFSDir("nabu-block-metadata-sql-file", "nabu-blockmetadata.sql");
             java.sql.Connection h2Instance = DriverManager.getConnection("jdbc:h2:" +
-                    metadataPath.toString() + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
+                    metadataPath.toAbsolutePath() + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
             Connection instance = new UncloseableConnection(h2Instance);
             instance.setAutoCommit(true);
             return new JdbcBlockMetadataStore(() -> instance, new H2BlockMetadataCommands());
