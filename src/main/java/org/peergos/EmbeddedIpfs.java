@@ -173,14 +173,15 @@ public class EmbeddedIpfs {
 
     public static Multiaddr[] getAddresses(Host node, Kademlia dht, Multihash targetNodeId) throws ConnectionException {
         AddressBook addressBook = node.getAddressBook();
-        PeerId peerId = PeerId.fromBase58(targetNodeId.bareMultihash().toBase58());
+        Multihash targetPeerId = targetNodeId.bareMultihash();
+        PeerId peerId = PeerId.fromBase58(targetPeerId.toBase58());
         Optional<Multiaddr> targetAddressesOpt = addressBook.get(peerId).join().stream().findFirst();
         Multiaddr[] allAddresses = null;
         if (targetAddressesOpt.isEmpty()) {
-            List<PeerAddresses> closestPeers = dht.findClosestPeers(targetNodeId, 1, node);
-            Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetNodeId)).findFirst();
+            List<PeerAddresses> closestPeers = dht.findClosestPeers(targetPeerId, 1, node);
+            Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetPeerId)).findFirst();
             if (matching.isEmpty()) {
-                throw new ConnectionException("Target not found: " + targetNodeId);
+                throw new ConnectionException("Target not found: " + targetPeerId);
             }
             PeerAddresses peer = matching.get();
             allAddresses = peer.addresses.stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
