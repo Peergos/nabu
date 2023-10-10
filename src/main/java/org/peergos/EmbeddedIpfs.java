@@ -165,7 +165,6 @@ public class EmbeddedIpfs {
 
     public static EmbeddedIpfs build(RecordStore records,
                                      Blockstore blocks,
-                                     BlockMetadataStore metaDB,
                                      List<MultiAddress> swarmAddresses,
                                      List<MultiAddress> bootstrap,
                                      IdentitySection identity,

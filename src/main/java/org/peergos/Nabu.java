@@ -54,7 +54,6 @@ public class Nabu {
         BlockMetadataStore meta = buildBlockMetadata(args);
         EmbeddedIpfs ipfs = EmbeddedIpfs.build(records,
                 buildBlockStore(config, ipfsPath, meta),
-                meta,
                 config.addresses.getSwarmAddresses(),
                 config.bootstrap.getBootstrapAddresses(),
                 config.identity,
