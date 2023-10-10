@@ -2,6 +2,7 @@ package org.peergos.blockstore;
 
 import io.ipfs.cid.*;
 import io.ipfs.multihash.*;
+import org.peergos.blockstore.metadatadb.BlockMetadata;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -50,5 +51,10 @@ public class ProvidingBlockstore implements Blockstore {
     @Override
     public CompletableFuture<Boolean> bloomAdd(Cid cid) {
         return target.bloomAdd(cid);
+    }
+
+    @Override
+    public CompletableFuture<BlockMetadata> getBlockMetadata(Cid h) {
+        return target.getBlockMetadata(h);
     }
 }

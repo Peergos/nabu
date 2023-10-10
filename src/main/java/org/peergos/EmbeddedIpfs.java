@@ -7,6 +7,11 @@ import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
 import org.peergos.blockstore.*;
+import org.peergos.blockstore.metadatadb.BlockMetadataStore;
+import org.peergos.blockstore.metadatadb.JdbcBlockMetadataStore;
+import org.peergos.blockstore.metadatadb.CachingBlockMetadataStore;
+import org.peergos.blockstore.metadatadb.sql.H2BlockMetadataCommands;
+import org.peergos.blockstore.metadatadb.sql.UncloseableConnection;
 import org.peergos.blockstore.s3.S3Blockstore;
 import org.peergos.config.*;
 import org.peergos.net.ConnectionException;
@@ -19,6 +24,9 @@ import org.peergos.protocol.http.*;
 import org.peergos.util.Logging;
 
 import java.nio.file.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.*;
@@ -113,12 +121,28 @@ public class EmbeddedIpfs {
         return node != null ? node.stop() : CompletableFuture.completedFuture(null);
     }
 
-    public static Blockstore buildBlockStore(Config config, Path ipfsPath) {
+    public static BlockMetadataStore buildBlockMetadata(Args a) {
+        try {
+            //see https://www.h2database.com/html/features.html#compatibility for the extra params to support
+            // compatibility mode. This is required for 'ON CONFLICT DO NOTHING aka INSERT OR IGNORE INTO'
+            Path metadataPath = a.fromIPFSDir("nabu-block-metadata-sql-file", "nabu-blockmetadata.sql");
+            java.sql.Connection h2Instance = DriverManager.getConnection("jdbc:h2:" +
+                    metadataPath.toAbsolutePath() + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
+            Connection instance = new UncloseableConnection(h2Instance);
+            instance.setAutoCommit(true);
+            return new JdbcBlockMetadataStore(() -> instance, new H2BlockMetadataCommands());
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    public static Blockstore buildBlockStore(Config config, Path ipfsPath, BlockMetadataStore meta) {
         Blockstore blocks = null;
         if (config.datastore.blockMount.prefix.equals("flatfs.datastore")) {
             blocks = new FileBlockstore(ipfsPath);
         }else if (config.datastore.blockMount.prefix.equals("s3.datastore")) {
-            blocks = new S3Blockstore(config.datastore.blockMount.getParams());
+            S3Blockstore s3blocks = new S3Blockstore(config.datastore.blockMount.getParams(), meta);
+            blocks = s3blocks;
+            s3blocks.updateMetadataStoreIfEmpty();
         } else {
             throw new IllegalStateException("Unrecognized datastore prefix: " + config.datastore.blockMount.prefix);
         }
@@ -132,8 +156,11 @@ public class EmbeddedIpfs {
         } else {
             throw new IllegalStateException("Unhandled filter type: " + config.datastore.filter.type);
         }
-        return config.datastore.allowedCodecs.codecs.isEmpty() ?
+        Blockstore filteredBlockStore = config.datastore.allowedCodecs.codecs.isEmpty() ?
                 blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
+
+        return config.datastore.blockMount.prefix.equals("s3.datastore") ? filteredBlockStore
+                : new CachingBlockMetadataStore(filteredBlockStore, meta);
     }
 
     public static EmbeddedIpfs build(RecordStore records,
