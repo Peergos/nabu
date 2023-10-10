@@ -33,7 +33,7 @@ public interface BlockMetadataStore {
         if (block.codec == Cid.Codec.Raw) {
             BlockMetadata meta = new BlockMetadata(data.length, Collections.emptyList());
             return meta;
-        } else {
+        } else if(block.codec == Cid.Codec.DagCbor){
             CborObject cbor = CborObject.fromByteArray(data);
             List<Cid> links = cbor
                     .links().stream()
@@ -41,6 +41,8 @@ public interface BlockMetadataStore {
                     .collect(Collectors.toList());
             BlockMetadata meta = new BlockMetadata(data.length, links);
             return meta;
+        } else {
+            throw new IllegalStateException("Unsupported Block type");
         }
     }
 
