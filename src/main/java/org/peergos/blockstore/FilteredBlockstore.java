@@ -2,6 +2,7 @@ package org.peergos.blockstore;
 
 import io.ipfs.cid.Cid;
 import io.ipfs.multihash.*;
+import org.peergos.blockstore.metadatadb.BlockMetadata;
 import org.peergos.util.*;
 
 import java.util.List;
@@ -67,4 +68,10 @@ public class FilteredBlockstore implements Blockstore {
     public static FilteredBlockstore infiniBased(Blockstore source, double falsePositiveRate) {
         return new FilteredBlockstore(source, CidInfiniFilter.build(source, falsePositiveRate));
     }
+
+    @Override
+    public CompletableFuture<BlockMetadata> getBlockMetadata(Cid h) {
+        return blocks.getBlockMetadata(h);
+    }
+
 }

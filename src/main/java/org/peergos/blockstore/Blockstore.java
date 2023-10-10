@@ -40,8 +40,5 @@ public interface Blockstore {
         return Optional.empty();
     }
 
-    default CompletableFuture<BlockMetadata> getBlockMetadata(Cid h) {
-        return get(h)
-                .thenApply(rawOpt -> BlockMetadataStore.extractMetadata(h, rawOpt.get()));
-    }
+    CompletableFuture<BlockMetadata> getBlockMetadata(Cid h);
 }

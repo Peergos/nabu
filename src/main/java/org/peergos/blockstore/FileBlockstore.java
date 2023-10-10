@@ -3,6 +3,7 @@ package org.peergos.blockstore;
 import io.ipfs.cid.Cid;
 import io.ipfs.multihash.Multihash;
 import org.peergos.Hash;
+import org.peergos.blockstore.metadatadb.BlockMetadata;
 import org.peergos.util.*;
 
 import java.io.*;
@@ -146,5 +147,10 @@ public class FileBlockstore implements Blockstore {
             return keyToHash(filename.substring(0, filename.length() - BLOCK_FILE_SUFFIX.length()));
         }).collect(Collectors.toList());
         return CompletableFuture.completedFuture(cidList);
+    }
+
+    @Override
+    public CompletableFuture<BlockMetadata> getBlockMetadata(Cid h) {
+        throw new IllegalStateException("Unsupported operation!");
     }
 }
