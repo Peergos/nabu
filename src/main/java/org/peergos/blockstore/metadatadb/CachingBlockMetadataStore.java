@@ -22,11 +22,6 @@ public class CachingBlockMetadataStore implements Blockstore {
     }
 
     @Override
-    public Optional<BlockMetadataStore> getBlockMetadataStore() {
-        return Optional.of(metadata);
-    }
-
-    @Override
     public CompletableFuture<Cid> put(byte[] block, Cid.Codec codec) {
         return target.put(block, codec)
                 .thenApply(cid -> {

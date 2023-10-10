@@ -36,9 +36,5 @@ public interface Blockstore {
 
     CompletableFuture<Boolean> bloomAdd(Cid cid);
 
-    default Optional<BlockMetadataStore> getBlockMetadataStore() {
-        return Optional.empty();
-    }
-
     CompletableFuture<BlockMetadata> getBlockMetadata(Cid h);
 }
