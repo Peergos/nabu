@@ -5,7 +5,6 @@ import io.ipfs.multihash.Multihash;
 import org.junit.*;
 import org.peergos.blockstore.metadatadb.BlockMetadataStore;
 import org.peergos.blockstore.metadatadb.JdbcBlockMetadataStore;
-import org.peergos.blockstore.metadatadb.RamBlockMetadataStore;
 import org.peergos.blockstore.metadatadb.sql.H2BlockMetadataCommands;
 import org.peergos.blockstore.metadatadb.sql.UncloseableConnection;
 import org.peergos.blockstore.s3.S3Blockstore;

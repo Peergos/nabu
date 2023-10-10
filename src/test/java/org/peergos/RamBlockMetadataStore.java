@@ -1,6 +1,8 @@
-package org.peergos.blockstore.metadatadb;
+package org.peergos;
 
 import io.ipfs.cid.Cid;
+import org.peergos.blockstore.metadatadb.BlockMetadata;
+import org.peergos.blockstore.metadatadb.BlockMetadataStore;
 
 import java.util.HashMap;
 import java.util.Map;
