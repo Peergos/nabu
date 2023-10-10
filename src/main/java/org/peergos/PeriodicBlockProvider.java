@@ -48,7 +48,11 @@ public class PeriodicBlockProvider {
     public void run() {
         while (running.get()) {
             try {
+                LOG.info("Starting block provider run");
+                long t0 = System.currentTimeMillis();
                 publish(getBlocks.get());
+                long t1 = System.currentTimeMillis();
+                LOG.info("Finished block provider run in " + (t1 - t0)/1_000 + "s");
                 Thread.sleep(reprovideIntervalMillis);
             } catch (Throwable e) {
                 LOG.log(Level.WARNING, e.getMessage(), e);
