@@ -25,7 +25,7 @@ public class RamAddressBook implements AddressBook {
     @NotNull
     @Override
     public CompletableFuture<Collection<Multiaddr>> getAddrs(@NotNull PeerId peerId) {
-        return CompletableFuture.completedFuture(addresses.getOrDefault(peerId, Collections.emptySet()));
+        return CompletableFuture.completedFuture(new ArrayList(addresses.getOrDefault(peerId, Collections.emptySet())));
     }
 
     @NotNull
