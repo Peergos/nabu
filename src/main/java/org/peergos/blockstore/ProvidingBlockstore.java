@@ -2,18 +2,21 @@ package org.peergos.blockstore;
 
 import io.ipfs.cid.*;
 import io.ipfs.multihash.*;
-import org.peergos.blockstore.metadatadb.BlockMetadata;
+import org.peergos.blockstore.metadatadb.*;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.*;
 
 public class ProvidingBlockstore implements Blockstore {
 
     private final Blockstore target;
+    private final BlockMetadataStore metaDB;
     public final BlockingDeque<Cid> toPublish = new LinkedBlockingDeque<>();
 
-    public ProvidingBlockstore(Blockstore target) {
+    public ProvidingBlockstore(Blockstore target, BlockMetadataStore metaDB) {
         this.target = target;
+        this.metaDB = metaDB;
     }
 
     @Override
@@ -45,7 +48,7 @@ public class ProvidingBlockstore implements Blockstore {
 
     @Override
     public CompletableFuture<List<Cid>> refs() {
-        return target.refs();
+        return CompletableFuture.completedFuture(metaDB.list().collect(Collectors.toList()));
     }
 
     @Override
@@ -55,6 +58,6 @@ public class ProvidingBlockstore implements Blockstore {
 
     @Override
     public CompletableFuture<BlockMetadata> getBlockMetadata(Cid h) {
-        return target.getBlockMetadata(h);
+        return CompletableFuture.completedFuture(metaDB.get(h).get());
     }
 }

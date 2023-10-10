@@ -165,12 +165,13 @@ public class EmbeddedIpfs {
 
     public static EmbeddedIpfs build(RecordStore records,
                                      Blockstore blocks,
+                                     BlockMetadataStore metaDB,
                                      List<MultiAddress> swarmAddresses,
                                      List<MultiAddress> bootstrap,
                                      IdentitySection identity,
                                      BlockRequestAuthoriser authoriser,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler) {
-        ProvidingBlockstore blockstore = new ProvidingBlockstore(blocks);
+        ProvidingBlockstore blockstore = new ProvidingBlockstore(blocks,metaDB);
         ProviderStore providers = new RamProviderStore();
 
         HostBuilder builder = new HostBuilder().setIdentity(identity.privKeyProtobuf).listen(swarmAddresses);

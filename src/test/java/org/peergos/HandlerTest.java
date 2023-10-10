@@ -44,7 +44,7 @@ public class HandlerTest {
 
             apiServer = HttpServer.create(localAPIAddress, 500);
             Blockstore blocks = new TypeLimitedBlockstore(new RamBlockstore(), Set.of(Cid.Codec.Raw));
-            EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(blocks), null, null, null, Optional.empty(), Collections.emptyList());
+            EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(blocks, new RamBlockMetadataStore()), null, null, null, Optional.empty(), Collections.emptyList());
             apiServer.createContext(APIHandler.API_URL, new APIHandler(ipfs));
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
@@ -97,7 +97,7 @@ public class HandlerTest {
             InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
             apiServer = HttpServer.create(localAPIAddress, 500);
-            EmbeddedIpfs ipfs = new EmbeddedIpfs(node1, new ProvidingBlockstore(new RamBlockstore()), null, dht, null, Optional.empty(), Collections.emptyList());
+            EmbeddedIpfs ipfs = new EmbeddedIpfs(node1, new ProvidingBlockstore(new RamBlockstore(), new RamBlockMetadataStore()), null, dht, null, Optional.empty(), Collections.emptyList());
             apiServer.createContext(APIHandler.API_URL, new APIHandler(ipfs));
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
@@ -122,7 +122,7 @@ public class HandlerTest {
             InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
             apiServer = HttpServer.create(localAPIAddress, 500);
-            EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(new RamBlockstore()), null, null, null, Optional.empty(), Collections.emptyList());
+            EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(new RamBlockstore(), new RamBlockMetadataStore()), null, null, null, Optional.empty(), Collections.emptyList());
             apiServer.createContext(APIHandler.API_URL, new APIHandler(ipfs));
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();

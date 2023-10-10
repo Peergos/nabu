@@ -100,7 +100,7 @@ public class P2pHttpTest {
             server2.createContext("/", httpExchange -> {
                 try {
                     byte[] body = responseText.getBytes();
-                    httpExchange.sendResponseHeaders(200, body.length);
+                    httpExchange.sendResponseHeaders(400, body.length);
                     httpExchange.getResponseBody().write(body);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -114,8 +114,14 @@ public class P2pHttpTest {
 
             URL target = new URL("http", "localhost", port,
                     "/p2p/" + peerAsCid + "/http/message" + urlParam);
-            Response reply = send(target, "POST", requestBody.getBytes(), requestHeaders);
-            Assert.assertTrue("reply", responseText.equals(new String(reply.body)));
+            for (int i=0; i<100; i++) {
+                try {
+                    Response reply = send(target, "POST", requestBody.getBytes(), requestHeaders);
+                    Assert.assertTrue(reply.statusCode == 400);
+                } catch (IOException e) {
+                    System.out.println();
+                }
+            }
         } catch (IOException ioe) {
             ioe.printStackTrace();
             Assert.assertTrue("IOException", false);

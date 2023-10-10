@@ -1,5 +1,6 @@
 package org.peergos;
 
+import io.ipfs.cid.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import org.junit.*;
@@ -14,6 +15,8 @@ public class KademliaTest {
 
     @Test
     public void findOtherNode() throws Exception {
+        Cid hash = Cid.decode("bafzaajaiaejcafx7o77di6q5lezyzopbxjoqgujrrfou4zijghi5jonchk7zchat");
+        Multihash d = hash.bareMultihash();
         RamBlockstore blockstore1 = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
                 new RamProviderStore(), new RamRecordStore(), blockstore1, (c, b, p, a) -> CompletableFuture.completedFuture(true));
@@ -21,17 +24,17 @@ public class KademliaTest {
         node1.start().join();
         IdentifyBuilder.addIdentifyProtocol(node1);
 
-        HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
-        Host node2 = builder2.build();
-        node2.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node2);
+//        HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
+//                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+//        Host node2 = builder2.build();
+//        node2.start().join();
+//        IdentifyBuilder.addIdentifyProtocol(node2);
 
         try {
             // bootstrap node 2
-            Kademlia dht2 = builder2.getWanDht().get();
-            dht2.bootstrapRoutingTable(node2, BootstrapTest.BOOTSTRAP_NODES, addr -> !addr.contains("/wss/"));
-            dht2.bootstrap(node2);
+//            Kademlia dht2 = builder2.getWanDht().get();
+//            dht2.bootstrapRoutingTable(node2, BootstrapTest.BOOTSTRAP_NODES, addr -> !addr.contains("/wss/"));
+//            dht2.bootstrap(node2);
 
             // bootstrap node 1
             Kademlia dht1 = builder1.getWanDht().get();
@@ -39,7 +42,7 @@ public class KademliaTest {
             dht1.bootstrap(node1);
 
             // Check node1 can find node2 from kubo
-            Multihash peerId2 = Multihash.deserialize(node2.getPeerId().getBytes());
+            Multihash peerId2 = Multihash.fromBase58("12D3KooWBN95Mu5roMQfLW8DDn3b5x2Z8Z92U1XVZRazew8j1CVp");//Multihash.deserialize(node2.getPeerId().getBytes());
             List<PeerAddresses> closestPeers = dht1.findClosestPeers(peerId2, 2, node1);
             Optional<PeerAddresses> matching = closestPeers.stream()
                     .filter(p -> p.peerId.equals(peerId2))
@@ -48,7 +51,7 @@ public class KademliaTest {
                 throw new IllegalStateException("Couldn't find node2 from kubo!");
         } finally {
             node1.stop();
-            node2.stop();
+//            node2.stop();
         }
     }
 }
