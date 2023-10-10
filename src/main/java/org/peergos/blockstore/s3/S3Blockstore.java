@@ -179,7 +179,7 @@ public class S3Blockstore implements Blockstore {
         if (blockMetadata.size() > 0)
             return;
         LOG.info("Updating block metadata store from S3. Listing blocks...");
-        List<Cid> all = refs().join();
+        List<Cid> all = directRefs().join();
         LOG.info("Updating block metadata store from S3. Updating db with " + all.size() + " blocks...");
 
         int updateParallelism = 10;
@@ -344,6 +344,10 @@ public class S3Blockstore implements Blockstore {
 
     @Override
     public CompletableFuture<List<Cid>> refs() {
+        return CompletableFuture.completedFuture(blockMetadata.list().collect(Collectors.toList()));
+    }
+
+    public CompletableFuture<List<Cid>> directRefs() {
         List<Cid> cidList = new ArrayList<>();
         applyToAll(obj -> cidList.add(keyToHash(obj.key)), Integer.MAX_VALUE);
         return CompletableFuture.completedFuture(cidList);

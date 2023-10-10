@@ -171,7 +171,7 @@ public class EmbeddedIpfs {
                                      IdentitySection identity,
                                      BlockRequestAuthoriser authoriser,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler) {
-        ProvidingBlockstore blockstore = new ProvidingBlockstore(blocks,metaDB);
+        ProvidingBlockstore blockstore = new ProvidingBlockstore(blocks);
         ProviderStore providers = new RamProviderStore();
 
         HostBuilder builder = new HostBuilder().setIdentity(identity.privKeyProtobuf).listen(swarmAddresses);

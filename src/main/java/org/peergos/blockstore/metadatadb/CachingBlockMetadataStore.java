@@ -9,7 +9,7 @@ import org.peergos.util.Futures;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Stream;
+import java.util.stream.*;
 
 public class CachingBlockMetadataStore implements Blockstore {
 
@@ -84,7 +84,7 @@ public class CachingBlockMetadataStore implements Blockstore {
 
     @Override
     public CompletableFuture<List<Cid>> refs() {
-        return target.refs();
+        return CompletableFuture.completedFuture(metadata.list().collect(Collectors.toList()));
     }
 
     @Override

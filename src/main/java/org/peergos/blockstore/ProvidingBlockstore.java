@@ -11,12 +11,10 @@ import java.util.stream.*;
 public class ProvidingBlockstore implements Blockstore {
 
     private final Blockstore target;
-    private final BlockMetadataStore metaDB;
     public final BlockingDeque<Cid> toPublish = new LinkedBlockingDeque<>();
 
-    public ProvidingBlockstore(Blockstore target, BlockMetadataStore metaDB) {
+    public ProvidingBlockstore(Blockstore target) {
         this.target = target;
-        this.metaDB = metaDB;
     }
 
     @Override
@@ -48,7 +46,7 @@ public class ProvidingBlockstore implements Blockstore {
 
     @Override
     public CompletableFuture<List<Cid>> refs() {
-        return CompletableFuture.completedFuture(metaDB.list().collect(Collectors.toList()));
+        return target.refs();
     }
 
     @Override
@@ -58,6 +56,6 @@ public class ProvidingBlockstore implements Blockstore {
 
     @Override
     public CompletableFuture<BlockMetadata> getBlockMetadata(Cid h) {
-        return CompletableFuture.completedFuture(metaDB.get(h).get());
+        return target.getBlockMetadata(h);
     }
 }
