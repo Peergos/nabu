@@ -265,6 +265,8 @@ public class S3Blockstore implements Blockstore {
 
     @Override
     public CompletableFuture<Optional<byte[]>> get(Cid cid) {
+        if (blockMetadata.get(cid).isEmpty())
+            return CompletableFuture.completedFuture(Optional.empty());
         return getWithBackoff(() -> getWithoutRetry(cid));
     }
 
