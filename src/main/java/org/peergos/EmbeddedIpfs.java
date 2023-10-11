@@ -1,5 +1,6 @@
 package org.peergos;
 
+import io.ipfs.cid.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
@@ -36,7 +37,7 @@ public class EmbeddedIpfs {
     private static final Logger LOG = Logging.LOG();
 
     public final Host node;
-    public final ProvidingBlockstore blockstore;
+    public final Blockstore blockstore;
     public final BlockService blocks;
     public final RecordStore records;
 
@@ -44,15 +45,16 @@ public class EmbeddedIpfs {
     public final Bitswap bitswap;
     public final Optional<HttpProtocol.Binding> p2pHttp;
     private final List<MultiAddress> bootstrap;
-    private final PeriodicBlockProvider blockProvider;
+    private final Optional<PeriodicBlockProvider> blockProvider;
 
     public EmbeddedIpfs(Host node,
-                        ProvidingBlockstore blockstore,
+                        Blockstore blockstore,
                         RecordStore records,
                         Kademlia dht,
                         Bitswap bitswap,
                         Optional<HttpProtocol.Binding> p2pHttp,
-                        List<MultiAddress> bootstrap) {
+                        List<MultiAddress> bootstrap,
+                        Optional<BlockingDeque<Cid>> newBlockProvider) {
         this.node = node;
         this.blockstore = blockstore;
         this.records = records;
@@ -61,8 +63,8 @@ public class EmbeddedIpfs {
         this.p2pHttp = p2pHttp;
         this.bootstrap = bootstrap;
         this.blocks = new BitswapBlockService(node, bitswap, dht);
-        this.blockProvider = new PeriodicBlockProvider(22 * 3600_000L,
-                () -> blockstore.refs().join().stream(), node, dht, blockstore.toPublish);
+        this.blockProvider = newBlockProvider.map(q -> new PeriodicBlockProvider(22 * 3600_000L,
+                () -> blockstore.refs().join().stream(), node, dht, q));
     }
 
     public List<HashedBlock> getBlocks(List<Want> wants, Set<PeerId> peers, boolean addToLocal) {
@@ -108,16 +110,14 @@ public class EmbeddedIpfs {
         dht.bootstrap(node);
         dht.startBootstrapThread(node);
 
-        blockProvider.start();
+        blockProvider.ifPresent(p -> p.start());
     }
 
     public CompletableFuture<Void> stop() throws Exception {
         if (records != null) {
             records.close();
         }
-        if (blockProvider != null) {
-            blockProvider.stop();
-        }
+        blockProvider.ifPresent(b -> b.stop());
         return node != null ? node.stop() : CompletableFuture.completedFuture(null);
     }
 
@@ -165,12 +165,15 @@ public class EmbeddedIpfs {
 
     public static EmbeddedIpfs build(RecordStore records,
                                      Blockstore blocks,
+                                     boolean provideBlocks,
                                      List<MultiAddress> swarmAddresses,
                                      List<MultiAddress> bootstrap,
                                      IdentitySection identity,
                                      BlockRequestAuthoriser authoriser,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler) {
-        ProvidingBlockstore blockstore = new ProvidingBlockstore(blocks);
+        Blockstore blockstore = provideBlocks ?
+                new ProvidingBlockstore(blocks) :
+                blocks;
         ProviderStore providers = new RamProviderStore();
 
         HostBuilder builder = new HostBuilder().setIdentity(identity.privKeyProtobuf).listen(swarmAddresses);
@@ -195,7 +198,10 @@ public class EmbeddedIpfs {
 
         Host node = builder.addProtocols(protocols).build();
 
-        return new EmbeddedIpfs(node, blockstore, records, dht, bitswap, httpHandler, bootstrap);
+        Optional<BlockingDeque<Cid>> newBlockProvider = provideBlocks ?
+                Optional.of(((ProvidingBlockstore)blockstore).toPublish) :
+                Optional.empty();
+        return new EmbeddedIpfs(node, blockstore, records, dht, bitswap, httpHandler, bootstrap, newBlockProvider);
     }
 
     public static Multiaddr[] getAddresses(Host node, Kademlia dht, Multihash targetNodeId) throws ConnectionException {
