@@ -86,8 +86,11 @@ public class PeriodicBlockProvider {
 
     public CompletableFuture<Void> publish(Cid h, PeerAddresses ourAddrs) {
         try {
-            return dht.provideBlock(h, us, ourAddrs);
-        } catch (Exception e) {
+            return dht.provideBlock(h, us, ourAddrs).exceptionally(t -> {
+                LOG.fine("Couldn't provide block: " + t.getMessage());
+                return null;
+            });
+        } catch (Throwable e) {
             LOG.fine("Couldn't provide block: " + e.getMessage());
             return CompletableFuture.completedFuture(null);
         }
