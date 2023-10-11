@@ -77,10 +77,19 @@ public class PeriodicBlockProvider {
         PeerAddresses ourAddrs = PeerAddresses.fromHost(us);
 
         List<CompletableFuture<Void>> published = blocks.parallel()
-                .map(ref -> dht.provideBlock(ref, us, ourAddrs))
+                .map(ref -> publish(ref, ourAddrs))
                 .collect(Collectors.toList());
         for (CompletableFuture<Void> fut : published) {
             fut.join();
+        }
+    }
+
+    public CompletableFuture<Void> publish(Cid h, PeerAddresses ourAddrs) {
+        try {
+            return dht.provideBlock(h, us, ourAddrs);
+        } catch (Exception e) {
+            LOG.fine("Couldn't provide block: " + e.getMessage());
+            return CompletableFuture.completedFuture(null);
         }
     }
 }
