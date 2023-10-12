@@ -300,19 +300,22 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         long ttl = hours * 3600_000_000_000L;
 
         int publishes = 0;
-        while (publishes < 20) {
-            List<PeerAddresses> closestPeers = findClosestPeers(publisher, 20, us);
+        for (int i=0; i < 5 && publishes < 20; i++) {
+            List<PeerAddresses> closestPeers = findClosestPeers(publisher, 25, us);
             for (PeerAddresses peer : closestPeers) {
-                boolean success = dialPeer(peer, us).join().putValue("/ipfs/" + value, expiry, sequence,
-                        ttl, publisher, priv).join();
-                if (success)
-                    publishes++;
+                try {
+                    boolean success = dialPeer(peer, us).join()
+                            .putValue("/ipfs/" + value, expiry, sequence,
+                                    ttl, publisher, priv).join();
+                    if (success)
+                        publishes++;
+                } catch (Exception e) {}
             }
         }
         return CompletableFuture.completedFuture(null);
     }
 
-    public CompletableFuture<String> resolveIpnsValue(Multihash publisher, Host us) {
+    public CompletableFuture<String> resolveIpnsValue(Multihash publisher, Host us, int minResults) {
         List<PeerAddresses> closestPeers = findClosestPeers(publisher, 20, us);
         List<IpnsRecord> candidates = new ArrayList<>();
         Set<PeerAddresses> queryCandidates = new HashSet<>();
@@ -321,10 +324,14 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             if (queriedPeers.contains(peer.peerId))
                 continue;
             queriedPeers.add(peer.peerId);
-            GetResult res = dialPeer(peer, us).join().getValue(publisher).join();
-            if (res.record.isPresent() && res.record.get().publisher.equals(publisher))
-                candidates.add(res.record.get().value);
-            queryCandidates.addAll(res.closerPeers);
+            try {
+                GetResult res = dialPeer(peer, us).join().getValue(publisher).join();
+                if (res.record.isPresent() && res.record.get().publisher.equals(publisher))
+                    candidates.add(res.record.get().value);
+                queryCandidates.addAll(res.closerPeers);
+            } catch (Exception e) {}
+            if (candidates.size() >= minResults)
+                break;
         }
 
         // Validate and sort records by sequence number
