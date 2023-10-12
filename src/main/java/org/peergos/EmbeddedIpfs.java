@@ -139,7 +139,7 @@ public class EmbeddedIpfs {
         Blockstore blocks;
         if (config.datastore.blockMount.prefix.equals("flatfs.datastore")) {
             blocks = new FileBlockstore(ipfsPath);
-        }else if (config.datastore.blockMount.prefix.equals("s3.datastore")) {
+        } else if (config.datastore.blockMount.prefix.equals("s3.datastore")) {
             S3Blockstore s3blocks = new S3Blockstore(config.datastore.blockMount.getParams(), meta);
             blocks = s3blocks;
             s3blocks.updateMetadataStoreIfEmpty();
@@ -150,11 +150,13 @@ public class EmbeddedIpfs {
                 blocks :
                 new CachingBlockMetadataStore(blocks, meta);
 
-        Blockstore typeLimited = config.datastore.allowedCodecs.codecs.isEmpty() ?
-                withMetadb :
-                new TypeLimitedBlockstore(withMetadb, config.datastore.allowedCodecs.codecs);
+        return typeLimited(filteredBlockStore(withMetadb, config), config);
+    }
 
-        return filteredBlockStore(typeLimited, config);
+    public static Blockstore typeLimited(Blockstore blocks, Config config) {
+        return config.datastore.allowedCodecs.codecs.isEmpty() ?
+                blocks :
+                new TypeLimitedBlockstore(blocks, config.datastore.allowedCodecs.codecs)
     }
 
     public static Blockstore filteredBlockStore(Blockstore blocks, Config config) {
