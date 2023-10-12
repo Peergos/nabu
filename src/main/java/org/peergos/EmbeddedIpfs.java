@@ -136,7 +136,7 @@ public class EmbeddedIpfs {
         }
     }
     public static Blockstore buildBlockStore(Config config, Path ipfsPath, BlockMetadataStore meta) {
-        Blockstore blocks = null;
+        Blockstore blocks;
         if (config.datastore.blockMount.prefix.equals("flatfs.datastore")) {
             blocks = new FileBlockstore(ipfsPath);
         }else if (config.datastore.blockMount.prefix.equals("s3.datastore")) {
@@ -146,21 +146,27 @@ public class EmbeddedIpfs {
         } else {
             throw new IllegalStateException("Unrecognized datastore prefix: " + config.datastore.blockMount.prefix);
         }
-        Blockstore blockStore;
+        Blockstore withMetadb = config.datastore.blockMount.prefix.equals("s3.datastore") ?
+                blocks :
+                new CachingBlockMetadataStore(blocks, meta);
+
+        Blockstore typeLimited = config.datastore.allowedCodecs.codecs.isEmpty() ?
+                withMetadb :
+                new TypeLimitedBlockstore(withMetadb, config.datastore.allowedCodecs.codecs);
+
+        return filteredBlockStore(typeLimited, config);
+    }
+
+    public static Blockstore filteredBlockStore(Blockstore blocks, Config config) {
         if (config.datastore.filter.type == FilterType.BLOOM) {
-            blockStore = FilteredBlockstore.bloomBased(blocks, config.datastore.filter.falsePositiveRate);
+            return FilteredBlockstore.bloomBased(blocks, config.datastore.filter.falsePositiveRate);
         } else if(config.datastore.filter.type == FilterType.INFINI) {
-            blockStore = FilteredBlockstore.infiniBased(blocks, config.datastore.filter.falsePositiveRate);
+            return FilteredBlockstore.infiniBased(blocks, config.datastore.filter.falsePositiveRate);
         } else if(config.datastore.filter.type == FilterType.NONE) {
-            blockStore = blocks;
+            return blocks;
         } else {
             throw new IllegalStateException("Unhandled filter type: " + config.datastore.filter.type);
         }
-        Blockstore filteredBlockStore = config.datastore.allowedCodecs.codecs.isEmpty() ?
-                blockStore : new TypeLimitedBlockstore(blockStore, config.datastore.allowedCodecs.codecs);
-
-        return config.datastore.blockMount.prefix.equals("s3.datastore") ? filteredBlockStore
-                : new CachingBlockMetadataStore(filteredBlockStore, meta);
     }
 
     public static EmbeddedIpfs build(RecordStore records,
