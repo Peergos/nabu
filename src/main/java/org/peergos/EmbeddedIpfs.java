@@ -156,7 +156,7 @@ public class EmbeddedIpfs {
     public static Blockstore typeLimited(Blockstore blocks, Config config) {
         return config.datastore.allowedCodecs.codecs.isEmpty() ?
                 blocks :
-                new TypeLimitedBlockstore(blocks, config.datastore.allowedCodecs.codecs)
+                new TypeLimitedBlockstore(blocks, config.datastore.allowedCodecs.codecs);
     }
 
     public static Blockstore filteredBlockStore(Blockstore blocks, Config config) {
