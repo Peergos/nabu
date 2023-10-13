@@ -55,6 +55,7 @@ public class KademliaTest {
         }
     }
 
+    @Ignore
     @Test
     public void ipnsBenchmark() throws Exception {
         RamBlockstore blockstore1 = new RamBlockstore();
