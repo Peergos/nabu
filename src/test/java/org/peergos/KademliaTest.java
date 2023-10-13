@@ -84,11 +84,16 @@ public class KademliaTest {
             dht2.bootstrapRoutingTable(node2, BootstrapTest.BOOTSTRAP_NODES, addr -> !addr.contains("/wss/"));
             dht2.bootstrap(node2);
 
+            List<PrivKey> signers = new ArrayList<>();
             for (int i=0; i < 10; i++) {
                 // publish mapping from node 1
                 PrivKey signer = Ed25519Kt.generateEd25519KeyPair().getFirst();
+                signers.add(signer);
                 Multihash pub = Multihash.deserialize(PeerId.fromPubKey(signer.publicKey()).getBytes());
+                long p0 = System.currentTimeMillis();
                 dht1.publishIpnsValue(signer, pub, value, 1, node1).join();
+                long p1 = System.currentTimeMillis();
+                System.out.println("Publish took " + (p1-p0) + "ms");
 
                 // retrieve it from node 2
                 long t0 = System.currentTimeMillis();
@@ -96,6 +101,16 @@ public class KademliaTest {
                 long t1 = System.currentTimeMillis();
                 Assert.assertTrue(res.equals("/ipfs/" + value));
                 System.out.println("Resolved in " + (t1 - t0) + "ms");
+            }
+
+            // retrieve all again
+            for (PrivKey signer : signers) {
+                Multihash pub = Multihash.deserialize(PeerId.fromPubKey(signer.publicKey()).getBytes());
+                long t0 = System.currentTimeMillis();
+                String res = dht2.resolveIpnsValue(pub, node2, 1).orTimeout(10, TimeUnit.SECONDS).join();
+                long t1 = System.currentTimeMillis();
+                Assert.assertTrue(res.equals("/ipfs/" + value));
+                System.out.println("Resolved again in " + (t1 - t0) + "ms");
             }
         } finally {
             node1.stop();
