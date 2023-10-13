@@ -4,6 +4,7 @@ import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.MultiAddress;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.PeerId;
+import io.libp2p.core.multiformats.*;
 import org.peergos.PeerAddresses;
 import org.peergos.util.JSONParser;
 
@@ -142,7 +143,7 @@ public class NabuClient {
             Map<String, Object> responses = (Map<String, Object>)entry.get("Responses");
             Multihash peerId = Multihash.fromBase58((String) responses.get("ID"));
             ArrayList<String> addrs = (ArrayList<String>)responses.get("Addrs");
-            List<MultiAddress> peerAddresses = addrs.stream().map(a -> new MultiAddress(a)).collect(Collectors.toList());
+            List<Multiaddr> peerAddresses = addrs.stream().map(a -> Multiaddr.fromString(a)).collect(Collectors.toList());
             providers.add(new PeerAddresses(peerId, peerAddresses));
         }
         return providers;

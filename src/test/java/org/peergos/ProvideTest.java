@@ -56,7 +56,6 @@ public class ProvideTest {
             byte[] blockData = ("This is hopefully a unique block" + System.currentTimeMillis()).getBytes();
             Cid block = blockstore.put(blockData, Cid.Codec.Raw).join();
             PeerAddresses ourAddresses = new PeerAddresses(node1Id, node1.listenAddresses().stream()
-                    .map(m -> new MultiAddress(m.toString()))
                     .collect(Collectors.toList()));
             dht.provideBlock(block, node1, ourAddresses).join();
 

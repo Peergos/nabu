@@ -140,7 +140,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         if (maxCount == 1) {
             Collection<Multiaddr> existing = addressBook.get(PeerId.fromBase58(peerIdkey.toBase58())).join();
             if (! existing.isEmpty())
-                return Collections.singletonList(new PeerAddresses(peerIdkey, existing.stream().map(a -> a.toString()).map(MultiAddress::new).collect(Collectors.toList())));
+                return Collections.singletonList(new PeerAddresses(peerIdkey, new ArrayList<>(existing)));
             Optional<PeerAddresses> match = localClosest.stream().filter(p -> p.peerId.equals(peerIdkey)).findFirst();
             if (match.isPresent())
                 return Collections.singletonList(match.get());
@@ -266,8 +266,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
 
     private Multiaddr[] getPublic(PeerAddresses target) {
         return target.addresses.stream()
-                .filter(a -> localDht || a.isPublic(false))
-                .map(a -> Multiaddr.fromString(a.toString()))
+                .filter(a -> localDht || PeerAddresses.isPublic(a, false))
                 .collect(Collectors.toList()).toArray(new Multiaddr[0]);
     }
 

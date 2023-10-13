@@ -58,10 +58,7 @@ public class KademliaEngine {
         }
         return nodes.stream()
                 .map(n -> {
-                    List<MultiAddress> addrs = addressBook.getAddrs(PeerId.fromBase58(n.getLink())).join()
-                            .stream()
-                            .map(m -> new MultiAddress(m.toString()))
-                            .collect(Collectors.toList());
+                    List<Multiaddr> addrs = new ArrayList<>(addressBook.getAddrs(PeerId.fromBase58(n.getLink())).join());
                     return new PeerAddresses(Multihash.fromBase58(n.getLink()), addrs);
                 })
                 .collect(Collectors.toList());
@@ -107,11 +104,8 @@ public class KademliaEngine {
                 Set<PeerAddresses> providers = providersStore.getProviders(hash);
                 if (blocks.hasAny(hash).join()) {
                     providers = new HashSet<>(providers);
-                    providers.add(new PeerAddresses(ourPeerId, addressBook.getAddrs(PeerId.fromBase58(ourPeerId.toBase58()))
-                            .join()
-                            .stream()
-                            .map(a -> new MultiAddress(a.toString()))
-                            .collect(Collectors.toList())));
+                    providers.add(new PeerAddresses(ourPeerId,
+                            new ArrayList<>(addressBook.getAddrs(PeerId.fromBase58(ourPeerId.toBase58())).join())));
                 }
                 Dht.Message.Builder builder = msg.toBuilder();
                 builder = builder.addAllProviderPeers(providers.stream()

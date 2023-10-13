@@ -93,7 +93,7 @@ public class IpnsTest {
                     break;
                 PeerAddresses closer = queue.poll();
                 List<String> candidates = closer.addresses.stream()
-                        .map(MultiAddress::toString)
+                        .map(a -> a.toString())
                         .filter(a -> a.contains("tcp") && a.contains("ip4") && !a.contains("127.0.0.1") && !a.contains("/172."))
                         .collect(Collectors.toList());
                 for (String candidate: candidates) {

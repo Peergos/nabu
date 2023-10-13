@@ -33,7 +33,7 @@ public class AutonatProtocol extends ProtobufProtocolHandler<AutonatProtocol.Aut
                     .setDial(Autonat.Message.Dial.newBuilder()
                             .setPeer(Autonat.Message.PeerInfo.newBuilder()
                                     .addAllAddrs(us.addresses.stream()
-                                            .map(a -> ByteString.copyFrom(a.getBytes()))
+                                            .map(a -> ByteString.copyFrom(a.serialize()))
                                             .collect(Collectors.toList()))
                                     .setId(ByteString.copyFrom(us.peerId.toBytes()))))
                     .build())
