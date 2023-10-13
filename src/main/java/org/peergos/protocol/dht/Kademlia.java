@@ -301,15 +301,16 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         int publishes = 0;
         for (int i=0; i < 5 && publishes < 20; i++) {
             List<PeerAddresses> closestPeers = findClosestPeers(publisher, 25, us);
-            for (PeerAddresses peer : closestPeers) {
+            publishes += closestPeers.stream().parallel().mapToInt(peer -> {
                 try {
                     boolean success = dialPeer(peer, us).join()
                             .putValue("/ipfs/" + value, expiry, sequence,
                                     ttl, publisher, priv).join();
                     if (success)
-                        publishes++;
+                        return 1;
                 } catch (Exception e) {}
-            }
+                return 0;
+            }).sum();
         }
         return CompletableFuture.completedFuture(null);
     }
