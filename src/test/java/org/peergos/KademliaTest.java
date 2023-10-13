@@ -91,7 +91,7 @@ public class KademliaTest {
 
                 // retrieve it from node 2
                 long t0 = System.currentTimeMillis();
-                String res = dht2.resolveIpnsValue(pub, node2, 1).join();
+                String res = dht2.resolveIpnsValue(pub, node2, 1).orTimeout(10, TimeUnit.SECONDS).join();
                 long t1 = System.currentTimeMillis();
                 Assert.assertTrue(res.equals("/ipfs/" + value));
                 System.out.println("Resolved in " + (t1 - t0) + "ms");
