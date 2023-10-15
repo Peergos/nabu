@@ -37,7 +37,7 @@ public class P2pHttpTest {
             h.accept(emptyReply.retain());
         });
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
-                        new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                        new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
         builder1 = builder1.addProtocol(node1Http);
         Host node1 = builder1.build();
         node1.start().join();
@@ -73,7 +73,7 @@ public class P2pHttpTest {
             HttpProtocol.proxyRequest(req, new InetSocketAddress("127.0.0.1", localPort), h);
         });
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
-                new RamProviderStore(), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(1000), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true));
         builder2 = builder2.addProtocol(node2Http);
         Host node2 = builder2.build();
         node2.start().join();

@@ -182,7 +182,7 @@ public class EmbeddedIpfs {
         Blockstore blockstore = provideBlocks ?
                 new ProvidingBlockstore(blocks) :
                 blocks;
-        ProviderStore providers = new RamProviderStore();
+        ProviderStore providers = new RamProviderStore(10_000);
 
         HostBuilder builder = new HostBuilder().setIdentity(identity.privKeyProtobuf).listen(swarmAddresses);
         if (! builder.getPeerId().equals(identity.peerId)) {

@@ -3,6 +3,7 @@ package org.peergos;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import org.jetbrains.annotations.*;
+import org.peergos.util.*;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -39,18 +40,5 @@ public class RamAddressBook implements AddressBook {
         val.addAll(Arrays.asList(multiaddrs));
         addresses.put(peerId, val);
         return CompletableFuture.completedFuture(null);
-    }
-
-    public static class LRUCache<K, V> extends LinkedHashMap<K, V> {
-        private final int cacheSize;
-
-        public LRUCache(int cacheSize) {
-            super(16, 0.75f, true);
-            this.cacheSize = cacheSize;
-        }
-
-        protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
-            return size() >= cacheSize;
-        }
     }
 }
