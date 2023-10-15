@@ -85,7 +85,9 @@ public class KademliaTest {
             dht2.bootstrap(node2);
 
             List<PrivKey> signers = new ArrayList<>();
-            for (int i=0; i < 10; i++) {
+            long publishTotal = 0, resolveTotal = 0;
+            int iterations = 10;
+            for (int i = 0; i < iterations; i++) {
                 // publish mapping from node 1
                 PrivKey signer = Ed25519Kt.generateEd25519KeyPair().getFirst();
                 signers.add(signer);
@@ -94,6 +96,7 @@ public class KademliaTest {
                 dht1.publishIpnsValue(signer, pub, value, 1, node1).join();
                 long p1 = System.currentTimeMillis();
                 System.out.println("Publish took " + (p1-p0) + "ms");
+                publishTotal += p1-p0;
 
                 // retrieve it from node 2
                 long t0 = System.currentTimeMillis();
@@ -101,7 +104,9 @@ public class KademliaTest {
                 long t1 = System.currentTimeMillis();
                 Assert.assertTrue(res.equals("/ipfs/" + value));
                 System.out.println("Resolved in " + (t1 - t0) + "ms");
+                resolveTotal += t1-t0;
             }
+            System.out.println("Publish av: " + publishTotal/iterations + ", resolve av: " + resolveTotal/iterations);
 
             // retrieve all again
             for (PrivKey signer : signers) {
