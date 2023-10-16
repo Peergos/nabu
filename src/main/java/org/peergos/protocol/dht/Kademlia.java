@@ -134,8 +134,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     public List<PeerAddresses> findClosestPeers(Multihash peerIdkey, int maxCount, Host us) {
         byte[] key = peerIdkey.toBytes();
         Id keyId = Id.create(Hash.sha256(key), 256);
-        SortedSet<RoutingEntry> closest = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
-        SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
+        SortedSet<RoutingEntry> closest = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
+        SortedSet<RoutingEntry> toQuery = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
         List<PeerAddresses> localClosest = engine.getKClosestPeers(key);
         if (maxCount == 1) {
             Collection<Multiaddr> existing = addressBook.get(PeerId.fromBase58(peerIdkey.toBase58())).join();
@@ -149,15 +149,17 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 .map(p -> new RoutingEntry(Id.create(Hash.sha256(p.peerId.toBytes()), 256), p))
                 .collect(Collectors.toList()));
         toQuery.addAll(closest);
-        Set<Multihash> queried = new HashSet<>();
+        Set<Multihash> queried = Collections.synchronizedSet(new HashSet<>());
         int queryParallelism = 3;
         while (true) {
-            List<RoutingEntry> queryThisRound = toQuery.stream().limit(queryParallelism).collect(Collectors.toList());
-            toQuery.removeAll(queryThisRound);
-            queryThisRound.forEach(r -> queried.add(r.addresses.peerId));
-            List<CompletableFuture<List<PeerAddresses>>> futures = queryThisRound.stream()
+            List<CompletableFuture<List<PeerAddresses>>> futures = toQuery.stream()
+                    .limit(queryParallelism)
                     .parallel()
-                    .map(r -> getCloserPeers(peerIdkey, r.addresses, us))
+                    .map(r -> {
+                        toQuery.remove(r);
+                        queried.add(r.addresses.peerId);
+                        return getCloserPeers(peerIdkey, r.addresses, us);
+                    })
                     .collect(Collectors.toList());
             boolean foundCloser = false;
             for (CompletableFuture<List<PeerAddresses>> future : futures) {
