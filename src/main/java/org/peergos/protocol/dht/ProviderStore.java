@@ -1,13 +1,13 @@
 package org.peergos.protocol.dht;
 
 import io.ipfs.multihash.*;
-import org.peergos.*;
+import org.peergos.protocol.dht.pb.*;
 
 import java.util.*;
 
 public interface ProviderStore {
 
-    void addProvider(Multihash m, PeerAddresses peer);
+    void addProvider(Multihash m, Dht.Message.Peer peer);
 
-    Set<PeerAddresses> getProviders(Multihash m);
+    Set<Dht.Message.Peer> getProviders(Multihash m);
 }

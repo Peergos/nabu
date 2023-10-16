@@ -47,7 +47,10 @@ public class KademliaEngine {
     }
 
     public Set<PeerAddresses> getProviders(Multihash h) {
-        return providersStore.getProviders(h);
+        return providersStore.getProviders(h)
+                .stream()
+                .map(PeerAddresses::fromProtobuf)
+                .collect(Collectors.toSet());
     }
 
     public List<PeerAddresses> getKClosestPeers(byte[] key) {
@@ -95,21 +98,20 @@ public class KademliaEngine {
                 byte[] remotePeerIdBytes = source.getBytes();
                 Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
                 if (providers.stream().allMatch(p -> Arrays.equals(p.getId().toByteArray(), remotePeerIdBytes))) {
-                    providers.stream().map(PeerAddresses::fromProtobuf).forEach(p -> providersStore.addProvider(hash, p));
+                    providers.forEach(p -> providersStore.addProvider(hash, p));
                 }
                 break;
             }
             case GET_PROVIDERS: {
                 Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
-                Set<PeerAddresses> providers = providersStore.getProviders(hash);
+                Set<Dht.Message.Peer> providers = providersStore.getProviders(hash);
                 if (blocks.hasAny(hash).join()) {
                     providers = new HashSet<>(providers);
                     providers.add(new PeerAddresses(ourPeerId,
-                            new ArrayList<>(addressBook.getAddrs(PeerId.fromBase58(ourPeerId.toBase58())).join())));
+                            new ArrayList<>(addressBook.getAddrs(PeerId.fromBase58(ourPeerId.toBase58())).join())).toProtobuf());
                 }
                 Dht.Message.Builder builder = msg.toBuilder();
                 builder = builder.addAllProviderPeers(providers.stream()
-                        .map(PeerAddresses::toProtobuf)
                         .collect(Collectors.toList()));
                 builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
                         .stream()
