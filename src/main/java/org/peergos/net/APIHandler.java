@@ -124,11 +124,19 @@ public class APIHandler extends Handler {
                         throw new APIException("argument \"cid\" is required\n");
                     }
                     Cid cid = Cid.decode(args.get(0));
-                    ipfs.blockstore.rm(cid).join();
-                    Map res = new HashMap<>();
-                    res.put("Error", "");
-                    res.put("Hash", cid.toString());
-                    replyJson(httpExchange, JSONParser.toString(res));
+                    boolean deleted = ipfs.blockstore.rm(cid).join();
+                    if (deleted) {
+                        Map res = new HashMap<>();
+                        res.put("Error", "");
+                        res.put("Hash", cid.toString());
+                        replyJson(httpExchange, JSONParser.toString(res));
+                    } else {
+                        try {
+                            httpExchange.sendResponseHeaders(400, 0);
+                        } catch (IOException ioe) {
+                            HttpUtil.replyError(httpExchange, ioe);
+                        }
+                    }
                     break;
                 }
                 case STAT: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-block-stat
