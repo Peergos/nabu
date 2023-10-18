@@ -194,7 +194,7 @@ public class BitswapEngine {
                         waiter.complete(new HashedBlock(c, data));
                         localWants.remove(w);
                     } else
-                        LOG.info("Received block we don't want: " + c.toBase58() + " from " + sourcePeerId.bareMultihash());
+                        LOG.info("Received block we don't want: z" + c.toBase58() + " from " + sourcePeerId.bareMultihash());
                 }
             } catch (IOException e) {
                 e.printStackTrace();
