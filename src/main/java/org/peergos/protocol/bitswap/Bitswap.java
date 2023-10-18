@@ -81,7 +81,7 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
 
     public void sendWants(Host us, Set<PeerId> peers) {
         Set<Want> wants = engine.getWants();
-        LOG.fine("Broadcast wants: " + wants.size());
+        LOG.info("Broadcast wants: " + wants.size());
         Map<Want, PeerId> haves = engine.getHaves();
         // broadcast to all connected bitswap peers if none are supplied
         Set<PeerId> audience = peers.isEmpty() ? getBroadcastAudience() : peers;

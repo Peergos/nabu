@@ -224,7 +224,9 @@ public class S3Blockstore implements Blockstore {
 
     @Override
     public CompletableFuture<Boolean> has(Cid cid) {
-            return getWithBackoff(() -> getSizeWithoutRetry(cid)).thenApply(optSize -> optSize.isPresent());
+        if (blockMetadata.get(cid).isEmpty())
+            return CompletableFuture.completedFuture(false);
+        return getWithBackoff(() -> getSizeWithoutRetry(cid)).thenApply(optSize -> optSize.isPresent());
     }
 
     @Override

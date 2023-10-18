@@ -25,6 +25,7 @@ public class BitswapEngine {
     private final ConcurrentHashMap<Want, CompletableFuture<HashedBlock>> localWants = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Want, Boolean> persistBlocks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Want, PeerId> blockHaves = new ConcurrentHashMap<>();
+    private final Map<Want, Boolean> deniedWants = Collections.synchronizedMap(new LRUCache<>(10_000));
     private final Set<PeerId> connections = new HashSet<>();
     private final BlockRequestAuthoriser authoriser;
     private AddressBook addressBook;
@@ -102,7 +103,18 @@ public class BitswapEngine {
                 boolean isCancel = e.getCancel();
                 boolean sendDontHave = e.getSendDontHave();
                 boolean wantBlock = e.getWantType().getNumber() == 0;
+                Want w = new Want(c, auth);
                 if (wantBlock) {
+                    boolean denied = deniedWants.containsKey(w);
+                    if (denied) {
+                        MessageOuterClass.Message.BlockPresence presence = MessageOuterClass.Message.BlockPresence.newBuilder()
+                                .setCid(ByteString.copyFrom(c.toBytes()))
+                                .setType(MessageOuterClass.Message.BlockPresenceType.DontHave)
+                                .build();
+                        presences.add(presence);
+                        messageSize += presence.getSerializedSize();
+                        continue;
+                    }
                     Optional<byte[]> block = store.get(c).join();
                     if (block.isPresent() && authoriser.allowRead(c, block.get(), sourcePeerId, auth.orElse("")).join()) {
                         MessageOuterClass.Message.Block blockP = MessageOuterClass.Message.Block.newBuilder()
@@ -121,6 +133,10 @@ public class BitswapEngine {
                         messageSize += blockSize;
                         blocks.add(blockP);
                     } else if (sendDontHave) {
+                        if (block.isPresent()) {
+                            deniedWants.put(w, true);
+                            LOG.info("Rejecting auth for block " + c + " from " + sourcePeerId.bareMultihash());
+                        }
                         MessageOuterClass.Message.BlockPresence presence = MessageOuterClass.Message.BlockPresence.newBuilder()
                                 .setCid(ByteString.copyFrom(c.toBytes()))
                                 .setType(MessageOuterClass.Message.BlockPresenceType.DontHave)
