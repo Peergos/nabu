@@ -26,6 +26,7 @@ public class BitswapEngine {
     private final ConcurrentHashMap<Want, Boolean> persistBlocks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Want, PeerId> blockHaves = new ConcurrentHashMap<>();
     private final Map<Want, Boolean> deniedWants = Collections.synchronizedMap(new LRUCache<>(10_000));
+    private final Map<PeerId, Map<Want, Boolean>> recentBlocksSent = Collections.synchronizedMap(new LRUCache<>(100));
     private final Set<PeerId> connections = new HashSet<>();
     private final BlockRequestAuthoriser authoriser;
     private AddressBook addressBook;
@@ -96,6 +97,11 @@ public class BitswapEngine {
         int messageSize = 0;
         Multihash peerM = Multihash.deserialize(source.remotePeerId().getBytes());
         Cid sourcePeerId = new Cid(1, Cid.Codec.Libp2pKey, peerM.getType(), peerM.getHash());
+        Map<Want, Boolean> recent = recentBlocksSent.get(source.remotePeerId());
+        if (recent == null) {
+            recent = Collections.synchronizedMap(new LRUCache<>(1_000));
+            recentBlocksSent.put(source.remotePeerId(), recent);
+        }
         if (msg.hasWantlist()) {
             for (MessageOuterClass.Message.Wantlist.Entry e : msg.getWantlist().getEntriesList()) {
                 Cid c = Cid.cast(e.getBlock().toByteArray());
@@ -115,6 +121,8 @@ public class BitswapEngine {
                         messageSize += presence.getSerializedSize();
                         continue;
                     }
+                    if (recent.containsKey(w))
+                        continue; // don't re-send this block as we recently sent it to this peer
                     Optional<byte[]> block = store.get(c).join();
                     if (block.isPresent() && authoriser.allowRead(c, block.get(), sourcePeerId, auth.orElse("")).join()) {
                         MessageOuterClass.Message.Block blockP = MessageOuterClass.Message.Block.newBuilder()
@@ -132,6 +140,7 @@ public class BitswapEngine {
                         }
                         messageSize += blockSize;
                         blocks.add(blockP);
+                        recent.put(w, true);
                     } else if (sendDontHave) {
                         if (block.isPresent()) {
                             deniedWants.put(w, true);
