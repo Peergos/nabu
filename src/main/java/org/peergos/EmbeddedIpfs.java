@@ -80,8 +80,16 @@ public class EmbeddedIpfs {
                 remote.add(w);
         }
         local.stream()
-                .map(w -> new HashedBlock(w.cid, blockstore.get(w.cid).join().get()))
-                .forEach(blocksFound::add);
+                .forEach(w -> {
+                    try {
+                        Optional<byte[]> block = blockstore.get(w.cid).join();
+                        block.ifPresent(b -> blocksFound.add(new HashedBlock(w.cid, b)));
+                        if (block.isEmpty())
+                            remote.add(w);
+                    } catch (Exception e) {
+                        remote.add(w);
+                    }
+                });
         if (remote.isEmpty())
             return blocksFound;
         return java.util.stream.Stream.concat(
