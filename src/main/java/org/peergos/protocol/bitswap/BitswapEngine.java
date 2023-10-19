@@ -17,6 +17,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
 import java.util.logging.*;
+import java.util.stream.*;
 
 public class BitswapEngine {
     private static final Logger LOG = Logging.LOG();
@@ -27,6 +28,7 @@ public class BitswapEngine {
     private final ConcurrentHashMap<Want, PeerId> blockHaves = new ConcurrentHashMap<>();
     private final Map<Want, Boolean> deniedWants = Collections.synchronizedMap(new LRUCache<>(10_000));
     private final Map<PeerId, Map<Want, Boolean>> recentBlocksSent = Collections.synchronizedMap(new LRUCache<>(100));
+    private final Map<PeerId, Map<Want, Boolean>> recentWantsSent = Collections.synchronizedMap(new org.peergos.util.LRUCache<>(100));
     private final Set<PeerId> connections = new HashSet<>();
     private final BlockRequestAuthoriser authoriser;
     private AddressBook addressBook;
@@ -67,7 +69,26 @@ public class BitswapEngine {
         return connected;
     }
 
-    public Set<Want> getWants() {
+    private Map<Want, Boolean> recentSentWants(PeerId peer) {
+        Map<Want, Boolean> recent = recentWantsSent.get(peer);
+        if (recent == null) {
+            recent = Collections.synchronizedMap(new LRUCache<>(1000));
+            recentWantsSent.put(peer, recent);
+        }
+        return recent;
+    }
+
+    public Set<Want> getWants(Set<PeerId> peers) {
+        if (peers.size() == 1) {
+            PeerId peer = peers.stream().findFirst().get();
+            Map<Want, Boolean> recent = recentSentWants(peer);
+
+            Set<Want> res = localWants.keySet().stream()
+                    .filter(w -> !recent.containsKey(w))
+                    .collect(Collectors.toSet());
+            res.forEach(w -> recent.put(w, true));
+            return res;
+        }
         return localWants.keySet();
     }
 

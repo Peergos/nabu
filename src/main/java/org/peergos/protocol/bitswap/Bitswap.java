@@ -64,12 +64,6 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
             results.add(res);
         }
         sendWants(us, peers);
-        ForkJoinPool.commonPool().execute(() -> {
-            while (engine.hasWants()) {
-                try {Thread.sleep(5_000);} catch (InterruptedException e) {}
-                sendWants(us, peers);
-            }
-        });
         return results;
     }
 
@@ -80,7 +74,7 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
     }
 
     public void sendWants(Host us, Set<PeerId> peers) {
-        Set<Want> wants = engine.getWants();
+        Set<Want> wants = engine.getWants(peers);
         Map<Want, PeerId> haves = engine.getHaves();
         // broadcast to all connected bitswap peers if none are supplied
         Set<PeerId> audience = peers.isEmpty() ? getBroadcastAudience() : peers;
