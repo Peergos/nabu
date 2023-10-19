@@ -90,7 +90,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             return true;
         } catch (Exception e) {
             if (e.getCause() instanceof NothingToCompleteException || e.getCause() instanceof NonCompleteException)
-                LOG.info("Couldn't connect to " + peer.peerId);
+                LOG.fine("Couldn't connect to " + peer.peerId);
             else
                 e.printStackTrace();
             return false;
