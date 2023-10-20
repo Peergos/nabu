@@ -42,23 +42,23 @@ public class CachingBlockMetadataStore implements Blockstore {
                 });
     }
 
-    private void cacheBlockMetadata(byte[] block, boolean isRaw) {
-        Cid cid = hashToCid(block, isRaw);
+    private void cacheBlockMetadata(byte[] block, Cid.Codec codec) {
+        Cid cid = hashToCid(block, codec);
         metadata.put(cid, block);
     }
 
-    private Cid hashToCid(byte[] input, boolean isRaw) {
-        return buildCid(Hash.sha256(input), isRaw);
+    private Cid hashToCid(byte[] input, Cid.Codec codec) {
+        return buildCid(Hash.sha256(input), codec);
     }
 
-    private Cid buildCid(byte[] sha256, boolean isRaw) {
-        return Cid.buildCidV1(isRaw ? Cid.Codec.Raw : Cid.Codec.DagCbor, Multihash.Type.sha2_256, sha256);
+    private Cid buildCid(byte[] sha256, Cid.Codec codec) {
+        return Cid.buildCidV1(codec, Multihash.Type.sha2_256, sha256);
     }
 
     @Override
     public CompletableFuture<Optional<byte[]>> get(Cid hash) {
         return target.get(hash).thenApply(bopt -> {
-            bopt.ifPresent(b -> cacheBlockMetadata(b, hash.codec == Cid.Codec.Raw));
+            bopt.ifPresent(b -> cacheBlockMetadata(b, hash.codec));
             return bopt;
         });
     }
