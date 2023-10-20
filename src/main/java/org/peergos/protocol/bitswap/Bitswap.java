@@ -12,6 +12,7 @@ import org.peergos.util.*;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
 import java.util.function.*;
 import java.util.logging.*;
 import java.util.stream.*;
@@ -22,6 +23,7 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
 
     private final BitswapEngine engine;
     private final LRUCache<PeerId, Boolean> connected = new LRUCache<>(100);
+    private final LRUCache<Set<PeerId>, DownloadManager> downloads = new LRUCache<>(100);
     private AddressBook addrs;
 
     public Bitswap(BitswapEngine engine) {
@@ -64,6 +66,8 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
             results.add(res);
         }
         sendWants(us, peers);
+        DownloadManager manager = downloads.getOrDefault(peers, new DownloadManager(us, peers));
+        manager.ensureRunning();
         return results;
     }
 
@@ -73,8 +77,40 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
         return res;
     }
 
+    private class DownloadManager {
+        private final Host us;
+        private final Set<PeerId> peers;
+        private final AtomicBoolean running = new AtomicBoolean(false);
+
+        public DownloadManager(Host us, Set<PeerId> peers) {
+            this.us = us;
+            this.peers = peers;
+        }
+
+        public void ensureRunning() {
+            if (! running.get())
+                new Thread(() -> run()).start();
+        }
+
+        public void run() {
+            running.set(true);
+            while (true) {
+                try {Thread.sleep(5_000);} catch (InterruptedException e) {}
+                Set<Want> wants = engine.getWants(peers);
+                if (wants.isEmpty())
+                    break;
+                sendWants(us, wants, peers);
+            }
+            running.set(false);
+        }
+    }
+
     public void sendWants(Host us, Set<PeerId> peers) {
         Set<Want> wants = engine.getWants(peers);
+        sendWants(us, wants, peers);
+    }
+
+    public void sendWants(Host us, Set<Want> wants, Set<PeerId> peers) {
         Map<Want, PeerId> haves = engine.getHaves();
         // broadcast to all connected bitswap peers if none are supplied
         Set<PeerId> audience = peers.isEmpty() ? getBroadcastAudience() : peers;
