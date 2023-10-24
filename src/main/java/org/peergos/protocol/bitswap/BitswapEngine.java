@@ -175,6 +175,9 @@ public class BitswapEngine {
                                 .build();
                         presences.add(presence);
                         messageSize += presence.getSerializedSize();
+                    } else if (block.isPresent()) {
+                        deniedWants.put(w, true);
+                        LOG.info("Rejecting repeated invalid auth for block " + c + " from " + sourcePeerId.bareMultihash());
                     }
                 } else {
                     boolean hasBlock = store.has(c).join();
