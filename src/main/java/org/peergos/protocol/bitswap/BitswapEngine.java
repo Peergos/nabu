@@ -98,7 +98,7 @@ public class BitswapEngine {
             Set<Want> res = localWants.entrySet().stream()
                     .filter(e -> e.getValue().creationTime > now - 5*60*1000)
                     .map(e -> e.getKey())
-                    .filter(w -> recent.get(w) < now - minResendWait)
+                    .filter(w -> ! recent.containsKey(w) || recent.get(w) < now - minResendWait)
                     .collect(Collectors.toSet());
             res.forEach(w -> recent.put(w, now));
             return res;
