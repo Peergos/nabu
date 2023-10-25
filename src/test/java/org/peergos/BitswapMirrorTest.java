@@ -29,6 +29,7 @@ public class BitswapMirrorTest {
         IdentifyBuilder.addIdentifyProtocol(node1);
         IPFS kubo = new IPFS("localhost", 5001);
         Multiaddr kuboAddress = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kubo.id().get("ID"));
+        preloadBlocksToKubo(kubo);
 //        Multiaddr kuboAddress = Multiaddr.fromString("/ip4/172.104.157.121/tcp/4001/p2p/QmVdFZgHnEgcedCS2G2ZNiEN59LuVrnRm7z3yXtEBv2XiF");
         node1.getAddressBook().setAddrs(kuboAddress.getPeerId(), 0, kuboAddress).join();
         Kademlia dht1 = builder1.getWanDht().get();
@@ -43,19 +44,26 @@ public class BitswapMirrorTest {
             Set<Want> rawToGet = new HashSet<>();
             toGet.add(new Want(Cid.decode("zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg")));
             long t1 = System.currentTimeMillis();
+            Map<Cid, byte[]> blocks = new HashMap<>();
             while (true) {
                 Bitswap bitswap1 = builder1.getBitswap().get();
 //                BitswapController bc1 = bitswap1.dial(node1, kuboAddress).getController().join();
                 List<CborObject> cborBlocks = bitswap1
                         .get(new ArrayList<>(toGet), node1, Set.of(kuboAddress.getPeerId()), false).stream()
                         .map(f -> f.join())
-                        .map(h -> h.block)
+                        .map(h -> {
+                            blocks.put(h.hash, h.block);
+                            return h.block;
+                        })
                         .map(CborObject::fromByteArray)
                         .collect(Collectors.toList());
                 List<byte[]> rawBlocks = bitswap1
                         .get(new ArrayList<>(rawToGet), node1, Set.of(kuboAddress.getPeerId()), false).stream()
                         .map(f -> f.join())
-                        .map(h -> h.block)
+                        .map(h -> {
+                            blocks.put(h.hash, h.block);
+                            return h.block;
+                        })
                         .collect(Collectors.toList());
                 toGet.clear();
                 rawToGet.clear();
@@ -72,8 +80,28 @@ public class BitswapMirrorTest {
             }
             long t2 = System.currentTimeMillis();
             System.out.println("Mirror took " + (t2-t1) + "mS");
+            Assert.assertTrue(blocks.size() == 6745);
         } finally {
             node1.stop();
+        }
+    }
+
+    private static void preloadBlocksToKubo(IPFS kubo) throws IOException {
+        DataInputStream din = new DataInputStream(new FileInputStream("blocks.bin"));
+        Map<Cid, byte[]> blocks = new HashMap<>();
+        while (true) {
+            try {
+                int cidSize = din.readInt();
+                byte[] rawCid = din.readNBytes(cidSize);
+                int len = din.readInt();
+                byte[] b = din.readNBytes(len);
+                blocks.put(Cid.cast(rawCid), b);
+            } catch (IOException e) {
+                break;
+            }
+        }
+        for (Map.Entry<Cid, byte[]> e : blocks.entrySet()) {
+            kubo.block.put(e.getValue(), Optional.of(e.getKey().codec == Cid.Codec.Raw ? "raw" : "dag-cbor"));
         }
     }
 }

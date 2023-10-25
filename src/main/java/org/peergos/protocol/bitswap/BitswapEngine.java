@@ -70,14 +70,13 @@ public class BitswapEngine {
     }
 
     private static final class WantResult {
-        public final CompletableFuture<HashedBlock> result = new CompletableFuture();
+        public final CompletableFuture<HashedBlock> result = new CompletableFuture<>();
         public final long creationTime;
 
         public WantResult(long creationTime) {
             this.creationTime = creationTime;
         }
     }
-
 
     private Map<Want, Long> recentSentWants(PeerId peer) {
         Map<Want, Long> recent = recentWantsSent.get(peer);
