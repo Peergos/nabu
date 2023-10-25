@@ -23,7 +23,7 @@ public class BitswapEngine {
     private static final Logger LOG = Logging.LOG();
 
     private final Blockstore store;
-    private final ConcurrentHashMap<Want, CompletableFuture<HashedBlock>> localWants = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Want, WantResult> localWants = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Want, Boolean> persistBlocks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Want, PeerId> blockHaves = new ConcurrentHashMap<>();
     private final Map<Want, Boolean> deniedWants = Collections.synchronizedMap(new LRUCache<>(10_000));
@@ -47,14 +47,14 @@ public class BitswapEngine {
     }
 
     public CompletableFuture<HashedBlock> getWant(Want w, boolean addToBlockstore) {
-        CompletableFuture<HashedBlock> existing = localWants.get(w);
+        WantResult existing = localWants.get(w);
         if (existing != null)
-            return existing;
-        CompletableFuture<HashedBlock> res = new CompletableFuture<>();
+            return existing.result;
         if (addToBlockstore)
             persistBlocks.put(w, true);
+        WantResult res = new WantResult(System.currentTimeMillis());
         localWants.put(w, res);
-        return res;
+        return res.result;
     }
 
     public boolean hasWants() {
@@ -67,6 +67,15 @@ public class BitswapEngine {
             connected.addAll(connections);
         }
         return connected;
+    }
+
+    private static final class WantResult {
+        public final CompletableFuture<HashedBlock> result = new CompletableFuture<>();
+        public final long creationTime;
+
+        public WantResult(long creationTime) {
+            this.creationTime = creationTime;
+        }
     }
 
     private Map<Want, Long> recentSentWants(PeerId peer) {
@@ -85,8 +94,10 @@ public class BitswapEngine {
 
             long now = System.currentTimeMillis();
             long minResendWait = 5_000;
-            Set<Want> res = localWants.keySet().stream()
-                    .filter(w -> !recent.containsKey(w) || recent.get(w) < now - minResendWait)
+            Set<Want> res = localWants.entrySet().stream()
+                    .filter(e -> e.getValue().creationTime > now - 5*60*1000)
+                    .map(e -> e.getKey())
+                    .filter(w -> ! recent.containsKey(w) || recent.get(w) < now - minResendWait)
                     .collect(Collectors.toSet());
             res.forEach(w -> recent.put(w, now));
             return res;
@@ -220,13 +231,13 @@ public class BitswapEngine {
                     byte[] hash = Hash.sha256(data);
                     Cid c = new Cid(version, codec, type, hash);
                     Want w = new Want(c, auth);
-                    CompletableFuture<HashedBlock> waiter = localWants.get(w);
+                    WantResult waiter = localWants.get(w);
                     if (waiter != null) {
                         if (persistBlocks.containsKey(w)) {
                             store.put(data, codec);
                             persistBlocks.remove(w);
                         }
-                        waiter.complete(new HashedBlock(c, data));
+                        waiter.result.complete(new HashedBlock(c, data));
                         localWants.remove(w);
                     } else
                         LOG.info("Received block we don't want: z" + c.toBase58() + " from " + sourcePeerId.bareMultihash());

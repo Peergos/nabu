@@ -17,8 +17,6 @@ jobs:
         java-version: 11
     - name: Install and run ipfs
       run: ./install-run-ipfs.sh
-    - name: Pin data in kubo
-      run: ./kubo-pin.sh
     - name: Build and Package
       run: mvn package -Dmaven.test.skip=true
     - name: Run tests
