@@ -36,46 +36,46 @@ public class S3Blockstore implements Blockstore {
 
     private static final Histogram readTimerLog = Histogram.build()
             .labelNames("filesize")
-            .name("block_read_seconds")
+            .name("nabu_block_read_seconds")
             .help("Time to read a block from immutable storage")
             .exponentialBuckets(0.01, 2, 16)
             .register();
     private static final Histogram writeTimerLog = Histogram.build()
             .labelNames("filesize")
-            .name("s3_block_write_seconds")
+            .name("nabu_s3_block_write_seconds")
             .help("Time to write a block to immutable storage")
             .exponentialBuckets(0.01, 2, 16)
             .register();
     private static final Counter blockHeads = Counter.build()
-            .name("s3_block_heads")
+            .name("nabu_s3_block_heads")
             .help("Number of block heads to S3")
             .register();
     private static final Counter blockGets = Counter.build()
-            .name("s3_block_gets")
+            .name("nabu_s3_block_gets")
             .help("Number of block gets to S3")
             .register();
     private static final Counter failedBlockGets = Counter.build()
-            .name("s3_block_get_failures")
+            .name("nabu_s3_block_get_failures")
             .help("Number of failed block gets to S3")
             .register();
     private static final Counter blockPuts = Counter.build()
-            .name("s3_block_puts")
+            .name("nabu_s3_block_puts")
             .help("Number of block puts to S3")
             .register();
     private static final Histogram blockPutBytes = Histogram.build()
             .labelNames("size")
-            .name("s3_block_put_bytes")
+            .name("nabu_s3_block_put_bytes")
             .help("Number of bytes written to S3")
             .exponentialBuckets(0.01, 2, 16)
             .register();
 
     private static final Counter getRateLimited = Counter.build()
-            .name("s3_get_rate_limited")
+            .name("nabu_s3_get_rate_limited")
             .help("Number of times we get a http 429 rate limit response during a block get")
             .register();
 
     private static final Counter rateLimited = Counter.build()
-            .name("s3_rate_limited")
+            .name("nabu_s3_rate_limited")
             .help("Number of times we get a http 429 rate limit response")
             .register();
 
