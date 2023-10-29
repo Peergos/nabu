@@ -6,6 +6,7 @@ import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.Stream;
 import io.libp2p.core.multiformats.*;
+import io.prometheus.client.*;
 import org.peergos.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.bitswap.pb.*;
@@ -122,7 +123,7 @@ public class BitswapEngine {
         }
     }
 
-    public void receiveMessage(MessageOuterClass.Message msg, Stream source) {
+    public void receiveMessage(MessageOuterClass.Message msg, Stream source, Counter sentBytes) {
 
         List<MessageOuterClass.Message.BlockPresence> presences = new ArrayList<>();
         List<MessageOuterClass.Message.Block> blocks = new ArrayList<>();
@@ -263,7 +264,10 @@ public class BitswapEngine {
         if (presences.isEmpty() && blocks.isEmpty() && wants.isEmpty())
             return;
 
-        buildAndSendMessages(wants, presences, blocks, source::writeAndFlush);
+        buildAndSendMessages(wants, presences, blocks, reply -> {
+            sentBytes.inc(reply.getSerializedSize());
+            source.writeAndFlush(reply);
+        });
     }
 
     public void buildAndSendMessages(List<MessageOuterClass.Message.Wantlist.Entry> wants,
