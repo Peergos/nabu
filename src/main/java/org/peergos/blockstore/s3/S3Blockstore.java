@@ -35,11 +35,13 @@ public class S3Blockstore implements Blockstore {
     private static final Logger LOG = Logging.LOG();
 
     private static final Histogram readTimerLog = Histogram.build()
+            .labelNames("filesize")
             .name("ipfs_block_read_seconds")
             .help("Time to read a block from immutable storage")
             .exponentialBuckets(0.01, 2, 16)
             .register();
     private static final Histogram writeTimerLog = Histogram.build()
+            .labelNames("filesize")
             .name("ipfs_block_write_seconds")
             .help("Time to write a block to immutable storage")
             .exponentialBuckets(0.01, 2, 16)
@@ -61,6 +63,7 @@ public class S3Blockstore implements Blockstore {
             .help("Number of block puts to S3")
             .register();
     private static final Histogram blockPutBytes = Histogram.build()
+            .labelNames("size")
             .name("ipfs_block_put_bytes")
             .help("Number of bytes written to S3")
             .exponentialBuckets(0.01, 2, 16)
