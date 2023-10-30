@@ -236,6 +236,7 @@ public class BitswapEngine {
 
         LOG.fine("Bitswap received " + msg.getWantlist().getEntriesCount() + " wants, " + msg.getPayloadCount() +
                 " blocks and " + msg.getBlockPresencesCount() + " presences from " + sourcePeerId);
+        boolean receivedWantedBlock = false;
         for (MessageOuterClass.Message.Block block : msg.getPayloadList()) {
             byte[] cidPrefix = block.getPrefix().toByteArray();
             Optional<String> auth = block.getAuth().isEmpty() ?
@@ -256,6 +257,7 @@ public class BitswapEngine {
                     Want w = new Want(c, auth);
                     WantResult waiter = localWants.get(w);
                     if (waiter != null) {
+                        receivedWantedBlock = true;
                         if (persistBlocks.containsKey(w)) {
                             store.put(data, codec);
                             persistBlocks.remove(w);
@@ -271,6 +273,7 @@ public class BitswapEngine {
         }
         if (! localWants.isEmpty())
             LOG.fine("Remaining: " + localWants.size());
+        boolean receivedRequestedHave = false;
         for (MessageOuterClass.Message.BlockPresence blockPresence : msg.getBlockPresencesList()) {
             Cid c = Cid.cast(blockPresence.getCid().toByteArray());
             Optional<String> auth = blockPresence.getAuth().isEmpty() ?
@@ -279,10 +282,11 @@ public class BitswapEngine {
             Want w = new Want(c, auth);
             boolean have = blockPresence.getType().getNumber() == 0;
             if (have && localWants.containsKey(w)) {
+                receivedRequestedHave = true;
                 blockHaves.put(w, source.remotePeerId());
             }
         }
-        if (absentBlocks > 10 && presentBlocks == 0) {
+        if (absentBlocks > 10 && presentBlocks == 0 && ! receivedRequestedHave && ! receivedWantedBlock) {
             // This peer is sending us lots of irrelevant requests, block them
             blockedPeers.put(source.remotePeerId(), true);
         }
