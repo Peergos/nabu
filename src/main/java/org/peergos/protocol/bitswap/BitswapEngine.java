@@ -31,18 +31,30 @@ public class BitswapEngine {
     private final Map<Want, Boolean> deniedWants = Collections.synchronizedMap(new LRUCache<>(10_000));
     private final Map<PeerId, Map<Want, Boolean>> recentBlocksSent = Collections.synchronizedMap(new LRUCache<>(100));
     private final Map<PeerId, Map<Want, Long>> recentWantsSent = Collections.synchronizedMap(new org.peergos.util.LRUCache<>(100));
+    private final Map<PeerId, Boolean> blockedPeers = Collections.synchronizedMap(new LRUCache<>(1_000));
+    private final boolean blockAggressivePeers;
     private final Set<PeerId> connections = new HashSet<>();
     private final BlockRequestAuthoriser authoriser;
     private AddressBook addressBook;
 
-    public BitswapEngine(Blockstore store, BlockRequestAuthoriser authoriser, int maxMessageSize) {
+    public BitswapEngine(Blockstore store, BlockRequestAuthoriser authoriser, int maxMessageSize, boolean blockAggressivePeers) {
         this.store = store;
         this.authoriser = authoriser;
         this.maxMessageSize = maxMessageSize;
+        this.blockAggressivePeers = blockAggressivePeers;
     }
+
+    public BitswapEngine(Blockstore store, BlockRequestAuthoriser authoriser, int maxMessageSize) {
+        this(store, authoriser, maxMessageSize, false);
+    }
+
 
     public int maxMessageSize() {
         return maxMessageSize;
+    }
+
+    public boolean allowConnection(PeerId peer) {
+        return ! blockAggressivePeers || ! blockedPeers.containsKey(peer);
     }
 
     public void setAddressBook(AddressBook addrs) {
@@ -133,7 +145,6 @@ public class BitswapEngine {
 
         List<MessageOuterClass.Message.BlockPresence> presences = new ArrayList<>();
         List<MessageOuterClass.Message.Block> blocks = new ArrayList<>();
-        List<MessageOuterClass.Message.Wantlist.Entry> wants = new ArrayList<>();
 
         int messageSize = 0;
         Multihash peerM = Multihash.deserialize(source.remotePeerId().getBytes());
@@ -143,6 +154,8 @@ public class BitswapEngine {
             recent = Collections.synchronizedMap(new LRUCache<>(1_000));
             recentBlocksSent.put(source.remotePeerId(), recent);
         }
+        int absentBlocks = 0;
+        int presentBlocks = 0;
         if (msg.hasWantlist()) {
             for (MessageOuterClass.Message.Wantlist.Entry e : msg.getWantlist().getEntriesList()) {
                 Cid c = Cid.cast(e.getBlock().toByteArray());
@@ -165,6 +178,10 @@ public class BitswapEngine {
                     if (recent.containsKey(w))
                         continue; // don't re-send this block as we recently sent it to this peer
                     Optional<byte[]> block = store.get(c).join();
+                    if (block.isEmpty())
+                        absentBlocks++;
+                    else
+                        presentBlocks++;
                     if (block.isPresent() && authoriser.allowRead(c, block.get(), sourcePeerId, auth.orElse("")).join()) {
                         MessageOuterClass.Message.Block blockP = MessageOuterClass.Message.Block.newBuilder()
                                 .setPrefix(ByteString.copyFrom(prefixBytes(c)))
@@ -173,8 +190,7 @@ public class BitswapEngine {
                                 .build();
                         int blockSize = blockP.getSerializedSize();
                         if (blockSize + messageSize > maxMessageSize) {
-                            buildAndSendMessages(wants, presences, blocks, source::writeAndFlush);
-                            wants = new ArrayList<>();
+                            buildAndSendMessages(Collections.emptyList(), presences, blocks, source::writeAndFlush);
                             presences = new ArrayList<>();
                             blocks = new ArrayList<>();
                             messageSize = 0;
@@ -266,11 +282,15 @@ public class BitswapEngine {
                 blockHaves.put(w, source.remotePeerId());
             }
         }
+        if (absentBlocks > 10 && presentBlocks == 0) {
+            // This peer is sending us lots of irrelevant requests, block them
+            blockedPeers.put(source.remotePeerId(), true);
+        }
 
-        if (presences.isEmpty() && blocks.isEmpty() && wants.isEmpty())
+        if (presences.isEmpty() && blocks.isEmpty())
             return;
 
-        buildAndSendMessages(wants, presences, blocks, reply -> {
+        buildAndSendMessages(Collections.emptyList(), presences, blocks, reply -> {
             sentBytes.inc(reply.getSerializedSize());
             source.writeAndFlush(reply);
         });
