@@ -8,6 +8,7 @@ import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.Stream;
 import io.libp2p.core.multiformats.*;
+import io.prometheus.client.*;
 import org.peergos.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.dht.pb.*;
@@ -67,13 +68,14 @@ public class KademliaEngine {
                 .collect(Collectors.toList());
     }
 
-    public void receiveRequest(Dht.Message msg, PeerId source, Stream stream) {
+    public void receiveRequest(Dht.Message msg, PeerId source, Stream stream, Counter sentBytes) {
         switch (msg.getType()) {
             case PUT_VALUE: {
                 Optional<IpnsMapping> mapping = IPNS.validateIpnsEntry(msg);
                 if (mapping.isPresent()) {
                     ipnsStore.put(mapping.get().publisher, mapping.get().value);
                     stream.writeAndFlush(msg);
+                    sentBytes.inc(msg.getSerializedSize());
                 }
                 break;
             }
@@ -90,7 +92,9 @@ public class KademliaEngine {
                         .stream()
                         .map(PeerAddresses::toProtobuf)
                         .collect(Collectors.toList()));
-                stream.writeAndFlush(builder.build());
+                Dht.Message reply = builder.build();
+                stream.writeAndFlush(reply);
+                sentBytes.inc(reply.getSerializedSize());
                 break;
             }
             case ADD_PROVIDER: {
@@ -117,7 +121,9 @@ public class KademliaEngine {
                         .stream()
                         .map(PeerAddresses::toProtobuf)
                         .collect(Collectors.toList()));
-                stream.writeAndFlush(builder.build());
+                Dht.Message reply = builder.build();
+                stream.writeAndFlush(reply);
+                sentBytes.inc(reply.getSerializedSize());
                 break;
             }
             case FIND_NODE: {
@@ -126,7 +132,9 @@ public class KademliaEngine {
                         .stream()
                         .map(PeerAddresses::toProtobuf)
                         .collect(Collectors.toList()));
-                stream.writeAndFlush(builder.build());
+                Dht.Message reply = builder.build();
+                stream.writeAndFlush(reply);
+                sentBytes.inc(reply.getSerializedSize());
                 break;
             }
             case PING: {break;} // Not used any more
