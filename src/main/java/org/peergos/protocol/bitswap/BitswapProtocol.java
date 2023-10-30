@@ -29,7 +29,7 @@ public class BitswapProtocol extends ProtobufProtocolHandler<BitswapController> 
     private final BitswapEngine engine;
 
     public BitswapProtocol(BitswapEngine engine) {
-        super(MessageOuterClass.Message.getDefaultInstance(), Bitswap.MAX_MESSAGE_SIZE, Bitswap.MAX_MESSAGE_SIZE);
+        super(MessageOuterClass.Message.getDefaultInstance(), engine.maxMessageSize(), engine.maxMessageSize());
         this.engine = engine;
     }
 

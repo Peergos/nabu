@@ -31,6 +31,11 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
         this.engine = engine;
     }
 
+    public Bitswap(String protocolId, BitswapEngine engine) {
+        super(protocolId, new BitswapProtocol(engine));
+        this.engine = engine;
+    }
+
     public void setAddressBook(AddressBook addrs) {
         engine.setAddressBook(addrs);
         this.addrs = addrs;

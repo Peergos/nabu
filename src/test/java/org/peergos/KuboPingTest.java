@@ -22,7 +22,7 @@ public class KuboPingTest {
         Host node1 = new HostBuilder()
                 .generateIdentity()
                 .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + TestPorts.getPort())))
-                .addProtocols(List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true)))))
+                .addProtocols(List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true), Bitswap.MAX_MESSAGE_SIZE))))
                 .addMuxers(List.of(StreamMuxerProtocol.getYamux()))
                 .build();
         node1.start().join();

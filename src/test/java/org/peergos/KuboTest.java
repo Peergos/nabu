@@ -18,7 +18,7 @@ public class KuboTest {
 
     @Test
     public void getBlock() throws IOException {
-        Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true)));
+        Bitswap bitswap1 = new Bitswap(new BitswapEngine(new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true), Bitswap.MAX_MESSAGE_SIZE));
         Host node1 = HostBuilder.build(TestPorts.getPort(), List.of(bitswap1));
         node1.start().join();
         IdentifyBuilder.addIdentifyProtocol(node1);

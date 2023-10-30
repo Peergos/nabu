@@ -24,6 +24,7 @@ public class BitswapEngine {
     private static final Logger LOG = Logging.LOG();
 
     private final Blockstore store;
+    private final int maxMessageSize;
     private final ConcurrentHashMap<Want, WantResult> localWants = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Want, Boolean> persistBlocks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Want, PeerId> blockHaves = new ConcurrentHashMap<>();
@@ -34,9 +35,14 @@ public class BitswapEngine {
     private final BlockRequestAuthoriser authoriser;
     private AddressBook addressBook;
 
-    public BitswapEngine(Blockstore store, BlockRequestAuthoriser authoriser) {
+    public BitswapEngine(Blockstore store, BlockRequestAuthoriser authoriser, int maxMessageSize) {
         this.store = store;
         this.authoriser = authoriser;
+        this.maxMessageSize = maxMessageSize;
+    }
+
+    public int maxMessageSize() {
+        return maxMessageSize;
     }
 
     public void setAddressBook(AddressBook addrs) {
@@ -166,7 +172,7 @@ public class BitswapEngine {
                                 .setData(ByteString.copyFrom(block.get()))
                                 .build();
                         int blockSize = blockP.getSerializedSize();
-                        if (blockSize + messageSize > Bitswap.MAX_MESSAGE_SIZE) {
+                        if (blockSize + messageSize > maxMessageSize) {
                             buildAndSendMessages(wants, presences, blocks, source::writeAndFlush);
                             wants = new ArrayList<>();
                             presences = new ArrayList<>();
@@ -280,7 +286,7 @@ public class BitswapEngine {
         for (int i=0; i < wants.size(); i++) {
             MessageOuterClass.Message.Wantlist.Entry want = wants.get(i);
             int wantSize = want.getSerializedSize();
-            if (wantSize + messageSize > Bitswap.MAX_MESSAGE_SIZE) {
+            if (wantSize + messageSize > maxMessageSize) {
                 sender.accept(builder.build());
                 builder = MessageOuterClass.Message.newBuilder();
                 messageSize = 0;
@@ -291,7 +297,7 @@ public class BitswapEngine {
         for (int i=0; i < presences.size(); i++) {
             MessageOuterClass.Message.BlockPresence presence = presences.get(i);
             int presenceSize = presence.getSerializedSize();
-            if (presenceSize + messageSize > Bitswap.MAX_MESSAGE_SIZE) {
+            if (presenceSize + messageSize > maxMessageSize) {
                 sender.accept(builder.build());
                 builder = MessageOuterClass.Message.newBuilder();
                 messageSize = 0;
