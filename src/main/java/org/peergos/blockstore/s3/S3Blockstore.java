@@ -35,52 +35,46 @@ public class S3Blockstore implements Blockstore {
     private static final Logger LOG = Logging.LOG();
 
     private static final Histogram readTimerLog = Histogram.build()
-            .labelNames("seconds")
+            .labelNames("filesize")
             .name("ipfs_block_read_seconds")
             .help("Time to read a block from immutable storage")
             .exponentialBuckets(0.01, 2, 16)
             .register();
     private static final Histogram writeTimerLog = Histogram.build()
-            .labelNames("seconds")
+            .labelNames("filesize")
             .name("ipfs_block_write_seconds")
             .help("Time to write a block to immutable storage")
             .exponentialBuckets(0.01, 2, 16)
             .register();
     private static final Counter blockHeads = Counter.build()
-            .labelNames("total")
             .name("ipfs_block_heads_total")
             .help("The total number of S3 block head requests")
             .register();
     private static final Counter blockGets = Counter.build()
-            .labelNames("total")
             .name("ipfs_block_gets_total")
             .help("The total number of S3 block get requests")
             .register();
     private static final Counter failedBlockGets = Counter.build()
-            .labelNames("count")
             .name("ipfs_block_get_failures")
             .help("Number of failed block gets to S3")
             .register();
     private static final Counter blockPuts = Counter.build()
-            .labelNames("total")
             .name("ipfs_block_puts_total")
             .help("Number of block puts to S3")
             .register();
     private static final Histogram blockPutBytes = Histogram.build()
-            .labelNames("bytes")
+            .labelNames("size")
             .name("ipfs_block_put_bytes")
             .help("Number of bytes written to S3")
             .exponentialBuckets(0.01, 2, 16)
             .register();
 
     private static final Counter getRateLimited = Counter.build()
-            .labelNames("total")
             .name("ipfs_get_rate_limited_total")
             .help("Number of times we get a http 429 rate limit response during a block get")
             .register();
 
     private static final Counter rateLimited = Counter.build()
-            .labelNames("total")
             .name("ipfs_rate_limited_total")
             .help("Number of times we get a http 429 rate limit response")
             .register();
