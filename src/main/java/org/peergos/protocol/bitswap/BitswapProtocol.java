@@ -45,6 +45,10 @@ public class BitswapProtocol extends ProtobufProtocolHandler<BitswapController> 
     @NotNull
     @Override
     protected CompletableFuture<BitswapController> onStartResponder(@NotNull Stream stream) {
+        if (! engine.allowConnection(stream.remotePeerId())) {
+            stream.close();
+            throw new IllegalStateException("Blocked peer " + stream.remotePeerId());
+        }
         BitswapConnection conn = new BitswapConnection(stream, responderSentBytes);
         engine.addConnection(stream.remotePeerId(), stream.getConnection().remoteAddress());
         stream.pushHandler(new MessageHandler(engine, responderSentBytes, responderReceivedBytes));
