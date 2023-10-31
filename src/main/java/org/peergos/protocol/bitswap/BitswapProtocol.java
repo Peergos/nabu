@@ -29,6 +29,10 @@ public class BitswapProtocol extends ProtobufProtocolHandler<BitswapController> 
             .name("bitswap_responder_sent_bytes")
             .help("Total sent bytes in bitswap responder")
             .register();
+    private static final Counter blockedConnections = Counter.build()
+            .name("bitswap_blocked_connections")
+            .help("Total connection attempts blocked in bitswap")
+            .register();
     private final BitswapEngine engine;
 
     public BitswapProtocol(BitswapEngine engine) {
@@ -50,7 +54,7 @@ public class BitswapProtocol extends ProtobufProtocolHandler<BitswapController> 
     protected CompletableFuture<BitswapController> onStartResponder(@NotNull Stream stream) {
         if (! engine.allowConnection(stream.remotePeerId())) {
             stream.close();
-            LOG.info("Blocked peer " + stream.remotePeerId());
+            blockedConnections.inc();
             return new CompletableFuture<>();
         }
         BitswapConnection conn = new BitswapConnection(stream, responderSentBytes);
