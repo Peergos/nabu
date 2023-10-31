@@ -5,11 +5,14 @@ import io.libp2p.protocol.*;
 import io.prometheus.client.*;
 import org.jetbrains.annotations.*;
 import org.peergos.protocol.bitswap.pb.*;
+import org.peergos.util.Logging;
 
 import java.util.concurrent.*;
+import java.util.logging.*;
 
 public class BitswapProtocol extends ProtobufProtocolHandler<BitswapController> {
 
+    private static final Logger LOG = Logging.LOG();
     private static final Counter initiatorReceivedBytes = Counter.build()
             .name("bitswap_initiator_received_bytes")
             .help("Total received bytes in bitswap initiator")
@@ -47,7 +50,8 @@ public class BitswapProtocol extends ProtobufProtocolHandler<BitswapController> 
     protected CompletableFuture<BitswapController> onStartResponder(@NotNull Stream stream) {
         if (! engine.allowConnection(stream.remotePeerId())) {
             stream.close();
-            throw new IllegalStateException("Blocked peer " + stream.remotePeerId());
+            LOG.info("Blocked peer " + stream.remotePeerId());
+            return new CompletableFuture<>();
         }
         BitswapConnection conn = new BitswapConnection(stream, responderSentBytes);
         engine.addConnection(stream.remotePeerId(), stream.getConnection().remoteAddress());

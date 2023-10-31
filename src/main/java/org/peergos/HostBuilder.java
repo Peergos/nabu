@@ -110,6 +110,15 @@ public class HostBuilder {
                                      RecordStore records,
                                      Blockstore blocks,
                                      BlockRequestAuthoriser authoriser) {
+        return create(listenPort, providers, records, blocks, authoriser, false);
+    }
+
+    public static HostBuilder create(int listenPort,
+                                     ProviderStore providers,
+                                     RecordStore records,
+                                     Blockstore blocks,
+                                     BlockRequestAuthoriser authoriser,
+                                     boolean blockAggressivePeers) {
         HostBuilder builder = new HostBuilder()
                 .generateIdentity()
                 .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)));
@@ -121,7 +130,7 @@ public class HostBuilder {
                 new Ping(),
                 new AutonatProtocol.Binding(),
                 new CircuitHopProtocol.Binding(relayManager, stop),
-                new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE)),
+                new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
                 dht));
     }
 
