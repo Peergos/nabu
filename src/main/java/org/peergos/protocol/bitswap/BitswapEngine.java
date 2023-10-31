@@ -289,6 +289,7 @@ public class BitswapEngine {
         if (absentBlocks > 10 && presentBlocks == 0 && ! receivedRequestedHave && ! receivedWantedBlock) {
             // This peer is sending us lots of irrelevant requests, block them
             blockedPeers.put(source.remotePeerId(), true);
+            source.close();
         }
 
         if (presences.isEmpty() && blocks.isEmpty())
