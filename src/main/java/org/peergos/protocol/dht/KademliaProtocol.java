@@ -18,14 +18,7 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
             .name("kademlia_initiator_sent_bytes")
             .help("Total sent bytes in kademlia protocol initiator")
             .register();
-    private static final Counter responderReceivedBytes = Counter.build()
-            .name("kademlia_responder_received_bytes")
-            .help("Total received bytes in kademlia protocol responder")
-            .register();
-    private static final Counter responderSentBytes = Counter.build()
-            .name("kademlia_responder_sent_bytes")
-            .help("Total sent bytes in kademlia protocol responder")
-            .register();
+
     public static final int MAX_MESSAGE_SIZE = 1024*1024;
 
     private final KademliaEngine engine;
@@ -48,7 +41,7 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
     @Override
     protected CompletableFuture<KademliaController> onStartResponder(@NotNull Stream stream) {
         engine.addIncomingConnection(stream.remotePeerId(), stream.getConnection().remoteAddress());
-        IncomingRequestHandler handler = new IncomingRequestHandler(engine, responderSentBytes, responderReceivedBytes);
+        IncomingRequestHandler handler = new IncomingRequestHandler(engine);
         stream.pushHandler(handler);
         return CompletableFuture.completedFuture(handler);
     }
@@ -98,18 +91,14 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
 
     class IncomingRequestHandler implements ProtocolMessageHandler<Dht.Message>, KademliaController {
         private final KademliaEngine engine;
-        private final Counter sentBytes, receivedBytes;
 
-        public IncomingRequestHandler(KademliaEngine engine, Counter sentBytes, Counter receivedBytes) {
+        public IncomingRequestHandler(KademliaEngine engine) {
             this.engine = engine;
-            this.sentBytes = sentBytes;
-            this.receivedBytes = receivedBytes;
         }
 
         @Override
         public void onMessage(@NotNull Stream stream, Dht.Message msg) {
-            receivedBytes.inc(msg.getSerializedSize());
-            engine.receiveRequest(msg, stream.remotePeerId(), stream, sentBytes);
+            engine.receiveRequest(msg, stream.remotePeerId(), stream);
         }
 
         @Override
