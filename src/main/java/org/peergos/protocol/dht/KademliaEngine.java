@@ -20,6 +20,27 @@ import java.util.stream.*;
 
 public class KademliaEngine {
 
+    private static final Counter responderReceivedBytes = Counter.build()
+            .name("kademlia_responder_received_bytes")
+            .help("Total received bytes in kademlia protocol responder")
+            .register();
+    private static final Counter responderSentBytes = Counter.build()
+            .name("kademlia_responder_sent_bytes")
+            .help("Total sent bytes in kademlia protocol responder")
+            .register();
+    private static final Counter responderIpnsSentBytes = Counter.build()
+            .name("kademlia_responder_ipns_sent_bytes")
+            .help("Total sent bytes in kademlia ipns protocol responder")
+            .register();
+    private static final Counter responderProvidersSentBytes = Counter.build()
+            .name("kademlia_responder_providers_sent_bytes")
+            .help("Total sent bytes in kademlia getProviders protocol responder")
+            .register();
+    private static final Counter responderFindNodeSentBytes = Counter.build()
+            .name("kademlia_responder_find_node_sent_bytes")
+            .help("Total sent bytes in kademlia findNode protocol responder")
+            .register();
+
     private final ProviderStore providersStore;
     private final RecordStore ipnsStore;
     public final Router router;
@@ -68,14 +89,15 @@ public class KademliaEngine {
                 .collect(Collectors.toList());
     }
 
-    public void receiveRequest(Dht.Message msg, PeerId source, Stream stream, Counter sentBytes) {
+    public void receiveRequest(Dht.Message msg, PeerId source, Stream stream) {
+        responderReceivedBytes.inc(msg.getSerializedSize());
         switch (msg.getType()) {
             case PUT_VALUE: {
                 Optional<IpnsMapping> mapping = IPNS.validateIpnsEntry(msg);
                 if (mapping.isPresent()) {
                     ipnsStore.put(mapping.get().publisher, mapping.get().value);
                     stream.writeAndFlush(msg);
-                    sentBytes.inc(msg.getSerializedSize());
+                    responderSentBytes.inc(msg.getSerializedSize());
                 }
                 break;
             }
@@ -94,7 +116,8 @@ public class KademliaEngine {
                         .collect(Collectors.toList()));
                 Dht.Message reply = builder.build();
                 stream.writeAndFlush(reply);
-                sentBytes.inc(reply.getSerializedSize());
+                responderSentBytes.inc(reply.getSerializedSize());
+                responderIpnsSentBytes.inc(reply.getSerializedSize());
                 break;
             }
             case ADD_PROVIDER: {
@@ -123,7 +146,8 @@ public class KademliaEngine {
                         .collect(Collectors.toList()));
                 Dht.Message reply = builder.build();
                 stream.writeAndFlush(reply);
-                sentBytes.inc(reply.getSerializedSize());
+                responderSentBytes.inc(reply.getSerializedSize());
+                responderProvidersSentBytes.inc(reply.getSerializedSize());
                 break;
             }
             case FIND_NODE: {
@@ -134,7 +158,8 @@ public class KademliaEngine {
                         .collect(Collectors.toList()));
                 Dht.Message reply = builder.build();
                 stream.writeAndFlush(reply);
-                sentBytes.inc(reply.getSerializedSize());
+                responderSentBytes.inc(reply.getSerializedSize());
+                responderFindNodeSentBytes.inc(reply.getSerializedSize());
                 break;
             }
             case PING: {break;} // Not used any more
