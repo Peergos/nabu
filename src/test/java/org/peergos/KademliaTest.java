@@ -4,6 +4,7 @@ import io.ipfs.cid.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
+import io.libp2p.core.multiformats.*;
 import io.libp2p.crypto.keys.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
@@ -120,6 +121,27 @@ public class KademliaTest {
         } finally {
             node1.stop();
             node2.stop();
+        }
+    }
+
+    @Test
+    public void kademliaFindNodeLimitTest() {
+        PeerId us = new HostBuilder().generateIdentity().getPeerId();
+        KademliaEngine kad = new KademliaEngine(Multihash.fromBase58(us.toBase58()),
+                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore());
+        RamAddressBook addrs = new RamAddressBook();
+        kad.setAddressBook(addrs);
+        for (int i=0; i < 1000; i++) {
+            PeerId peer = new HostBuilder().generateIdentity().getPeerId();
+            for (int j=0; j < 100; j++) {
+                kad.addIncomingConnection(peer);
+                addrs.addAddrs(peer, 0, new Multiaddr[]{new Multiaddr("/ip4/127.0.0.1/tcp/4001/p2p/" + peer.toBase58())});
+            }
+        }
+        List<PeerAddresses> closest = kad.getKClosestPeers(new byte[32]);
+        Assert.assertTrue(closest.size() <= 20);
+        for (PeerAddresses addr : closest) {
+            Assert.assertTrue(addr.addresses.size() == 1);
         }
     }
 }

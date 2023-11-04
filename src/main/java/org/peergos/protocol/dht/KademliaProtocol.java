@@ -31,7 +31,7 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
     @NotNull
     @Override
     protected CompletableFuture<KademliaController> onStartInitiator(@NotNull Stream stream) {
-        engine.addOutgoingConnection(stream.remotePeerId(), stream.getConnection().remoteAddress());
+        engine.addOutgoingConnection(stream.remotePeerId());
         ReplyHandler handler = new ReplyHandler(stream, initiatorSentBytes, initiatorReceivedBytes);
         stream.pushHandler(handler);
         return CompletableFuture.completedFuture(handler);
@@ -40,7 +40,7 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
     @NotNull
     @Override
     protected CompletableFuture<KademliaController> onStartResponder(@NotNull Stream stream) {
-        engine.addIncomingConnection(stream.remotePeerId(), stream.getConnection().remoteAddress());
+        engine.addIncomingConnection(stream.remotePeerId());
         IncomingRequestHandler handler = new IncomingRequestHandler(engine);
         stream.pushHandler(handler);
         return CompletableFuture.completedFuture(handler);

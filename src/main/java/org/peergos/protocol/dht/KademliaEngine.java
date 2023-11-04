@@ -60,11 +60,11 @@ public class KademliaEngine {
         this.addressBook = addrs;
     }
 
-    public synchronized void addOutgoingConnection(PeerId peer, Multiaddr addr) {
+    public synchronized void addOutgoingConnection(PeerId peer) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
     }
 
-    public synchronized void addIncomingConnection(PeerId peer, Multiaddr addr) {
+    public synchronized void addIncomingConnection(PeerId peer) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
     }
 
@@ -152,8 +152,11 @@ public class KademliaEngine {
             }
             case FIND_NODE: {
                 Dht.Message.Builder builder = msg.toBuilder();
-                builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
+                Multihash sourcePeer = Multihash.deserialize(source.getBytes());
+                byte[] target = msg.getKey().toByteArray();
+                builder = builder.addAllCloserPeers(getKClosestPeers(target)
                         .stream()
+                        .filter(p -> ! p.peerId.equals(sourcePeer)) // don't tell a peer about themselves
                         .map(PeerAddresses::toProtobuf)
                         .collect(Collectors.toList()));
                 Dht.Message reply = builder.build();
