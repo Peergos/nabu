@@ -1,3 +1,5 @@
+![logo](assets/nabu-logo.png)
+
 # Nabu
 
 A minimal Java implementation of [IPFS](https://ipfs.io)
