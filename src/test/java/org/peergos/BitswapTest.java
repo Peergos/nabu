@@ -20,11 +20,11 @@ public class BitswapTest {
     @Test
     public void getBlock() {
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
-                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         RamBlockstore blockstore2 = new RamBlockstore();
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
-                new RamProviderStore(1000), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(1000), new RamRecordStore(), blockstore2, (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node2 = builder2.build();
         node1.start().join();
         node2.start().join();
@@ -49,11 +49,11 @@ public class BitswapTest {
     @Test
     public void blockFlooder() {
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
-                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
         Host flooder = builder1.build();
         RamBlockstore blockstore2 = new RamBlockstore();
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
-                new RamProviderStore(1000), new RamRecordStore(), blockstore2, (c, b, p, a) -> CompletableFuture.completedFuture(true), true);
+                new RamProviderStore(1000), new RamRecordStore(), blockstore2, (c, p, a) -> CompletableFuture.completedFuture(true), true);
         Host node2 = builder2.build();
         flooder.start().join();
         node2.start().join();

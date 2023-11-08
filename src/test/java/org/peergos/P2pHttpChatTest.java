@@ -25,7 +25,7 @@ public class P2pHttpChatTest {
             h.accept(replyOk.retain());
         });
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
-                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
+                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true))
                 .addProtocol(node1Http);
         Host node1 = builder1.build();
         HttpProtocol.Binding node2Http = new HttpProtocol.Binding((s, req, h) -> {
@@ -34,7 +34,7 @@ public class P2pHttpChatTest {
             h.accept(replyOk.retain());
         });
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
-                        new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
+                        new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true))
                 .addProtocol(node2Http);
         Host node2 = builder2.build();
         node1.start().join();

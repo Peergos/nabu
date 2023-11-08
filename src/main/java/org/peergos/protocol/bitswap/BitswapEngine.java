@@ -177,16 +177,16 @@ public class BitswapEngine {
                     }
                     if (recent.containsKey(w))
                         continue; // don't re-send this block as we recently sent it to this peer
-                    Optional<byte[]> block = store.get(c).join();
-                    if (block.isEmpty())
+                    boolean blockPresent = store.has(c).join();
+                    if (! blockPresent)
                         absentBlocks++;
                     else
                         presentBlocks++;
-                    if (block.isPresent() && authoriser.allowRead(c, block.get(), sourcePeerId, auth.orElse("")).join()) {
+                    if (blockPresent && authoriser.allowRead(c, sourcePeerId, auth.orElse("")).join()) {
                         MessageOuterClass.Message.Block blockP = MessageOuterClass.Message.Block.newBuilder()
                                 .setPrefix(ByteString.copyFrom(prefixBytes(c)))
                                 .setAuth(ByteString.copyFrom(ArrayOps.hexToBytes(auth.orElse(""))))
-                                .setData(ByteString.copyFrom(block.get()))
+                                .setData(ByteString.copyFrom(store.get(c).join().get()))
                                 .build();
                         int blockSize = blockP.getSerializedSize();
                         if (blockSize + messageSize > maxMessageSize) {
@@ -199,7 +199,7 @@ public class BitswapEngine {
                         blocks.add(blockP);
                         recent.put(w, true);
                     } else if (sendDontHave) {
-                        if (block.isPresent()) {
+                        if (blockPresent) {
                             deniedWants.put(w, true);
                             LOG.info("Rejecting auth for block " + c + " from " + sourcePeerId.bareMultihash());
                         }
@@ -209,7 +209,7 @@ public class BitswapEngine {
                                 .build();
                         presences.add(presence);
                         messageSize += presence.getSerializedSize();
-                    } else if (block.isPresent()) {
+                    } else if (blockPresent) {
                         deniedWants.put(w, true);
                         LOG.info("Rejecting repeated invalid auth for block " + c + " from " + sourcePeerId.bareMultihash());
                     }
