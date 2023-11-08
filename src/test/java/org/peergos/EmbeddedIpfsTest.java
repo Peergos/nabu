@@ -59,7 +59,7 @@ public class EmbeddedIpfsTest {
     }
 
     public static EmbeddedIpfs build(List<MultiAddress> bootstrap, List<MultiAddress> swarmAddresses) {
-        BlockRequestAuthoriser blockRequestAuthoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
+        BlockRequestAuthoriser blockRequestAuthoriser = (c, p, a) -> CompletableFuture.completedFuture(true);
         HostBuilder builder = new HostBuilder().generateIdentity();
         PrivKey privKey = builder.getPrivateKey();
         PeerId peerId = builder.getPeerId();

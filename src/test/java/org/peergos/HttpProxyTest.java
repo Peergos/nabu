@@ -34,12 +34,12 @@ public class HttpProxyTest {
     public void p2pProxyRequest() throws IOException {
         InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
-                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
+                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true))
                 .addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
         Host node1 = builder1.build();
         InetSocketAddress proxyTarget = new InetSocketAddress("127.0.0.1", TestPorts.getPort());
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
-                        new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
+                        new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true))
                 .addProtocol(new HttpProtocol.Binding(proxyTarget));
         Host node2 = builder2.build();
         node1.start().join();
@@ -95,7 +95,7 @@ public class HttpProxyTest {
     public void p2pProxyClientTest() throws Exception {
         InetSocketAddress unusedProxyTarget = new InetSocketAddress("127.0.0.1", 7000);
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
-                        new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true))
+                        new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true))
                 .addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
         Host node1 = builder1.build();
         node1.start().join();

@@ -47,7 +47,7 @@ public class Nabu {
             AggregatedMetrics.startExporter(config.metrics.address, config.metrics.port);
         }
         LOG.info("Starting Nabu version: " + APIHandler.CURRENT_VERSION);
-        BlockRequestAuthoriser authoriser = (c, b, p, a) -> CompletableFuture.completedFuture(true);
+        BlockRequestAuthoriser authoriser = (c, p, a) -> CompletableFuture.completedFuture(true);
 
         Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toAbsolutePath().toString());
