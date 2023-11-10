@@ -45,8 +45,8 @@ public class ProvidingBlockstore implements Blockstore {
     }
 
     @Override
-    public CompletableFuture<List<Cid>> refs() {
-        return target.refs();
+    public CompletableFuture<List<Cid>> refs(boolean useBlockstore) {
+        return target.refs(useBlockstore);
     }
 
     @Override

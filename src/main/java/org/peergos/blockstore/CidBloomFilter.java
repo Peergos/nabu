@@ -24,7 +24,7 @@ public class CidBloomFilter implements Filter {
     }
 
     public static CidBloomFilter build(Blockstore bs, double falsePositiveRate) {
-        List<Cid> refs = bs.refs().join();
+        List<Cid> refs = bs.refs(false).join();
         BloomFilter<Cid> bloom = new BloomFilter<>(falsePositiveRate, refs.size());
         refs.forEach(bloom::add);
         return new CidBloomFilter(bloom);

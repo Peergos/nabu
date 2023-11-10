@@ -83,7 +83,9 @@ public class CachingBlockMetadataStore implements Blockstore {
     }
 
     @Override
-    public CompletableFuture<List<Cid>> refs() {
+    public CompletableFuture<List<Cid>> refs(boolean useBlockstore) {
+        if (useBlockstore)
+            return target.refs(true);
         return CompletableFuture.completedFuture(metadata.list().collect(Collectors.toList()));
     }
 
@@ -100,7 +102,7 @@ public class CachingBlockMetadataStore implements Blockstore {
     public void updateMetadataStoreIfEmpty() {
         if (metadata.size() > 0)
             return;
-        List<Cid> cids = target.refs().join();
+        List<Cid> cids = target.refs(true).join();
         for(Cid c : cids) {
             Optional<BlockMetadata> existing = metadata.get(c);
             if (existing.isEmpty())

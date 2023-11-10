@@ -64,7 +64,7 @@ public class EmbeddedIpfs {
         this.bootstrap = bootstrap;
         this.blocks = new BitswapBlockService(node, bitswap, dht);
         this.blockProvider = newBlockProvider.map(q -> new PeriodicBlockProvider(22 * 3600_000L,
-                () -> blockstore.refs().join().stream(), node, dht, q));
+                () -> blockstore.refs(false).join().stream(), node, dht, q));
     }
 
     public List<HashedBlock> getBlocks(List<Want> wants, Set<PeerId> peers, boolean addToLocal) {
