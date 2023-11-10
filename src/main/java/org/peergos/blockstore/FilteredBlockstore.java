@@ -57,8 +57,8 @@ public class FilteredBlockstore implements Blockstore {
     }
 
     @Override
-    public CompletableFuture<List<Cid>> refs() {
-        return blocks.refs();
+    public CompletableFuture<List<Cid>> refs(boolean useBlockstore) {
+        return blocks.refs(useBlockstore);
     }
 
     public static FilteredBlockstore bloomBased(Blockstore source, double falsePositiveRate) {

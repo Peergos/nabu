@@ -69,8 +69,8 @@ public class TypeLimitedBlockstore implements Blockstore {
     }
 
     @Override
-    public CompletableFuture<List<Cid>> refs() {
-        return blocks.refs();
+    public CompletableFuture<List<Cid>> refs(boolean useBlockstore) {
+        return blocks.refs(useBlockstore);
     }
 
     @Override

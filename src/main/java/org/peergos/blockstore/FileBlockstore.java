@@ -134,7 +134,7 @@ public class FileBlockstore implements Blockstore {
     }
 
     @Override
-    public CompletableFuture<List<Cid>> refs() {
+    public CompletableFuture<List<Cid>> refs(boolean useBlockstore) {
         List<Path> result = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(blocksRoot)) {
             result = walk.filter(f -> Files.isRegularFile(f) && f.getFileName().toString().endsWith(BLOCK_FILE_SUFFIX))

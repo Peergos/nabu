@@ -54,7 +54,7 @@ public class RamBlockstore implements Blockstore {
     }
 
     @Override
-    public CompletableFuture<List<Cid>> refs() {
+    public CompletableFuture<List<Cid>> refs(boolean useBlockstore) {
         return CompletableFuture.completedFuture(new ArrayList(blocks.keySet()));
     }
 

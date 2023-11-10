@@ -32,7 +32,7 @@ public interface Blockstore {
 
     CompletableFuture<Boolean> rm(Cid c);
 
-    CompletableFuture<List<Cid>> refs();
+    CompletableFuture<List<Cid>> refs(boolean useBlockstore);
 
     CompletableFuture<Boolean> bloomAdd(Cid cid);
 

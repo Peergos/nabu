@@ -161,7 +161,11 @@ public class APIHandler extends Handler {
                 }
                 case REFS_LOCAL: { // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-refs-local
                     AggregatedMetrics.API_REFS_LOCAL.inc();
-                    List<Cid> refs = ipfs.blockstore.refs().join();
+                    Boolean useBlockStore = Optional.ofNullable(params.get("use-block-store"))
+                            .map(a -> a.get(0))
+                            .map(Boolean::parseBoolean)
+                            .orElse(false);
+                    List<Cid> refs = ipfs.blockstore.refs(useBlockStore).join();
                     StringBuilder sb = new StringBuilder();
                     for (Cid cid : refs) {
                         Map<String, String> entry = new HashMap<>();

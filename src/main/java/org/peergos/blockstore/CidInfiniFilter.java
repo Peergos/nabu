@@ -33,7 +33,7 @@ public class CidInfiniFilter implements Filter {
     }
 
     public static CidInfiniFilter build(Blockstore bs, double falsePositiveRate) {
-        List<Cid> refs = bs.refs().join();
+        List<Cid> refs = bs.refs(false).join();
         int nBlocks = refs.size()*5/4; //  increase by 25% to avoid expansion during build
         int nextPowerOfTwo = Math.max(17, (int) (1 + Math.log(nBlocks) / Math.log(2)));
         double expansionAlpha = 0.8;

@@ -19,7 +19,7 @@ public class InfiniTest {
         CidInfiniFilter infini = CidInfiniFilter.build(bs, 0.01);
         long t2 = System.currentTimeMillis();
         System.out.println("Building filter took: " + (t2-t1)+ "ms");
-        List<Cid> refs = bs.refs().join();
+        List<Cid> refs = bs.refs(false).join();
         for (Cid ref : refs) {
             Assert.assertTrue(infini.has(ref));
         }

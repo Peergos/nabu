@@ -70,7 +70,7 @@ public class APIServiceTest {
         Assert.assertTrue("block retrieved", blockRetrieved.size() == 1);
         Assert.assertTrue("block is as expected", text.equals(new String(blockRetrieved.get(0).block)));
 
-        List<Cid> localRefs = ipfs.blockstore.refs().join();
+        List<Cid> localRefs = ipfs.blockstore.refs(false).join();
         for (Cid ref : localRefs) {
             List<HashedBlock> res = ipfs.getBlocks(List.of(new Want(ref)), Collections.emptySet(), false);
             Assert.assertTrue("ref retrieved", res.size() == 1);

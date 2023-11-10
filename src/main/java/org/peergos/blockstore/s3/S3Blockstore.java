@@ -409,7 +409,9 @@ public class S3Blockstore implements Blockstore {
     }
 
     @Override
-    public CompletableFuture<List<Cid>> refs() {
+    public CompletableFuture<List<Cid>> refs(boolean useBlockstore) {
+        if (useBlockstore)
+            return directRefs();
         return CompletableFuture.completedFuture(blockMetadata.list().collect(Collectors.toList()));
     }
 
