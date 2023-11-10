@@ -96,4 +96,15 @@ public class CachingBlockMetadataStore implements Blockstore {
             return res;
         });
     }
+
+    public void updateMetadataStoreIfEmpty() {
+        if (metadata.size() > 0)
+            return;
+        List<Cid> cids = target.refs().join();
+        for(Cid c : cids) {
+            Optional<BlockMetadata> existing = metadata.get(c);
+            if (existing.isEmpty())
+                metadata.put(c, target.getBlockMetadata(c).join());
+        }
+    }
 }
