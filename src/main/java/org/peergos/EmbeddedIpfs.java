@@ -143,15 +143,17 @@ public class EmbeddedIpfs {
             throw new RuntimeException(e);
         }
     }
-    public static Blockstore buildBlockStore(Config config, Path ipfsPath, BlockMetadataStore meta) {
+    public static Blockstore buildBlockStore(Config config, Path ipfsPath, BlockMetadataStore meta, boolean updateMetadb) {
         Blockstore withMetadb;
         if (config.datastore.blockMount.prefix.equals("flatfs.datastore")) {
             CachingBlockMetadataStore cachedBlocks = new CachingBlockMetadataStore(new FileBlockstore(ipfsPath), meta);
-            cachedBlocks.updateMetadataStoreIfEmpty();
+            if (updateMetadb)
+                cachedBlocks.updateMetadataStoreIfEmpty();
             withMetadb = cachedBlocks;
         } else if (config.datastore.blockMount.prefix.equals("s3.datastore")) {
             S3Blockstore s3blocks = new S3Blockstore(config.datastore.blockMount.getParams(), meta);
-            s3blocks.updateMetadataStoreIfEmpty();
+            if (updateMetadb)
+                s3blocks.updateMetadataStoreIfEmpty();
             withMetadb = s3blocks;
         } else {
             throw new IllegalStateException("Unrecognized datastore prefix: " + config.datastore.blockMount.prefix);

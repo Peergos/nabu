@@ -53,7 +53,7 @@ public class Nabu {
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toAbsolutePath().toString());
         BlockMetadataStore meta = buildBlockMetadata(args);
         EmbeddedIpfs ipfs = EmbeddedIpfs.build(records,
-                buildBlockStore(config, ipfsPath, meta),
+                buildBlockStore(config, ipfsPath, meta, true),
                 true,
                 config.addresses.getSwarmAddresses(),
                 config.bootstrap.getBootstrapAddresses(),
