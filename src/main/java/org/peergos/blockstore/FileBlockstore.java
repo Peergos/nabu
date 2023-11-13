@@ -137,7 +137,9 @@ public class FileBlockstore implements Blockstore {
     public CompletableFuture<List<Cid>> refs(boolean useBlockstore) {
         List<Path> result = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(blocksRoot)) {
-            result = walk.filter(f -> Files.isRegularFile(f) && f.getFileName().toString().endsWith(BLOCK_FILE_SUFFIX))
+            result = walk.filter(f -> Files.isRegularFile(f) &&
+                            f.toFile().length() > 0 &&
+                            f.getFileName().toString().endsWith(BLOCK_FILE_SUFFIX))
                     .collect(Collectors.toList());
         } catch (IOException ioe) {
             LOG.log(Level.WARNING, "Unable to retrieve local refs: " + ioe);
