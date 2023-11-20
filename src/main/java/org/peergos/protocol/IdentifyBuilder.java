@@ -60,7 +60,7 @@ public class IdentifyBuilder {
 
     public static List<Multiaddr> listNetworkAddresses(boolean includeIp6, Multiaddr addr) {
         try {
-            return NetworkInterface.networkInterfaces()
+            return Collections.list(NetworkInterface.getNetworkInterfaces()).stream()
                     .flatMap(net -> net.getInterfaceAddresses().stream()
                             .map(InterfaceAddress::getAddress)
                             .filter(ip -> includeIp6 || ip instanceof Inet4Address))
