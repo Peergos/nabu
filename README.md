@@ -31,6 +31,7 @@ Currently implemented properties:
 * configurable cid publishing function
 * Android compatibility
 * example serverless chat app using p2p http proxy for Android
+* interop tests with other implementations - https://github.com/libp2p/test-plans/
 
 In the future we will add:
 * circuit-relay
