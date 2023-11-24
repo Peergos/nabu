@@ -65,6 +65,15 @@ for Maven, add the following sections to your pom.xml (replacing $LATEST_VERSION
     </dependency>
   </dependencies>
 ```
+
+
+Build using Maven
+
+```
+mvn package -Dmaven.test.skip=true
+```
+
+
 ### Embedded usage
 ```java
 List<MultiAddress> swarmAddresses = List.of(new MultiAddress("/ip6/::/tcp/4001"));
