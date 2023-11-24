@@ -24,13 +24,15 @@ public class RelayTest {
     @Test
     public void remoteRelay() {
         HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
-                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(),
+                (c, p, a) -> CompletableFuture.completedFuture(true)).enableRelay();
         Host node1 = builder1.build();
         node1.start().join();
         IdentifyBuilder.addIdentifyProtocol(node1);
 
         HostBuilder builder2 = HostBuilder.create(10000 + new Random().nextInt(50000),
-                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(),
+                (c, p, a) -> CompletableFuture.completedFuture(true)).enableRelay();
         Host node2 = builder2.build();
         node2.start().join();
         IdentifyBuilder.addIdentifyProtocol(node2);
@@ -41,7 +43,9 @@ public class RelayTest {
 
             // set up node 2 to listen via a relay
             PeerAddresses relay = Relay.findRelay(builder2.getWanDht().get(), node2);
-            Multiaddr relayAddr = Multiaddr.fromString(relay.getPublicAddresses().stream().filter(a -> !a.toString().contains("/quic")).findFirst().get().toString())
+            Multiaddr relayAddr = Multiaddr.fromString(relay.getPublicAddresses().stream()
+                            .filter(a -> !a.toString().contains("/quic"))
+                            .findFirst().get().toString())
                     .withP2P(PeerId.fromBase58(relay.peerId.toBase58()));
             CircuitHopProtocol.HopController hop = builder2.getRelayHop().get().dial(node2, relayAddr).getController().join();
             CircuitHopProtocol.Reservation reservation = hop.reserve().join();
