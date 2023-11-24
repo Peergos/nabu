@@ -4,16 +4,22 @@ import identify.pb.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
+import io.libp2p.core.Stream;
 import io.libp2p.core.crypto.*;
 import io.libp2p.core.dsl.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.core.mux.*;
+import io.libp2p.core.security.*;
 import io.libp2p.crypto.keys.*;
 import io.libp2p.etc.types.*;
+import io.libp2p.etc.util.netty.*;
+import io.libp2p.multistream.*;
 import io.libp2p.protocol.*;
 import io.libp2p.security.noise.*;
 import io.libp2p.security.tls.*;
+import io.libp2p.transport.*;
+import io.libp2p.transport.implementation.*;
 import io.libp2p.transport.tcp.*;
 import io.libp2p.core.crypto.KeyKt;
 import org.peergos.blockstore.*;
@@ -21,6 +27,9 @@ import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
+
+import java.time.*;
+import java.time.temporal.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
@@ -113,6 +122,44 @@ public class HostBuilder {
         return create(listenPort, providers, records, blocks, authoriser, false);
     }
 
+    private void upgradeConnection(Stream s, Multihash peerid, int durationSeconds, long limitBytes) {
+        s.pushHandler(new InboundTrafficLimitHandler(limitBytes));
+        s.pushHandler(new TotalTimeoutHandler(Duration.of(durationSeconds, ChronoUnit.SECONDS)));
+
+        List<? extends ProtocolBinding<?>> bindings = protocols.stream()
+                .map(b -> (ProtocolBinding<?>)b)
+                .collect(Collectors.toList());
+        List<StreamMuxer> theMuxers = muxers.stream()
+                .map(m -> m.createMuxer(new MultistreamProtocolDebugV1(), bindings))
+                .collect(Collectors.toList());
+        List<SecureChannel> sec = List.of(new NoiseXXSecureChannel(privKey, theMuxers));
+        ConnectionUpgrader upgrader = new ConnectionUpgrader(
+                new MultistreamProtocolDebugV1(), sec,
+                new MultistreamProtocolDebugV1(), theMuxers);
+        ConnectionHandler handler = null;//new MultistreamProtocolDebugV1().createMultistream(bindings).toStreamHandler();
+        ConnectionBuilder connBuilder = new ConnectionBuilder(null, upgrader, handler,
+                false, PeerId.fromBase58(peerid.toBase58()), null);
+
+        s.getConnection().pushHandler(connBuilder);
+        connBuilder.getConnectionEstablished().thenApply(c -> c.muxerSession().createStream(bindings));
+
+/*        upgrader.establishSecureChannel(conn).thenCompose(sess -> {
+//            conn.setSecureSession(sess);
+            if (sess.getEarlyMuxer() != null) {
+                return upgrader.establishMuxer(sess.getEarlyMuxer(), conn);
+            } else
+                return upgrader.establishMuxer(conn);
+        });*/
+    }
+
+    public HostBuilder enableRelay() {
+        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding(this::upgradeConnection);
+        Multihash ourPeerId = Multihash.deserialize(peerId.getBytes());
+        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(privKey, ourPeerId, 5);
+        addProtocols(List.of(stop, new CircuitHopProtocol.Binding(relayManager, stop)));
+        return this;
+    }
+
     public static HostBuilder create(int listenPort,
                                      ProviderStore providers,
                                      RecordStore records,
@@ -124,13 +171,10 @@ public class HostBuilder {
                 .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)));
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blocks), false);
-        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
-        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
+
         return builder.addProtocols(List.of(
                 new Ping(),
                 new AutonatProtocol.Binding(),
-                stop,
-                new CircuitHopProtocol.Binding(relayManager, stop),
                 new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
                 dht));
     }

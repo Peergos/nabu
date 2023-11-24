@@ -5,6 +5,8 @@ import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.Stream;
 import io.libp2p.core.multiformats.*;
+import io.libp2p.multistream.*;
+import io.libp2p.protocol.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.*;
@@ -56,21 +58,27 @@ public class RelayTest {
     }
 
     @Test
-    public void localRelay() {
+    public void localRelay() throws Exception {
         HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(10_000), new RamRecordStore(), new RamBlockstore(),
+                (c, p, a) -> CompletableFuture.completedFuture(true))
+                .enableRelay();
         Host sender = builder1.build();
         sender.start().join();
         IdentifyBuilder.addIdentifyProtocol(sender);
 
         HostBuilder builder2 = HostBuilder.create(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(10_000), new RamRecordStore(), new RamBlockstore(),
+                (c, p, a) -> CompletableFuture.completedFuture(true))
+                .enableRelay();
         Host receiver = builder2.build();
         receiver.start().join();
         IdentifyBuilder.addIdentifyProtocol(receiver);
 
         HostBuilder relayBuilder = HostBuilder.create(10000 + new Random().nextInt(50000),
-                new RamProviderStore(), new RamRecordStore(), new RamBlockstore(), (c, b, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(10_000), new RamRecordStore(), new RamBlockstore(),
+                (c, p, a) -> CompletableFuture.completedFuture(true))
+                .enableRelay();
         Host relay = relayBuilder.build();
         relay.start().join();
         IdentifyBuilder.addIdentifyProtocol(relay);
@@ -85,6 +93,9 @@ public class RelayTest {
             System.out.println("Using relay " + relay.getPeerId());
             CircuitHopProtocol.HopController node1Hop = builder1.getRelayHop().get().dial(sender, relayAddr).getController().join();
             Stream stream = node1Hop.connect(Multihash.deserialize(receiver.getPeerId().getBytes())).join();
+            StreamHandler<PingController> pingHandler = new MultistreamProtocolDebugV1().createMultistream(List.of(new Ping())).toStreamHandler();
+            pingHandler.handleStream(stream);
+            Thread.sleep(10_000);
             System.out.println();
         } finally {
             sender.stop();

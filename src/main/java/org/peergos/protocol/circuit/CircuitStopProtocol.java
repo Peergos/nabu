@@ -13,8 +13,8 @@ import java.util.concurrent.*;
 public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProtocol.StopController> {
 
     public static class Binding extends StrictProtocolBinding<CircuitStopProtocol.StopController> {
-        public Binding() {
-            super("/libp2p/circuit/relay/0.2.0/stop", new CircuitStopProtocol());
+        public Binding(StreamUpgrader upgrader) {
+            super("/libp2p/circuit/relay/0.2.0/stop", new CircuitStopProtocol(upgrader));
         }
     }
 
@@ -63,9 +63,11 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
 
     public static class Receiver implements ProtocolMessageHandler<Circuit.StopMessage>, StopController {
         private final Stream stream;
+        private final StreamUpgrader upgrader;
 
-        public Receiver(Stream stream) {
+        public Receiver(Stream stream, StreamUpgrader upgrader) {
             this.stream = stream;
+            this.upgrader = upgrader;
         }
 
         @Override
@@ -77,8 +79,9 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
                 stream.writeAndFlush(Circuit.StopMessage.newBuilder()
                         .setType(Circuit.StopMessage.Type.STATUS).setStatus(Circuit.Status.OK)
                         .build());
-                // TODO: now upgrade connection with security and muxer protocol
-
+                // now upgrade connection with security and muxer protocol
+                System.out.println("Upgrading relayed incoming connection..");
+                upgrader.upgrade(stream, targetPeerId, durationSeconds, limitBytes);
             }
         }
 
@@ -93,8 +96,11 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
 
     private static final int TRAFFIC_LIMIT = 2*1024;
 
-    public CircuitStopProtocol() {
+    private final StreamUpgrader upgrader;
+
+    public CircuitStopProtocol(StreamUpgrader upgrader) {
         super(Circuit.StopMessage.getDefaultInstance(), TRAFFIC_LIMIT, TRAFFIC_LIMIT);
+        this.upgrader = upgrader;
     }
 
     @NotNull
@@ -108,8 +114,7 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
     @NotNull
     @Override
     protected CompletableFuture<StopController> onStartResponder(@NotNull Stream stream) {
-        System.out.println("circuit.stop::onStartResponder");
-        Receiver acceptor = new Receiver(stream);
+        Receiver acceptor = new Receiver(stream, upgrader);
         stream.pushHandler(acceptor);
         return CompletableFuture.completedFuture(acceptor);
     }

@@ -199,20 +199,17 @@ public class EmbeddedIpfs {
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
 
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blockstore), false);
-        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
-        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         Bitswap bitswap = new Bitswap(new BitswapEngine(blockstore, authoriser, Bitswap.MAX_MESSAGE_SIZE, true));
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
         List<ProtocolBinding> protocols = new ArrayList<>();
         protocols.add(new Ping());
         protocols.add(new AutonatProtocol.Binding());
-        protocols.add(new CircuitHopProtocol.Binding(relayManager, stop));
         protocols.add(bitswap);
         protocols.add(dht);
         httpHandler.ifPresent(protocols::add);
 
-        Host node = builder.addProtocols(protocols).build();
+        Host node = builder.addProtocols(protocols).enableRelay().build();
 
         Optional<BlockingDeque<Cid>> newBlockProvider = provideBlocks ?
                 Optional.of(((ProvidingBlockstore)blockstore).toPublish) :
