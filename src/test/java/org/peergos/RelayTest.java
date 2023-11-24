@@ -62,7 +62,7 @@ public class RelayTest {
     }
 
     @Test
-    public void localRelay() throws Exception {
+    public void localRelay() {
         HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
                 new RamProviderStore(10_000), new RamRecordStore(), new RamBlockstore(),
                 (c, p, a) -> CompletableFuture.completedFuture(true))
@@ -90,16 +90,18 @@ public class RelayTest {
         try {
             // set up node 2 to listen via a relay
             Multiaddr relayAddr = relay.listenAddresses().get(0).withP2P(relay.getPeerId());
-            CircuitHopProtocol.HopController hop = builder2.getRelayHop().get().dial(receiver, relayAddr).getController().join();
+            CircuitHopProtocol.HopController hop = builder2.getRelayHop().get()
+                    .dial(receiver, relayAddr).getController().join();
             CircuitHopProtocol.Reservation reservation = hop.reserve().join();
 
             // connect to node2 from node1 via a relay
             System.out.println("Using relay " + relay.getPeerId());
-            CircuitHopProtocol.HopController node1Hop = builder1.getRelayHop().get().dial(sender, relayAddr).getController().join();
+            CircuitHopProtocol.HopController node1Hop = builder1.getRelayHop().get()
+                    .dial(sender, relayAddr).getController().join();
             Stream stream = node1Hop.connect(Multihash.deserialize(receiver.getPeerId().getBytes())).join();
-            StreamHandler<PingController> pingHandler = new MultistreamProtocolDebugV1().createMultistream(List.of(new Ping())).toStreamHandler();
-            pingHandler.handleStream(stream);
-            Thread.sleep(10_000);
+            CompletableFuture<PingController> pingFut = new MultistreamProtocolDebugV1().createMultistream(List.of(new Ping())).initChannel(stream);
+            PingController contr = pingFut.orTimeout(5, TimeUnit.SECONDS).join();
+            long time = contr.ping().join();
             System.out.println();
         } finally {
             sender.stop();
