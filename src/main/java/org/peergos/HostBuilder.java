@@ -11,6 +11,7 @@ import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.core.mux.*;
 import io.libp2p.core.security.*;
+import io.libp2p.core.transport.*;
 import io.libp2p.crypto.keys.*;
 import io.libp2p.etc.types.*;
 import io.libp2p.etc.util.netty.*;
@@ -22,6 +23,7 @@ import io.libp2p.transport.*;
 import io.libp2p.transport.implementation.*;
 import io.libp2p.transport.tcp.*;
 import io.libp2p.core.crypto.KeyKt;
+import kotlin.jvm.functions.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.bitswap.*;
@@ -41,6 +43,7 @@ public class HostBuilder {
     private List<String> listenAddrs = new ArrayList<>();
     private List<ProtocolBinding> protocols = new ArrayList<>();
     private List<StreamMuxerProtocol> muxers = new ArrayList<>();
+    private List<Function1<ConnectionUpgrader, Transport>> transports = new ArrayList<>();
 
     public HostBuilder() {
     }
@@ -122,10 +125,13 @@ public class HostBuilder {
         return create(listenPort, providers, records, blocks, authoriser, false);
     }
 
-    private void upgradeConnection(Stream s, Multihash peerid, int durationSeconds, long limitBytes) {
+    private void upgradeAndlimitConnection(Stream s, Multihash peerid, int durationSeconds, long limitBytes) {
         s.pushHandler(new InboundTrafficLimitHandler(limitBytes));
         s.pushHandler(new TotalTimeoutHandler(Duration.of(durationSeconds, ChronoUnit.SECONDS)));
+        upgradeConnection(s, peerid);
+    }
 
+    private void upgradeConnection(Stream s, Multihash peerid) {
         List<? extends ProtocolBinding<?>> bindings = protocols.stream()
                 .map(b -> (ProtocolBinding<?>)b)
                 .collect(Collectors.toList());
@@ -153,10 +159,14 @@ public class HostBuilder {
     }
 
     public HostBuilder enableRelay() {
-        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding(this::upgradeConnection);
+        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding(this::upgradeAndlimitConnection);
         Multihash ourPeerId = Multihash.deserialize(peerId.getBytes());
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(privKey, ourPeerId, 5);
-        addProtocols(List.of(stop, new CircuitHopProtocol.Binding(relayManager, stop)));
+        CircuitHopProtocol.Binding hop = new CircuitHopProtocol.Binding(relayManager, stop);
+        addProtocols(List.of(stop, hop));
+        transports.add(TcpTransport::new);
+        Kademlia kademlia = getWanDht().get();
+        transports.add(upg -> new RelayTransport(hop, upg, host -> RelayDiscovery.findRelay(kademlia, host)));
         return this;
     }
 
@@ -191,16 +201,19 @@ public class HostBuilder {
     public Host build() {
         if (muxers.isEmpty())
             muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
-        return build(privKey, listenAddrs, protocols, muxers);
+        if (transports.isEmpty())
+            transports.add(TcpTransport::new);
+        return build(privKey, listenAddrs, transports, protocols, muxers);
     }
 
     public static Host build(PrivKey privKey,
                              List<String> listenAddrs,
+                             List<Function1<ConnectionUpgrader, Transport>> transports,
                              List<ProtocolBinding> protocols,
                              List<StreamMuxerProtocol> muxers) {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
-            b.getTransports().add(TcpTransport::new);
+            b.getTransports().addAll(transports);
             b.getSecureChannels().add(NoiseXXSecureChannel::new);
 //            b.getSecureChannels().add(TlsSecureChannel::new);
 
@@ -246,6 +259,10 @@ public class HostBuilder {
         for (ProtocolBinding protocol : protocols) {
             if (protocol instanceof HostConsumer)
                 ((HostConsumer)protocol).setHost(host);
+        }
+        for (Transport transport : host.getNetwork().getTransports()) {
+            if (transport instanceof HostConsumer)
+                ((HostConsumer)transport).setHost(host);
         }
         return host;
     }

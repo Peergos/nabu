@@ -1,17 +1,19 @@
 package org.peergos;
 
+import com.google.protobuf.*;
+import identify.pb.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.Stream;
 import io.libp2p.core.multiformats.*;
+import io.libp2p.core.multiformats.Protocol;
 import io.libp2p.multistream.*;
 import io.libp2p.protocol.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.*;
 import org.peergos.protocol.circuit.*;
-import org.peergos.protocol.circuit.pb.*;
 import org.peergos.protocol.dht.*;
 
 import java.util.*;
@@ -20,6 +22,62 @@ import java.util.function.*;
 import java.util.stream.*;
 
 public class RelayTest {
+
+    public static List<RelayTransport.CandidateRelay> findRelayedPeer(Kademlia dht, Host us) {
+        for (int i=0; i < 20; i++) {
+            byte[] hash = new byte[32];
+            new Random().nextBytes(hash);
+
+            List<PeerAddresses> nodes = dht.findClosestPeers(new Multihash(Multihash.Type.sha2_256, hash), 20, us);
+            List<RelayTransport.CandidateRelay> relayed = nodes.stream()
+                    .filter(p -> !p.getPublicAddresses().isEmpty() && isRelayed(p))
+                    .map(p -> new RelayTransport.CandidateRelay(PeerId.fromBase58(p.peerId.toBase58()),
+                            p.addresses.stream()
+                                    .filter(a -> a.has(Protocol.P2PCIRCUIT) &&
+                                            !a.has(Protocol.QUIC) &&
+                                            !a.has(Protocol.QUICV1))
+                                    .collect(Collectors.toList())))
+                    .collect(Collectors.toList());
+            if (!relayed.isEmpty())
+                return relayed;
+        }
+        throw new IllegalStateException("Couldn't find relay");
+    }
+
+    public static boolean isRelayed(PeerAddresses p) {
+        try {
+            return p.addresses.stream()
+                    .anyMatch(a -> a.has(Protocol.P2PCIRCUIT));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Test
+    public void pingRemoteRelayedPeer() {
+        HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
+                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(),
+                (c, p, a) -> CompletableFuture.completedFuture(true)).enableRelay();
+        Host node1 = builder1.build();
+        node1.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node1);
+
+        try {
+            bootstrapNode(builder1, node1);
+            List<RelayTransport.CandidateRelay> relayed = findRelayedPeer(builder1.getWanDht().get(), node1);
+            RelayTransport.CandidateRelay target = relayed.get(0);
+
+            // connect to relayed peer from node1 via a relay
+            Multiaddr node2ViaRelay = target.addrs.get(0).concatenated(Multiaddr.fromString("/p2p/" + target.id.toBase58()));
+            System.out.println("Contacting " + node2ViaRelay);
+            StreamPromise<? extends PingController> dial = new Ping().dial(node1, node2ViaRelay);
+            PingController ping = dial.getController().join();
+            for (int i=0; i < 10; i++)
+                System.out.println("Relayed ping took " + ping.ping().join() + "ms");
+        } finally {
+            node1.stop();
+        }
+    }
 
     @Test
     public void remoteRelay() {
@@ -42,19 +100,23 @@ public class RelayTest {
             bootstrapNode(builder2, node2);
 
             // set up node 2 to listen via a relay
-            PeerAddresses relay = Relay.findRelay(builder2.getWanDht().get(), node2);
-            Multiaddr relayAddr = Multiaddr.fromString(relay.getPublicAddresses().stream()
+            List<RelayTransport.CandidateRelay> relays = RelayDiscovery.findRelay(builder2.getWanDht().get(), node2);
+            RelayTransport.CandidateRelay relay = relays.get(0);
+            Multiaddr relayAddr = Multiaddr.fromString(relay.addrs.stream()
                             .filter(a -> !a.toString().contains("/quic"))
                             .findFirst().get().toString())
-                    .withP2P(PeerId.fromBase58(relay.peerId.toBase58()));
+                    .withP2P(relay.id);
             CircuitHopProtocol.HopController hop = builder2.getRelayHop().get().dial(node2, relayAddr).getController().join();
             CircuitHopProtocol.Reservation reservation = hop.reserve().join();
 
             // connect to node2 from node1 via a relay
-            System.out.println("Using relay " + relay);
-            CircuitHopProtocol.HopController node1Hop = builder1.getRelayHop().get().dial(node1, relayAddr).getController().join();
-            Stream stream = node1Hop.connect(Multihash.deserialize(node2.getPeerId().getBytes())).join();
-            System.out.println();
+            System.out.println("Using relay " + relayAddr);
+            Multiaddr node2ViaRelay = relayAddr.concatenated(Multiaddr.fromString("/p2p-circuit/p2p/" + node2.getPeerId().toBase58()));
+            StreamPromise<? extends PingController> dial = new Ping().dial(node1, node2ViaRelay);
+            CompletableFuture<Stream> stream = dial.getStream();
+            PingController ping = dial.getController().join();
+            for (int i=0; i < 10; i++)
+                System.out.println("Relayed ping took " + ping.ping().join() + "ms");
         } finally {
             node1.stop();
             node2.stop();
@@ -96,13 +158,10 @@ public class RelayTest {
 
             // connect to node2 from node1 via a relay
             System.out.println("Using relay " + relay.getPeerId());
-            CircuitHopProtocol.HopController node1Hop = builder1.getRelayHop().get()
-                    .dial(sender, relayAddr).getController().join();
-            Stream stream = node1Hop.connect(Multihash.deserialize(receiver.getPeerId().getBytes())).join();
-            CompletableFuture<PingController> pingFut = new MultistreamProtocolDebugV1().createMultistream(List.of(new Ping())).initChannel(stream);
-            PingController contr = pingFut.orTimeout(5, TimeUnit.SECONDS).join();
-            long time = contr.ping().join();
-            System.out.println();
+            Multiaddr node2ViaRelay = relayAddr.concatenated(Multiaddr.fromString("/p2p-circuit/p2p/" + receiver.getPeerId().toBase58()));
+            PingController ping = new Ping().dial(sender, node2ViaRelay).getController().join();
+            for (int i=0; i < 10; i++)
+                System.out.println("Relayed p[ing took " + ping.ping().join() + "ms");
         } finally {
             sender.stop();
             receiver.stop();
