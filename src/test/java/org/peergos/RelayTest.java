@@ -80,7 +80,7 @@ public class RelayTest {
     }
 
     @Test
-    public void remoteRelay() {
+    public void remoteRelayToLocalPeer() {
         HostBuilder builder1 = HostBuilder.create(10000 + new Random().nextInt(50000),
                 new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(),
                 (c, p, a) -> CompletableFuture.completedFuture(true)).enableRelay();
@@ -113,7 +113,6 @@ public class RelayTest {
             System.out.println("Using relay " + relayAddr);
             Multiaddr node2ViaRelay = relayAddr.concatenated(Multiaddr.fromString("/p2p-circuit/p2p/" + node2.getPeerId().toBase58()));
             StreamPromise<? extends PingController> dial = new Ping().dial(node1, node2ViaRelay);
-            CompletableFuture<Stream> stream = dial.getStream();
             PingController ping = dial.getController().join();
             for (int i=0; i < 10; i++)
                 System.out.println("Relayed ping took " + ping.ping().join() + "ms");
@@ -161,7 +160,7 @@ public class RelayTest {
             Multiaddr node2ViaRelay = relayAddr.concatenated(Multiaddr.fromString("/p2p-circuit/p2p/" + receiver.getPeerId().toBase58()));
             PingController ping = new Ping().dial(sender, node2ViaRelay).getController().join();
             for (int i=0; i < 10; i++)
-                System.out.println("Relayed p[ing took " + ping.ping().join() + "ms");
+                System.out.println("Relayed ping took " + ping.ping().join() + "ms");
         } finally {
             sender.stop();
             receiver.stop();

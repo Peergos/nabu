@@ -20,7 +20,7 @@ public class RelayDiscovery {
         List<PeerAddresses> nodes = dht.findClosestPeers(new Multihash(Multihash.Type.sha2_256, hash), 20, us);
         List<RelayTransport.CandidateRelay> relays = nodes.stream()
                 .filter(p -> ! p.getPublicAddresses().isEmpty() && isRelay(p, us))
-                .map(p -> new RelayTransport.CandidateRelay(PeerId.fromBase58(p.peerId.toBase58()), p.addresses))
+                .map(p -> new RelayTransport.CandidateRelay(PeerId.fromBase58(p.peerId.toBase58()), p.getPublicAddresses()))
                 .collect(Collectors.toList());
         if (relays.isEmpty())
             throw new IllegalStateException("Couldn't find relay");
