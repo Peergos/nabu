@@ -7,6 +7,8 @@ import org.peergos.util.*;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.*;
+import java.util.stream.Stream;
 
 public class RamAddressBook implements AddressBook {
 
@@ -22,7 +24,7 @@ public class RamAddressBook implements AddressBook {
         addresses.putIfAbsent(peerId, new HashSet<>());
         Set<Multiaddr> val = addresses.get(peerId);
         synchronized (val) {
-            val.addAll(Arrays.asList(multiaddrs));
+            val.addAll(withoutPeerId(multiaddrs, peerId));
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -37,8 +39,23 @@ public class RamAddressBook implements AddressBook {
     @Override
     public CompletableFuture<Void> setAddrs(@NotNull PeerId peerId, long ttl, @NotNull Multiaddr... multiaddrs) {
         Set<Multiaddr> val = new HashSet<>();
-        val.addAll(Arrays.asList(multiaddrs));
+        val.addAll(withoutPeerId(multiaddrs, peerId));
         addresses.put(peerId, val);
         return CompletableFuture.completedFuture(null);
+    }
+
+    private static List<Multiaddr> withoutPeerId(Multiaddr[] in, PeerId id) {
+        byte[] peerId = id.getBytes();
+        return Stream.of(in)
+                .map(a -> withoutPeerId(a, peerId))
+                .collect(Collectors.toList());
+    }
+
+    private static Multiaddr withoutPeerId(Multiaddr in, byte[] peerId) {
+        List<MultiaddrComponent> comp = in.getComponents();
+        MultiaddrComponent last = comp.get(comp.size() - 1);
+        if (last.getProtocol() == Protocol.P2P && Arrays.equals(last.getValue(), peerId))
+            return new Multiaddr(comp.subList(0, comp.size() - 1));
+        return in;
     }
 }
