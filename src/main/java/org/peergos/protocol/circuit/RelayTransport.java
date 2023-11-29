@@ -7,6 +7,7 @@ import io.libp2p.core.multiformats.*;
 import io.libp2p.core.mux.*;
 import io.libp2p.core.security.*;
 import io.libp2p.core.transport.*;
+import io.libp2p.etc.*;
 import io.libp2p.transport.*;
 import io.netty.channel.*;
 import kotlin.*;
@@ -26,13 +27,16 @@ public class RelayTransport implements Transport, HostConsumer {
     private final Map<Multiaddr, Stream> dials = new ConcurrentHashMap<>();
     private final Function<Host, List<CandidateRelay>> candidateRelays;
     private final CircuitHopProtocol.Binding hop;
-    private final ConnectionUpgrader upgrader;
+    private final CircuitStopProtocol.Binding stop;
+    public final ConnectionUpgrader upgrader;
     private final AtomicInteger relayCount;
 
     public RelayTransport(CircuitHopProtocol.Binding hop,
+                          CircuitStopProtocol.Binding stop,
                           ConnectionUpgrader upgrader,
                           Function<Host, List<CandidateRelay>> candidateRelays) {
         this.hop = hop;
+        this.stop = stop;
         this.upgrader = upgrader;
         this.candidateRelays = candidateRelays;
         this.relayCount = new AtomicInteger(0);
@@ -185,7 +189,17 @@ public class RelayTransport implements Transport, HostConsumer {
         // request proxy to target
         Stream stream = ctr.connect(Multihash.deserialize(target.getPeerId().getBytes())).join();
         // upgrade with sec and muxer
-        ConnectionOverStream conn = new ConnectionOverStream(true, this, stream);
+        return upgradeStream(stream, true, upgrader, this, target.getPeerId(), connHandler);
+    }
+
+    public static CompletableFuture<Connection> upgradeStream(Stream stream,
+                                                              boolean isInitiator,
+                                                              ConnectionUpgrader upgrader,
+                                                              Transport transport,
+                                                              PeerId remote,
+                                                              ConnectionHandler connHandler) {
+        ConnectionOverStream conn = new ConnectionOverStream(isInitiator, transport, stream);
+        channel.attr(AttributesKt.getREMOTE_PEER_ID()).set(remote);
         return upgrader.establishSecureChannel(conn)
                 .thenCompose(sess -> {
                     conn.setSecureSession(sess);
@@ -208,6 +222,7 @@ public class RelayTransport implements Transport, HostConsumer {
 
     @Override
     public void initialize() {
+        stop.setTransport(this);
         // find relays and connect and reserve
         new Thread(() -> {
             while (true) {

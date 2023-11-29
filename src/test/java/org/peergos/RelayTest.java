@@ -1,14 +1,10 @@
 package org.peergos;
 
-import com.google.protobuf.*;
-import identify.pb.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
-import io.libp2p.core.Stream;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multiformats.Protocol;
-import io.libp2p.multistream.*;
 import io.libp2p.protocol.*;
 import org.junit.*;
 import org.peergos.blockstore.*;

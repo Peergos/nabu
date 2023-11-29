@@ -2,7 +2,7 @@ package org.peergos.protocol.circuit;
 
 import com.google.protobuf.*;
 import io.ipfs.multihash.*;
-import io.libp2p.core.Stream;
+import io.libp2p.core.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
 import org.jetbrains.annotations.*;
@@ -13,8 +13,14 @@ import java.util.concurrent.*;
 public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProtocol.StopController> {
 
     public static class Binding extends StrictProtocolBinding<CircuitStopProtocol.StopController> {
-        public Binding(StreamUpgrader upgrader) {
-            super("/libp2p/circuit/relay/0.2.0/stop", new CircuitStopProtocol(upgrader));
+        private final CircuitStopProtocol stop;
+        public Binding(CircuitStopProtocol stop) {
+            super("/libp2p/circuit/relay/0.2.0/stop", stop);
+            this.stop = stop;
+        }
+
+        public void setTransport(RelayTransport transport) {
+            stop.setTransport(transport);
         }
     }
 
@@ -63,17 +69,17 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
 
     public static class Receiver implements ProtocolMessageHandler<Circuit.StopMessage>, StopController {
         private final Stream stream;
-        private final StreamUpgrader upgrader;
+        private final RelayTransport transport;
 
-        public Receiver(Stream stream, StreamUpgrader upgrader) {
+        public Receiver(Stream stream, RelayTransport transport) {
             this.stream = stream;
-            this.upgrader = upgrader;
+            this.transport = transport;
         }
 
         @Override
         public void onMessage(@NotNull Stream stream, Circuit.StopMessage msg) {
             if (msg.getType() == Circuit.StopMessage.Type.CONNECT) {
-                Multihash targetPeerId = Multihash.deserialize(msg.getPeer().getId().toByteArray());
+                PeerId remote = new PeerId(msg.getPeer().getId().toByteArray());
                 int durationSeconds = msg.getLimit().getDuration();
                 long limitBytes = msg.getLimit().getData();
                 stream.writeAndFlush(Circuit.StopMessage.newBuilder()
@@ -81,7 +87,8 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
                         .build());
                 // now upgrade connection with security and muxer protocol
                 System.out.println("Upgrading relayed incoming connection..");
-                upgrader.upgrade(stream, targetPeerId, durationSeconds, limitBytes);
+                ConnectionHandler connHandler = null; // TODO
+                RelayTransport.upgradeStream(stream, false, transport.upgrader, transport, remote, connHandler);
             }
         }
 
@@ -96,11 +103,14 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
 
     private static final int TRAFFIC_LIMIT = 2*1024;
 
-    private final StreamUpgrader upgrader;
+    private RelayTransport transport;
 
-    public CircuitStopProtocol(StreamUpgrader upgrader) {
+    public CircuitStopProtocol() {
         super(Circuit.StopMessage.getDefaultInstance(), TRAFFIC_LIMIT, TRAFFIC_LIMIT);
-        this.upgrader = upgrader;
+    }
+
+    public void setTransport(RelayTransport transport) {
+        this.transport = transport;
     }
 
     @NotNull
@@ -114,7 +124,7 @@ public class CircuitStopProtocol extends ProtobufProtocolHandler<CircuitStopProt
     @NotNull
     @Override
     protected CompletableFuture<StopController> onStartResponder(@NotNull Stream stream) {
-        Receiver acceptor = new Receiver(stream, upgrader);
+        Receiver acceptor = new Receiver(stream, transport);
         stream.pushHandler(acceptor);
         return CompletableFuture.completedFuture(acceptor);
     }

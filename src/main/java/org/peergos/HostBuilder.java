@@ -159,14 +159,14 @@ public class HostBuilder {
     }
 
     public HostBuilder enableRelay() {
-        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding(this::upgradeAndlimitConnection);
+        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding(new CircuitStopProtocol());
         Multihash ourPeerId = Multihash.deserialize(peerId.getBytes());
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(privKey, ourPeerId, 5);
         CircuitHopProtocol.Binding hop = new CircuitHopProtocol.Binding(relayManager, stop);
         addProtocols(List.of(stop, hop));
         transports.add(TcpTransport::new);
         Kademlia kademlia = getWanDht().get();
-        transports.add(upg -> new RelayTransport(hop, upg, host -> RelayDiscovery.findRelay(kademlia, host)));
+        transports.add(upg -> new RelayTransport(hop, stop, upg, host -> RelayDiscovery.findRelay(kademlia, host)));
         return this;
     }
 
