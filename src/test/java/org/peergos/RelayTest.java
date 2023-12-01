@@ -60,11 +60,28 @@ public class RelayTest {
 
         try {
             bootstrapNode(builder1, node1);
-            List<RelayTransport.CandidateRelay> relayed = findRelayedPeer(builder1.getWanDht().get(), node1);
-            RelayTransport.CandidateRelay target = relayed.get(0);
+
+//            Optional<Multihash> knownRelayedNode = Optional.empty();
+            Optional<Multihash> knownRelayedNode = Optional.of(Multihash.fromBase58("12D3KooWKEYzUUwiZfZDSLSyfGQGgiA7p6wcXSzsSzZJCbYgAnTP"));
+            Multiaddr node2ViaRelay;
+            if (knownRelayedNode.isPresent()) {
+                List<PeerAddresses> find = builder1.getWanDht().get().findClosestPeers(knownRelayedNode.get(), 1, node1);
+                PeerAddresses target = find.get(0);
+                node2ViaRelay = target.getPublicAddresses()
+                        .stream()
+                        .filter(a -> a.has(Protocol.IP4) && a.has(Protocol.TCP))
+                        .findFirst().get()
+                        .concatenated(Multiaddr.fromString("/p2p/" + knownRelayedNode.get().toBase58()));
+            } else {
+                List<RelayTransport.CandidateRelay> relayed = findRelayedPeer(builder1.getWanDht().get(), node1);
+                RelayTransport.CandidateRelay target = relayed.get(0);
+                node2ViaRelay = target.addrs.stream()
+                    .filter(a -> a.has(Protocol.IP4))
+                    .findFirst().get()
+                    .concatenated(Multiaddr.fromString("/p2p/" + target.id.toBase58()));
+            }
 
             // connect to relayed peer from node1 via a relay
-            Multiaddr node2ViaRelay = target.addrs.get(0).concatenated(Multiaddr.fromString("/p2p/" + target.id.toBase58()));
             System.out.println("Contacting " + node2ViaRelay);
             StreamPromise<? extends PingController> dial = new Ping().dial(node1, node2ViaRelay);
             PingController ping = dial.getController().join();

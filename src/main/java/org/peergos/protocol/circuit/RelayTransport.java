@@ -199,20 +199,31 @@ public class RelayTransport implements Transport, HostConsumer {
                                                               PeerId remote,
                                                               ConnectionHandler connHandler) {
         ConnectionOverStream conn = new ConnectionOverStream(isInitiator, transport, stream);
-        channel.attr(AttributesKt.getREMOTE_PEER_ID()).set(remote);
-        return upgrader.establishSecureChannel(conn)
-                .thenCompose(sess -> {
-                    conn.setSecureSession(sess);
-                    if (sess.getEarlyMuxer() != null) {
-                        return ConnectionUpgrader.Companion.establishMuxer(sess.getEarlyMuxer(), conn);
-                    } else {
-                        return upgrader.establishMuxer(conn);
-                    }
-                }).thenApply(sess -> {
-                    conn.setMuxerSession(sess);
-                    connHandler.handleConnection(conn);
-                    return conn;
-                });
+        CompletableFuture<Connection> res = new CompletableFuture<>();
+        stream.pushHandler(new ChannelInitializer<>() {
+            @Override
+            protected void initChannel(Channel channel) throws Exception {
+                System.out.println("Upgrade outgoing relay to " + remote);
+                channel.attr(AttributesKt.getREMOTE_PEER_ID()).set(remote);
+                upgrader.establishSecureChannel(conn)
+                        .thenCompose(sess -> {
+                            conn.setSecureSession(sess);
+                            if (sess.getEarlyMuxer() != null) {
+                                return ConnectionUpgrader.Companion.establishMuxer(sess.getEarlyMuxer(), conn);
+                            } else {
+                                return upgrader.establishMuxer(conn);
+                            }
+                        }).thenAccept(sess -> {
+                            conn.setMuxerSession(sess);
+                            connHandler.handleConnection(conn);
+                            res.complete(conn);
+                        }).exceptionally(t -> {
+                            res.completeExceptionally(t);
+                            return null;
+                        });
+            }
+        });
+        return res;
     }
 
     @Override
