@@ -61,10 +61,14 @@ public class KademliaEngine {
     }
 
     public synchronized void addOutgoingConnection(PeerId peer) {
-        router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
+        addToRoutingTable(peer);
     }
 
     public synchronized void addIncomingConnection(PeerId peer) {
+        // don't auto add incoming kademlia connections to routing table
+    }
+
+    private void addToRoutingTable(PeerId peer) {
         router.touch(Instant.now(), new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
     }
 
