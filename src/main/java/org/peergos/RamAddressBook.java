@@ -54,7 +54,8 @@ public class RamAddressBook implements AddressBook {
     private static Multiaddr withoutPeerId(Multiaddr in, byte[] peerId) {
         List<MultiaddrComponent> comp = in.getComponents();
         MultiaddrComponent last = comp.get(comp.size() - 1);
-        if (last.getProtocol() == Protocol.P2P && Arrays.equals(last.getValue(), peerId))
+        if ((last.getProtocol() == Protocol.P2P || last.getProtocol() == Protocol.IPFS) &&
+                Arrays.equals(last.getValue(), peerId))
             return new Multiaddr(comp.subList(0, comp.size() - 1));
         return in;
     }
