@@ -185,7 +185,7 @@ public class HostBuilder {
                 if (connection.isInitiator())
                     return;
                 addrs.getAddrs(remotePeer).thenAccept(existing -> {
-                    if (existing.isEmpty())
+                    if (! existing.isEmpty())
                         return;
                     StreamPromise<IdentifyController> stream = connection.muxerSession()
                             .createStream(new IdentifyBinding(new IdentifyProtocol()));
