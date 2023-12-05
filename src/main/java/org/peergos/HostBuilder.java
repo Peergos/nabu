@@ -184,16 +184,19 @@ public class HostBuilder {
                 addrs.addAddrs(remotePeer, 0, remote);
                 if (connection.isInitiator())
                     return;
-                StreamPromise<IdentifyController> stream = connection.muxerSession()
-                        .createStream(new IdentifyBinding(new IdentifyProtocol()));
-                stream.getController()
-                        .thenCompose(IdentifyController::id)
-                        .thenAccept(remoteId -> {
-                            Multiaddr[] remoteAddrs = remoteId.getListenAddrsList()
-                                    .stream()
-                                    .map(bytes -> Multiaddr.deserialize(bytes.toByteArray()))
-                                    .toArray(Multiaddr[]::new);
-                            addrs.getAddrs(remotePeer).thenAccept(existing -> {
+                addrs.getAddrs(remotePeer).thenAccept(existing -> {
+                    if (existing.isEmpty())
+                        return;
+                    StreamPromise<IdentifyController> stream = connection.muxerSession()
+                            .createStream(new IdentifyBinding(new IdentifyProtocol()));
+                    stream.getController()
+                            .thenCompose(IdentifyController::id)
+                            .thenAccept(remoteId -> {
+                                Multiaddr[] remoteAddrs = remoteId.getListenAddrsList()
+                                        .stream()
+                                        .map(bytes -> Multiaddr.deserialize(bytes.toByteArray()))
+                                        .toArray(Multiaddr[]::new);
+
                                 addrs.addAddrs(remotePeer, 0, remoteAddrs);
                                 List<String> protocolIds = remoteId.getProtocolsList().stream().collect(Collectors.toList());
                                 if (protocolIds.contains(Kademlia.WAN_DHT_ID) && wan.isPresent()) {
@@ -204,7 +207,7 @@ public class HostBuilder {
                                         connection.muxerSession().createStream(wan.get());
                                 }
                             });
-                        });
+                });
             });
 
             for (String listenAddr : listenAddrs) {
