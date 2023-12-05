@@ -200,7 +200,7 @@ public class HostBuilder {
                                     // add to kademlia routing table iffi
                                     // 1) we haven't already dialled them
                                     // 2) they accept a new kademlia stream
-                                    if (! existing.isEmpty())
+                                    if (existing.isEmpty())
                                         connection.muxerSession().createStream(wan.get());
                                 }
                             });
