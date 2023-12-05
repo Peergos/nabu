@@ -26,12 +26,14 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
 
     private static final Logger LOG = Logging.LOG();
     public static final int BOOTSTRAP_PERIOD_MILLIS = 300_000;
+    public static final String WAN_DHT_ID = "/ipfs/kad/1.0.0";
+    public static final String LAN_DHT_ID = "/ipfs/lan/kad/1.0.0";
     private final KademliaEngine engine;
     private final boolean localDht;
     private AddressBook addressBook;
 
     public Kademlia(KademliaEngine dht, boolean localOnly) {
-        super("/ipfs/" + (localOnly ? "lan/" : "") + "kad/1.0.0", new KademliaProtocol(dht));
+        super(localOnly ? LAN_DHT_ID : WAN_DHT_ID, new KademliaProtocol(dht));
         this.engine = dht;
         this.localDht = localOnly;
     }

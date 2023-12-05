@@ -173,6 +173,10 @@ public class HostBuilder {
                     b.getConnectionHandlers().add((ConnectionHandler) protocol);
             }
 
+            Optional<Kademlia> wan = protocols.stream()
+                    .filter(p -> p instanceof Kademlia && p.getProtocolDescriptor().getAnnounceProtocols().contains("/ipfs/kad/1.0.0"))
+                    .map(p -> (Kademlia) p)
+                    .findFirst();
             // Send an identify req on all new incoming connections
             b.getConnectionHandlers().add(connection -> {
                 PeerId remotePeer = connection.secureSession().getRemoteId();
@@ -184,10 +188,23 @@ public class HostBuilder {
                         .createStream(new IdentifyBinding(new IdentifyProtocol()));
                 stream.getController()
                         .thenCompose(IdentifyController::id)
-                        .thenApply(remoteId -> addrs.addAddrs(remotePeer, 0, remoteId.getListenAddrsList()
-                                .stream()
-                                .map(bytes -> Multiaddr.deserialize(bytes.toByteArray()))
-                                .toArray(Multiaddr[]::new)));
+                        .thenAccept(remoteId -> {
+                            Multiaddr[] remoteAddrs = remoteId.getListenAddrsList()
+                                    .stream()
+                                    .map(bytes -> Multiaddr.deserialize(bytes.toByteArray()))
+                                    .toArray(Multiaddr[]::new);
+                            addrs.getAddrs(remotePeer).thenAccept(existing -> {
+                                addrs.addAddrs(remotePeer, 0, remoteAddrs);
+                                List<String> protocolIds = remoteId.getProtocolsList().stream().collect(Collectors.toList());
+                                if (protocolIds.contains(Kademlia.WAN_DHT_ID) && wan.isPresent()) {
+                                    // add to kademlia routing table iffi
+                                    // 1) we haven't already dialled them
+                                    // 2) they accept a new kademlia stream
+                                    if (! existing.isEmpty())
+                                        connection.muxerSession().createStream(wan.get());
+                                }
+                            });
+                        });
             });
 
             for (String listenAddr : listenAddrs) {
