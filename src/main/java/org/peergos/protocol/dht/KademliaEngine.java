@@ -8,12 +8,15 @@ import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.Stream;
 import io.libp2p.core.multiformats.*;
+import io.libp2p.core.multiformats.Protocol;
 import io.prometheus.client.*;
 import org.peergos.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.dht.pb.*;
 import org.peergos.protocol.ipns.*;
 
+import java.io.*;
+import java.net.*;
 import java.time.*;
 import java.util.*;
 import java.util.stream.*;
@@ -117,7 +120,7 @@ public class KademliaEngine {
                             .setValue(ByteString.copyFrom(ipnsRecord.get().raw)).build());
                 builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
                         .stream()
-                        .map(PeerAddresses::toProtobuf)
+                        .map(p -> p.toProtobuf(a -> isPublic(a)))
                         .collect(Collectors.toList()));
                 Dht.Message reply = builder.build();
                 stream.writeAndFlush(reply);
@@ -140,14 +143,17 @@ public class KademliaEngine {
                 if (blocks.hasAny(hash).join()) {
                     providers = new HashSet<>(providers);
                     providers.add(new PeerAddresses(ourPeerId,
-                            new ArrayList<>(addressBook.getAddrs(PeerId.fromBase58(ourPeerId.toBase58())).join())).toProtobuf());
+                            addressBook.getAddrs(PeerId.fromBase58(ourPeerId.toBase58())).join()
+                                    .stream()
+                                    .filter(a -> isPublic(a))
+                                    .collect(Collectors.toList())).toProtobuf());
                 }
                 Dht.Message.Builder builder = msg.toBuilder();
                 builder = builder.addAllProviderPeers(providers.stream()
                         .collect(Collectors.toList()));
                 builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
                         .stream()
-                        .map(PeerAddresses::toProtobuf)
+                        .map(p -> p.toProtobuf(a -> isPublic(a)))
                         .collect(Collectors.toList()));
                 Dht.Message reply = builder.build();
                 stream.writeAndFlush(reply);
@@ -162,7 +168,7 @@ public class KademliaEngine {
                 builder = builder.addAllCloserPeers(getKClosestPeers(target)
                         .stream()
                         .filter(p -> ! p.peerId.equals(sourcePeer)) // don't tell a peer about themselves
-                        .map(PeerAddresses::toProtobuf)
+                        .map(p -> p.toProtobuf(a -> isPublic(a)))
                         .collect(Collectors.toList()));
                 Dht.Message reply = builder.build();
                 stream.writeAndFlush(reply);
@@ -173,5 +179,22 @@ public class KademliaEngine {
             case PING: {break;} // Not used any more
             default: throw new IllegalStateException("Unknown message kademlia type: " + msg.getType());
         }
+    }
+
+    public static boolean isPublic(Multiaddr addr) {
+        try {
+            List<MultiaddrComponent> parts = addr.getComponents();
+            for (MultiaddrComponent part: parts) {
+                if (part.getProtocol() == Protocol.IP6ZONE)
+                    return true;
+                if (part.getProtocol() == Protocol.IP4 || part.getProtocol() == Protocol.IP6) {
+                    InetAddress ip = InetAddress.getByName(part.getStringValue());
+                    if (ip.isLoopbackAddress() || ip.isSiteLocalAddress() || ip.isLinkLocalAddress() || ip.isAnyLocalAddress())
+                        return false;
+                    return true;
+                }
+            }
+        } catch (IOException e) {}
+        return false;
     }
 }

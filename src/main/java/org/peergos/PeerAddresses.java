@@ -13,6 +13,7 @@ import org.peergos.protocol.dht.pb.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.function.*;
 import java.util.stream.*;
 
 public class PeerAddresses {
@@ -65,6 +66,16 @@ public class PeerAddresses {
         return Dht.Message.Peer.newBuilder()
                 .setId(ByteString.copyFrom(peerId.toBytes()))
                 .addAllAddrs(addresses.stream()
+                        .map(a -> ByteString.copyFrom(a.serialize()))
+                        .collect(Collectors.toList()))
+                .build();
+    }
+
+    public Dht.Message.Peer toProtobuf(Predicate<Multiaddr> filter) {
+        return Dht.Message.Peer.newBuilder()
+                .setId(ByteString.copyFrom(peerId.toBytes()))
+                .addAllAddrs(addresses.stream()
+                        .filter(filter)
                         .map(a -> ByteString.copyFrom(a.serialize()))
                         .collect(Collectors.toList()))
                 .build();
