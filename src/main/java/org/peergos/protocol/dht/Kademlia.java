@@ -133,6 +133,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         return a.addresses.peerId.toBase58().compareTo(b.addresses.peerId.toBase58());
     }
 
+    private final ExecutorService ioExec = Executors.newFixedThreadPool(16);
+
     public List<PeerAddresses> findClosestPeers(Multihash peerIdkey, int maxCount, Host us) {
         byte[] key = peerIdkey.toBytes();
         Id keyId = Id.create(Hash.sha256(key), 256);
@@ -154,19 +156,20 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         Set<Multihash> queried = Collections.synchronizedSet(new HashSet<>());
         int queryParallelism = 3;
         while (true) {
-            List<CompletableFuture<List<PeerAddresses>>> futures = toQuery.stream()
+            List<RoutingEntry> thisRound = toQuery.stream()
                     .limit(queryParallelism)
-                    .parallel()
+                    .collect(Collectors.toList());
+            List<Future<List<PeerAddresses>>> futures = thisRound.stream()
                     .map(r -> {
                         toQuery.remove(r);
                         queried.add(r.addresses.peerId);
-                        return getCloserPeers(peerIdkey, r.addresses, us);
+                        return ioExec.submit(() -> getCloserPeers(peerIdkey, r.addresses, us).join());
                     })
                     .collect(Collectors.toList());
             boolean foundCloser = false;
-            for (CompletableFuture<List<PeerAddresses>> future : futures) {
+            for (Future<List<PeerAddresses>> future : futures) {
                 try {
-                    List<PeerAddresses> result = future.join();
+                    List<PeerAddresses> result = future.get();
                     for (PeerAddresses peer : result) {
                         if (!queried.contains(peer.peerId)) {
                             // exit early if we are looking for the specific node
@@ -316,19 +319,19 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                                                 LocalDateTime expiry,
                                                 long ttlNanos,
                                                 Host us) {
-        int publishes = 0;
-        for (int i=0; i < 5 && publishes < 20; i++) {
+        Set<Multihash> publishes = Collections.synchronizedSet(new HashSet<>());
+        for (int i=0; i < 5 && publishes.size() < 20; i++) {
             List<PeerAddresses> closestPeers = findClosestPeers(publisher, 25, us);
-            publishes += closestPeers.stream().parallel().mapToInt(peer -> {
+            closestPeers.forEach(peer -> ioExec.submit(() -> {
                 try {
-                    boolean success = dialPeer(peer, us).join()
+                    dialPeer(peer, us).join()
                             .putValue(publishValue, expiry, sequence,
-                                    ttlNanos, publisher, priv).join();
-                    if (success)
-                        return 1;
+                                    ttlNanos, publisher, priv).thenAccept(success -> {
+                                if (success)
+                                    publishes.add(peer.peerId);
+                            });
                 } catch (Exception e) {}
-                return 0;
-            }).sum();
+            }));
         }
         return CompletableFuture.completedFuture(null);
     }
