@@ -47,9 +47,9 @@ public interface KademliaController {
                 .thenApply(Providers::fromProtobuf);
     }
 
-    default CompletableFuture<Boolean> putValue(String pathToPublish, LocalDateTime expiry, long sequence,
+    default CompletableFuture<Boolean> putValue(byte[] value, LocalDateTime expiry, long sequence,
                                                 long ttlNanos, Multihash peerId, PrivKey ourKey) {
-        byte[] cborEntryData = IPNS.createCborDataForIpnsEntry(pathToPublish, expiry,
+        byte[] cborEntryData = IPNS.createCborDataForIpnsEntry(value, expiry,
                 Ipns.IpnsEntry.ValidityType.EOL_VALUE, sequence, ttlNanos);
         String expiryString = IPNS.formatExpiry(expiry);
         byte[] signature = ourKey.sign(IPNS.createSigV2Data(cborEntryData));
@@ -62,7 +62,7 @@ public interface KademliaController {
         byte[] ipnsEntry = Ipns.IpnsEntry.newBuilder()
                 .setSequence(sequence)
                 .setTtl(ttlNanos)
-                .setValue(ByteString.copyFrom(pathToPublish.getBytes()))
+                .setValue(ByteString.copyFrom(value))
                 .setValidityType(Ipns.IpnsEntry.ValidityType.EOL)
                 .setValidity(ByteString.copyFrom(expiryString.getBytes()))
                 .setData(ByteString.copyFrom(cborEntryData))

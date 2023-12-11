@@ -297,19 +297,33 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         return CompletableFuture.allOf(provides.toArray(new CompletableFuture[0]));
     }
 
-    public CompletableFuture<Void> publishIpnsValue(PrivKey priv, Multihash publisher, Multihash value, long sequence, Host us) {
+    public CompletableFuture<Void> publishIpnsValue(PrivKey priv,
+                                                    Multihash publisher,
+                                                    Multihash value,
+                                                    long sequence,
+                                                    Host us) {
         int hours = 1;
         LocalDateTime expiry = LocalDateTime.now().plusHours(hours);
-        long ttl = hours * 3600_000_000_000L;
+        long ttlNanos = hours * 3600_000_000_000L;
+        byte[] publishValue = ("/ipfs/" + value).getBytes();
+        return publishValue(priv, publisher, publishValue, sequence, expiry, ttlNanos, us);
+    }
 
+    public CompletableFuture<Void> publishValue(PrivKey priv,
+                                                Multihash publisher,
+                                                byte[] publishValue,
+                                                long sequence,
+                                                LocalDateTime expiry,
+                                                long ttlNanos,
+                                                Host us) {
         int publishes = 0;
         for (int i=0; i < 5 && publishes < 20; i++) {
             List<PeerAddresses> closestPeers = findClosestPeers(publisher, 25, us);
             publishes += closestPeers.stream().parallel().mapToInt(peer -> {
                 try {
                     boolean success = dialPeer(peer, us).join()
-                            .putValue("/ipfs/" + value, expiry, sequence,
-                                    ttl, publisher, priv).join();
+                            .putValue(publishValue, expiry, sequence,
+                                    ttlNanos, publisher, priv).join();
                     if (success)
                         return 1;
                 } catch (Exception e) {}
@@ -319,9 +333,28 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         return CompletableFuture.completedFuture(null);
     }
 
-    public CompletableFuture<String> resolveIpnsValue(Multihash publisher, Host us, int minResults) {
-        List<PeerAddresses> closestPeers = findClosestPeers(publisher, 20, us);
+    public static Predicate<IpnsRecord> getNRecords(int minResults, CompletableFuture<byte[]> res) {
         List<IpnsRecord> candidates = new ArrayList<>();
+        return rec -> {
+            candidates.add(rec);
+            if (candidates.size() >= minResults) {
+                // Validate and sort records by sequence number
+                List<IpnsRecord> records = candidates.stream().sorted().collect(Collectors.toList());
+                res.complete(records.get(records.size() - 1).value);
+                return false;
+            }
+            return true;
+        };
+    }
+
+    public CompletableFuture<String> resolveIpnsValue(Multihash publisher, Host us, int minResults) {
+        CompletableFuture<byte[]> res = new CompletableFuture<>();
+        resolveValue(publisher, us, getNRecords(minResults, res));
+        return res.thenApply(String::new);
+    }
+
+    public void resolveValue(Multihash publisher, Host us, Predicate<IpnsRecord> getMore) {
+        List<PeerAddresses> closestPeers = findClosestPeers(publisher, 20, us);
         Set<PeerAddresses> queryCandidates = new HashSet<>();
         Set<Multihash> queriedPeers = new HashSet<>();
         for (PeerAddresses peer : closestPeers) {
@@ -331,15 +364,10 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             try {
                 GetResult res = dialPeer(peer, us).join().getValue(publisher).join();
                 if (res.record.isPresent() && res.record.get().publisher.equals(publisher))
-                    candidates.add(res.record.get().value);
+                    if ( !getMore.test(res.record.get().value))
+                        return;
                 queryCandidates.addAll(res.closerPeers);
             } catch (Exception e) {}
-            if (candidates.size() >= minResults)
-                break;
         }
-
-        // Validate and sort records by sequence number
-        List<IpnsRecord> records = candidates.stream().sorted().collect(Collectors.toList());
-        return CompletableFuture.completedFuture(records.get(records.size() - 1).value);
     }
 }

@@ -40,14 +40,14 @@ public class IPNS {
         return Cid.cast(key.substring(6).toByteArray());
     }
 
-    public static byte[] createCborDataForIpnsEntry(String pathToPublish,
+    public static byte[] createCborDataForIpnsEntry(byte[] value,
                                                     LocalDateTime expiry,
                                                     long validityType,
                                                     long sequence,
                                                     long ttl) {
         SortedMap<String, Cborable> state = new TreeMap<>();
         state.put("TTL", new CborObject.CborLong(ttl));
-        state.put("Value", new CborObject.CborByteArray(pathToPublish.getBytes()));
+        state.put("Value", new CborObject.CborByteArray(value));
         state.put("Sequence", new CborObject.CborLong(sequence));
         String expiryString = formatExpiry(expiry);
         state.put("Validity", new CborObject.CborByteArray(expiryString.getBytes(StandardCharsets.UTF_8)));
@@ -109,7 +109,7 @@ public class IPNS {
             if (expiry.isBefore(LocalDateTime.now()))
                 return Optional.empty();
             byte[] entryBytes = msg.getRecord().getValue().toByteArray();
-            IpnsRecord record = new IpnsRecord(entryBytes, entry.getSequence(), entry.getTtl(), expiry, entry.getValue().toStringUtf8());
+            IpnsRecord record = new IpnsRecord(entryBytes, entry.getSequence(), entry.getTtl(), expiry, entry.getValue().toByteArray());
             return Optional.of(new IpnsMapping(signer, record));
         } catch (InvalidProtocolBufferException e) {
             return Optional.empty();

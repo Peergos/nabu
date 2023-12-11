@@ -10,7 +10,7 @@ import java.io.InputStream;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Optional;
+import java.util.*;
 
 public class DatabaseRecordStore implements RecordStore {
 
@@ -76,7 +76,7 @@ public class DatabaseRecordStore implements RecordStore {
                         LocalDateTime expiry = LocalDateTime.ofEpochSecond(rs.getLong("expiryUTC"),
                                 0, ZoneOffset.UTC);
                         IpnsRecord record = new IpnsRecord(bout.toByteArray(), rs.getLong("sequence"),
-                                rs.getLong("ttlNanos"),  expiry, rs.getString("val"));
+                                rs.getLong("ttlNanos"),  expiry, rs.getString("val").getBytes());
                         return Optional.of(record);
                     } catch (IOException readEx) {
                         throw new IllegalStateException(readEx);
@@ -102,8 +102,8 @@ public class DatabaseRecordStore implements RecordStore {
             pstmt.setLong(3, record.sequence);
             pstmt.setLong(4, record.ttlNanos);
             pstmt.setLong(5, record.expiry.toEpochSecond(ZoneOffset.UTC));
-            pstmt.setString(6, record.value.length() > SIZE_OF_VAL ?
-                    record.value.substring(0, SIZE_OF_VAL) : record.value);
+            pstmt.setString(6, new String(record.value.length > SIZE_OF_VAL ?
+                    Arrays.copyOfRange(record.value, 0, SIZE_OF_VAL) : record.value));
             pstmt.executeUpdate();
         } catch (SQLException ex) {
             throw new IllegalStateException(ex);

@@ -4,6 +4,7 @@ import io.ipfs.cid.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
+import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
@@ -28,6 +29,7 @@ import java.nio.file.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.*;
@@ -96,6 +98,21 @@ public class EmbeddedIpfs {
                         blocksFound.stream(),
                         blocks.get(remote, peers, addToLocal).stream())
                 .collect(Collectors.toList());
+    }
+
+    public CompletableFuture<Void> publishValue(PrivKey priv, byte[] value, long sequence) {
+        Multihash pub = Multihash.deserialize(PeerId.fromPubKey(priv.publicKey()).getBytes());
+        int hours = 1;
+        LocalDateTime expiry = LocalDateTime.now().plusHours(hours);
+        long ttlNanos = hours * 3600_000_000_000L;
+        return dht.publishValue(priv, pub, value, sequence, expiry, ttlNanos, node);
+    }
+
+    public CompletableFuture<byte[]> resolveValue(PubKey pub) {
+        Multihash publisher = Multihash.deserialize(PeerId.fromPubKey(pub).getBytes());
+        CompletableFuture<byte[]> res = new CompletableFuture<>();
+        dht.resolveValue(publisher, node, Kademlia.getNRecords(2, res));
+        return res;
     }
 
     public void start() {

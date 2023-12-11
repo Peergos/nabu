@@ -49,7 +49,7 @@ public class IpnsTest {
             for (int i = 0; i < 10; i++) {
                 try {
                     success = dht.dial(node1, address2).getController().join()
-                            .putValue(pathToPublish, expiry, sequence, ttl, node1Id, node1.getPrivKey())
+                            .putValue(pathToPublish.getBytes(), expiry, sequence, ttl, node1Id, node1.getPrivKey())
                             .orTimeout(2, TimeUnit.SECONDS).join();
                     break;
                 } catch (Exception timeout) {

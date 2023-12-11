@@ -9,9 +9,9 @@ public class IpnsRecord implements Comparable<IpnsRecord> {
     public final byte[] raw;
     public final long sequence, ttlNanos;
     public final LocalDateTime expiry;
-    public final String value;
+    public final byte[] value;
 
-    public IpnsRecord(byte[] raw, long sequence, long ttlNanos, LocalDateTime expiry, String value) {
+    public IpnsRecord(byte[] raw, long sequence, long ttlNanos, LocalDateTime expiry, byte[] value) {
         this.raw = raw;
         this.sequence = sequence;
         this.ttlNanos = ttlNanos;

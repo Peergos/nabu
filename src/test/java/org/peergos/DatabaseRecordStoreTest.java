@@ -13,7 +13,7 @@ public class DatabaseRecordStoreTest {
     public void testRecordStore() {
         try (DatabaseRecordStore bs = new DatabaseRecordStore("mem:")) {
             LocalDateTime now = LocalDateTime.now();
-            IpnsRecord record = new IpnsRecord("raw".getBytes(), 1, 2, now, "value");
+            IpnsRecord record = new IpnsRecord("raw".getBytes(), 1, 2, now, "value".getBytes());
             Cid peerId = Cid.decode("zb2rhYSxw4ZjuzgCnWSt19Q94ERaeFhu9uSqRgjSdx9bsgM6f");
             bs.put(peerId, record);
             //make sure PUTing a second time succeeds

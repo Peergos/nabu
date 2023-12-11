@@ -6,6 +6,7 @@ import io.ipfs.multiaddr.*;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
+import io.libp2p.crypto.keys.*;
 import io.libp2p.protocol.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
@@ -37,6 +38,20 @@ public class EmbeddedIpfsTest {
 
         node1.stop();
         node2.stop();
+    }
+
+    @Test
+    public void publishValue() throws Exception {
+        EmbeddedIpfs node1 = build(BootstrapTest.BOOTSTRAP_NODES, List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
+        node1.start();
+
+        PrivKey publisher = Ed25519Kt.generateEd25519KeyPair().getFirst();
+        byte[] value = "This is a test".getBytes();
+        node1.publishValue(publisher, value, 1).join();
+        byte[] res = node1.resolveValue(publisher.publicKey()).join();
+        Assert.assertTrue(Arrays.equals(res, value));
+
+        node1.stop();
     }
 
     @Test
