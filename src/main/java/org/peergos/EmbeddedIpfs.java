@@ -23,6 +23,7 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
+import org.peergos.protocol.ipns.*;
 import org.peergos.util.Logging;
 
 import java.nio.file.*;
@@ -110,9 +111,9 @@ public class EmbeddedIpfs {
 
     public CompletableFuture<byte[]> resolveValue(PubKey pub) {
         Multihash publisher = Multihash.deserialize(PeerId.fromPubKey(pub).getBytes());
-        CompletableFuture<byte[]> res = new CompletableFuture<>();
-        dht.resolveValue(publisher, node, Kademlia.getNRecords(2, res));
-        return res;
+        List<IpnsRecord> candidates = dht.resolveValue(publisher, 1, node);
+        List<IpnsRecord> records = candidates.stream().sorted().collect(Collectors.toList());
+        return CompletableFuture.completedFuture(records.get(records.size() - 1).value);
     }
 
     public void start() {

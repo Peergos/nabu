@@ -49,7 +49,7 @@ public class FindPeerTest {
         PeerAddresses peer = matching.get();
         Multiaddr[] addrs = peer.getPublicAddresses().stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
         dht1.dial(node1, PeerId.fromBase58(peer.peerId.toBase58()), addrs)
-                .getController().join().closerPeers(toFind).join();
+                .getController().join().closerPeers(toFind.toBytes()).join();
         System.out.println("Peer lookup took " + (t2-t1) + "ms");
         return t2 - t1;
     }

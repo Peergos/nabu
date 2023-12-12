@@ -20,10 +20,10 @@ public interface KademliaController {
 
     CompletableFuture<Boolean> send(Dht.Message msg);
 
-    default CompletableFuture<List<PeerAddresses>> closerPeers(Multihash peerID) {
+    default CompletableFuture<List<PeerAddresses>> closerPeers(byte[] key) {
         return rpc(Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.FIND_NODE)
-                .setKey(ByteString.copyFrom(peerID.toBytes()))
+                .setKey(ByteString.copyFrom(key))
                 .build())
                 .thenApply(resp -> resp.getCloserPeersList().stream()
                         .map(PeerAddresses::fromProtobuf)
