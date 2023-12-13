@@ -87,7 +87,7 @@ public class KademliaTest {
 
             List<PrivKey> signers = new ArrayList<>();
             long publishTotal = 0, resolveTotal = 0;
-            int iterations = 5;
+            int iterations = 25;
             for (int i = 0; i < iterations; i++) {
                 // publish mapping from node 1
                 PrivKey signer = Ed25519Kt.generateEd25519KeyPair().getFirst();

@@ -385,8 +385,30 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             // exit early if we have enough results
             if (publishes.size() >= minPublishes)
                 break;
-            if (toQuery.size() == remaining)
+            if (toQuery.size() == remaining) {
+                // publish to closest remaining nodes
+                while (publishes.size() < minPublishes) {
+                    List<RoutingEntry> closest = toQuery.stream()
+                    .limit(minPublishes - publishes.size() + 5)
+                    .collect(Collectors.toList());
+                    List<? extends Future<?>> lastFutures = closest.stream()
+                            .map(r -> {
+                                toQuery.remove(r);
+                                queried.add(r.addresses.peerId);
+                                return ioExec.submit(() -> {
+                                    if (putValue(priv, publisher, publishValue, sequence, expiry, ttlNanos, r.addresses, us))
+                                        publishes.add(r.addresses.peerId);
+                                });
+                            })
+                            .collect(Collectors.toList());
+                    lastFutures.forEach(f -> {
+                        try {
+                            f.get();
+                        } catch (Exception e) {}
+                    });
+                }
                 break;
+            }
         }
         return CompletableFuture.completedFuture(null);
     }
