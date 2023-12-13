@@ -388,7 +388,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             if (toQuery.size() == remaining) {
                 // publish to closest remaining nodes
                 while (publishes.size() < minPublishes) {
-                    List<RoutingEntry> closest = toQuery.stream()
+                    List<RoutingEntry> closest = new TreeSet<>(toQuery).stream()
                     .limit(minPublishes - publishes.size() + 5)
                     .collect(Collectors.toList());
                     List<? extends Future<?>> lastFutures = closest.stream()
