@@ -317,6 +317,22 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         return publishValue(priv, publisher, publishValue, sequence, expiry, ttlNanos, us);
     }
 
+    private boolean putValue(PrivKey priv,
+                             Multihash publisher,
+                             byte[] publishValue,
+                             long sequence,
+                             LocalDateTime expiry,
+                             long ttlNanos,
+                             PeerAddresses peer,
+                             Host us) {
+        try {
+            return dialPeer(peer, us).join()
+                    .putValue(publishValue, expiry, sequence,
+                            ttlNanos, publisher, priv).join();
+        } catch (Exception e) {}
+        return false;
+    }
+
     public CompletableFuture<Void> publishValue(PrivKey priv,
                                                 Multihash publisher,
                                                 byte[] publishValue,
@@ -325,25 +341,53 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                                                 long ttlNanos,
                                                 Host us) {
         Set<Multihash> publishes = Collections.synchronizedSet(new HashSet<>());
-        for (int i=0; i < 5 && publishes.size() < 20; i++) {
-            List<PeerAddresses> closestPeers = findClosestPeers(IPNS.getKey(publisher), 25, us);
-            List<? extends Future<?>> futures = closestPeers.stream()
-                    .filter(p -> !publishes.contains(p.peerId))
-                    .map(peer -> ioExec.submit(() -> {
-                        try {
-                            dialPeer(peer, us).join()
-                                    .putValue(publishValue, expiry, sequence,
-                                            ttlNanos, publisher, priv).thenAccept(success -> {
-                                        if (success)
-                                            publishes.add(peer.peerId);
+        int minPublishes = 20;
+
+        byte[] key = IPNS.getKey(publisher);
+        Id keyId = Id.create(Hash.sha256(key), 256);
+        SortedSet<RoutingEntry> toQuery = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
+        List<PeerAddresses> localClosest = engine.getKClosestPeers(key);
+        int queryParallelism = 3;
+        toQuery.addAll(localClosest.stream()
+                .limit(queryParallelism)
+                .map(p -> new RoutingEntry(Id.create(Hash.sha256(p.peerId.toBytes()), 256), p))
+                .collect(Collectors.toList()));
+        Set<Multihash> queried = Collections.synchronizedSet(new HashSet<>());
+        while (! toQuery.isEmpty()) {
+            int remaining = toQuery.size() - 3;
+            List<RoutingEntry> thisRound = toQuery.stream()
+                    .limit(queryParallelism)
+                    .collect(Collectors.toList());
+            List<? extends Future<?>> futures = thisRound.stream()
+                    .map(r -> {
+                        toQuery.remove(r);
+                        queried.add(r.addresses.peerId);
+                        return ioExec.submit(() -> getCloserPeers(key, r.addresses, us).thenApply(res -> {
+                                    for (PeerAddresses peer : res) {
+                                        if (! queried.contains(peer.peerId)) {
+                                            Id peerKey = Id.create(Hash.sha256(IPNS.getKey(peer.peerId)), 256);
+                                            RoutingEntry e = new RoutingEntry(peerKey, peer);
+                                            toQuery.add(e);
+                                        }
+                                    }
+                                    ioExec.submit(() -> {
+                                        if (putValue(priv, publisher, publishValue, sequence, expiry, ttlNanos, r.addresses, us))
+                                            publishes.add(r.addresses.peerId);
                                     });
-                        } catch (Exception e) {}
-                    })).collect(Collectors.toList());
+                                    return true;
+                                }));
+                    })
+                    .collect(Collectors.toList());
             futures.forEach(f -> {
                 try {
                     f.get();
                 } catch (Exception e) {}
             });
+            // exit early if we have enough results
+            if (publishes.size() >= minPublishes)
+                break;
+            if (toQuery.size() == remaining)
+                break;
         }
         return CompletableFuture.completedFuture(null);
     }
