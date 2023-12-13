@@ -55,18 +55,17 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 })
                 .filter(filter)
                 .collect(Collectors.toList());
-        List<? extends CompletableFuture<? extends KademliaController>> futures = resolved.stream()
-                .parallel()
+        List<? extends Future<? extends KademliaController>> futures = resolved.stream()
                 .map(addr -> {
                     Multiaddr addrWithPeer = Multiaddr.fromString(addr);
                     addressBook.setAddrs(addrWithPeer.getPeerId(), 0, addrWithPeer);
-                    return dial(host, addrWithPeer).getController();
+                    return ioExec.submit(() -> dial(host, addrWithPeer).getController().join());
                 })
                 .collect(Collectors.toList());
         int successes = 0;
-        for (CompletableFuture<? extends KademliaController> future : futures) {
+        for (Future<? extends KademliaController> future : futures) {
             try {
-                future.orTimeout(5, TimeUnit.SECONDS).join();
+                future.get(5, TimeUnit.SECONDS);
                 successes++;
             } catch (Exception e) {}
         }
