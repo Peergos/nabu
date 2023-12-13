@@ -113,6 +113,8 @@ public class EmbeddedIpfs {
         Multihash publisher = Multihash.deserialize(PeerId.fromPubKey(pub).getBytes());
         List<IpnsRecord> candidates = dht.resolveValue(publisher, 1, node);
         List<IpnsRecord> records = candidates.stream().sorted().collect(Collectors.toList());
+        if (records.isEmpty())
+            return CompletableFuture.failedFuture(new IllegalStateException("Couldn't resolve IPNS value for " + pub));
         return CompletableFuture.completedFuture(records.get(records.size() - 1).value);
     }
 
