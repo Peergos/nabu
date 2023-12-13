@@ -65,7 +65,7 @@ public class EmbeddedIpfsTest {
         PrivKey publisher = Ed25519Kt.generateEd25519KeyPair().getFirst();
         byte[] value = "This is a test".getBytes();
         io.ipfs.multihash.Multihash pub = Multihash.deserialize(PeerId.fromPubKey(publisher.publicKey()).getBytes());
-        long hoursTtl = 24*2;
+        long hoursTtl = 24*365;
         LocalDateTime expiry = LocalDateTime.now().plusHours(hoursTtl);
         long ttlNanos = hoursTtl * 3600_000_000_000L;
         byte[] signedRecord = IPNS.createSignedRecord(value, expiry, 1, ttlNanos, publisher);
@@ -75,6 +75,16 @@ public class EmbeddedIpfsTest {
 
         byte[] res = node1.resolveValue(publisher.publicKey()).join();
         Assert.assertTrue(Arrays.equals(res, value));
+
+        // publish an updated value with same expiry
+        byte[] value2 = "Updated value".getBytes();
+        byte[] signedRecord2 = IPNS.createSignedRecord(value2, expiry, 2, ttlNanos, publisher);
+        node1.publishPresignedRecord(pub, signedRecord2).join();
+        node1.publishPresignedRecord(pub, signedRecord2).join();
+        node1.publishPresignedRecord(pub, signedRecord2).join();
+
+        byte[] res2 = node1.resolveValue(publisher.publicKey()).join();
+        Assert.assertTrue(Arrays.equals(res2, value2));
 
         node1.stop();
     }
