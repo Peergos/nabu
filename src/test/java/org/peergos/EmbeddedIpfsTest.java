@@ -47,7 +47,7 @@ public class EmbeddedIpfsTest {
 
         PrivKey publisher = Ed25519Kt.generateEd25519KeyPair().getFirst();
         byte[] value = "This is a test".getBytes();
-        node1.publishValue(publisher, value, 1).join();
+        node1.publishValue(publisher, value, 1, 24).join();
         byte[] res = node1.resolveValue(publisher.publicKey()).join();
         Assert.assertTrue(Arrays.equals(res, value));
 
