@@ -47,31 +47,6 @@ public interface KademliaController {
                 .thenApply(Providers::fromProtobuf);
     }
 
-    default CompletableFuture<Boolean> putValue(byte[] value, LocalDateTime expiry, long sequence,
-                                                long ttlNanos, Multihash peerId, PrivKey ourKey) {
-        byte[] cborEntryData = IPNS.createCborDataForIpnsEntry(value, expiry,
-                Ipns.IpnsEntry.ValidityType.EOL_VALUE, sequence, ttlNanos);
-        String expiryString = IPNS.formatExpiry(expiry);
-        byte[] signature = ourKey.sign(IPNS.createSigV2Data(cborEntryData));
-        PubKey pubKey = ourKey.publicKey();
-        byte[] pubKeyProtobuf = Crypto.PublicKey.newBuilder()
-                .setType(pubKey.getKeyType())
-                .setData(ByteString.copyFrom(pubKey.raw()))
-                .build()
-                .toByteArray();
-        byte[] ipnsEntry = Ipns.IpnsEntry.newBuilder()
-                .setSequence(sequence)
-                .setTtl(ttlNanos)
-                .setValue(ByteString.copyFrom(value))
-                .setValidityType(Ipns.IpnsEntry.ValidityType.EOL)
-                .setValidity(ByteString.copyFrom(expiryString.getBytes()))
-                .setData(ByteString.copyFrom(cborEntryData))
-                .setSignatureV2(ByteString.copyFrom(signature))
-                .setPubKey(ByteString.copyFrom(pubKeyProtobuf)) // not needed with Ed25519
-                .build().toByteArray();
-        return putValue(peerId, ipnsEntry);
-    }
-
     default CompletableFuture<Boolean> putValue(Multihash peerId, byte[] value) {
         byte[] ipnsRecordKey = IPNS.getKey(peerId);
         Dht.Message outgoing = Dht.Message.newBuilder()

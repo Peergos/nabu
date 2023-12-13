@@ -34,6 +34,35 @@ public class IPNS {
         return bout.toByteArray();
     }
 
+    public static byte[] createSignedRecord(byte[] value,
+                                            LocalDateTime expiry,
+                                            long sequence,
+                                            long ttlNanos,
+                                            PrivKey ourKey) {
+        byte[] cborEntryData = IPNS.createCborDataForIpnsEntry(value, expiry,
+                Ipns.IpnsEntry.ValidityType.EOL_VALUE, sequence, ttlNanos);
+        String expiryString = IPNS.formatExpiry(expiry);
+        byte[] signature = ourKey.sign(IPNS.createSigV2Data(cborEntryData));
+        PubKey pubKey = ourKey.publicKey();
+        Ipns.IpnsEntry.Builder entryBuilder = Ipns.IpnsEntry.newBuilder()
+                .setSequence(sequence)
+                .setTtl(ttlNanos)
+                .setValue(ByteString.copyFrom(value))
+                .setValidityType(Ipns.IpnsEntry.ValidityType.EOL)
+                .setValidity(ByteString.copyFrom(expiryString.getBytes()))
+                .setData(ByteString.copyFrom(cborEntryData))
+                .setSignatureV2(ByteString.copyFrom(signature));
+        if (ourKey.getKeyType() != Crypto.KeyType.Ed25519) {
+            byte[] pubKeyProtobuf = Crypto.PublicKey.newBuilder()
+                    .setType(pubKey.getKeyType())
+                    .setData(ByteString.copyFrom(pubKey.raw()))
+                    .build()
+                    .toByteArray();
+            entryBuilder = entryBuilder.setPubKey(ByteString.copyFrom(pubKeyProtobuf)); // not needed with Ed25519
+        }
+        return entryBuilder.build().toByteArray();
+    }
+
     public static Cid getCidFromKey(ByteString key) {
         if (! key.startsWith(ByteString.copyFrom("/ipns/".getBytes(StandardCharsets.UTF_8))))
             throw new IllegalStateException("Unknown IPNS key space: " + key);

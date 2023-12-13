@@ -105,7 +105,12 @@ public class EmbeddedIpfs {
         Multihash pub = Multihash.deserialize(PeerId.fromPubKey(priv.publicKey()).getBytes());
         LocalDateTime expiry = LocalDateTime.now().plusHours(hoursTtl);
         long ttlNanos = hoursTtl * 3600_000_000_000L;
-        return dht.publishValue(priv, pub, value, sequence, expiry, ttlNanos, node);
+        byte[] signedRecord = IPNS.createSignedRecord(value, expiry, sequence, ttlNanos, priv);
+        return dht.publishValue(pub, signedRecord, node);
+    }
+
+    public CompletableFuture<Void> publishPresignedRecord(Multihash pub, byte[] presignedRecord) {
+        return dht.publishValue(pub, presignedRecord, node);
     }
 
     public CompletableFuture<byte[]> resolveValue(PubKey pub) {

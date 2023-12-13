@@ -313,31 +313,23 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         LocalDateTime expiry = LocalDateTime.now().plusHours(hours);
         long ttlNanos = hours * 3600_000_000_000L;
         byte[] publishValue = ("/ipfs/" + value).getBytes();
-        return publishValue(priv, publisher, publishValue, sequence, expiry, ttlNanos, us);
+        byte[] signedRecord = IPNS.createSignedRecord(publishValue, expiry, sequence, ttlNanos, priv);
+        return publishValue(publisher, signedRecord, us);
     }
 
-    private boolean putValue(PrivKey priv,
-                             Multihash publisher,
-                             byte[] publishValue,
-                             long sequence,
-                             LocalDateTime expiry,
-                             long ttlNanos,
+    private boolean putValue(Multihash publisher,
+                             byte[] signedRecord,
                              PeerAddresses peer,
                              Host us) {
         try {
             return dialPeer(peer, us).join()
-                    .putValue(publishValue, expiry, sequence,
-                            ttlNanos, publisher, priv).join();
+                    .putValue(publisher, signedRecord).join();
         } catch (Exception e) {}
         return false;
     }
 
-    public CompletableFuture<Void> publishValue(PrivKey priv,
-                                                Multihash publisher,
-                                                byte[] publishValue,
-                                                long sequence,
-                                                LocalDateTime expiry,
-                                                long ttlNanos,
+    public CompletableFuture<Void> publishValue(Multihash publisher,
+                                                byte[] signedRecord,
                                                 Host us) {
         Set<Multihash> publishes = Collections.synchronizedSet(new HashSet<>());
         int minPublishes = 20;
@@ -370,7 +362,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                                         }
                                     }
                                     ioExec.submit(() -> {
-                                        if (putValue(priv, publisher, publishValue, sequence, expiry, ttlNanos, r.addresses, us))
+                                        if (putValue(publisher, signedRecord, r.addresses, us))
                                             publishes.add(r.addresses.peerId);
                                     });
                                     return true;
@@ -396,7 +388,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                                 toQuery.remove(r);
                                 queried.add(r.addresses.peerId);
                                 return ioExec.submit(() -> {
-                                    if (putValue(priv, publisher, publishValue, sequence, expiry, ttlNanos, r.addresses, us))
+                                    if (putValue(publisher, signedRecord, r.addresses, us))
                                         publishes.add(r.addresses.peerId);
                                 });
                             })

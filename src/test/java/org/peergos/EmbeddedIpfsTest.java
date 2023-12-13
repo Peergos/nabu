@@ -3,6 +3,7 @@ package org.peergos;
 import identify.pb.*;
 import io.ipfs.cid.*;
 import io.ipfs.multiaddr.*;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
@@ -12,7 +13,9 @@ import org.junit.*;
 import org.peergos.blockstore.*;
 import org.peergos.config.*;
 import org.peergos.protocol.dht.*;
+import org.peergos.protocol.ipns.*;
 
+import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.*;
@@ -48,6 +51,28 @@ public class EmbeddedIpfsTest {
         PrivKey publisher = Ed25519Kt.generateEd25519KeyPair().getFirst();
         byte[] value = "This is a test".getBytes();
         node1.publishValue(publisher, value, 1, 24).join();
+        byte[] res = node1.resolveValue(publisher.publicKey()).join();
+        Assert.assertTrue(Arrays.equals(res, value));
+
+        node1.stop();
+    }
+
+    @Test
+    public void publishPresignedValue() throws Exception {
+        EmbeddedIpfs node1 = build(BootstrapTest.BOOTSTRAP_NODES, List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
+        node1.start();
+
+        PrivKey publisher = Ed25519Kt.generateEd25519KeyPair().getFirst();
+        byte[] value = "This is a test".getBytes();
+        io.ipfs.multihash.Multihash pub = Multihash.deserialize(PeerId.fromPubKey(publisher.publicKey()).getBytes());
+        long hoursTtl = 24*2;
+        LocalDateTime expiry = LocalDateTime.now().plusHours(hoursTtl);
+        long ttlNanos = hoursTtl * 3600_000_000_000L;
+        byte[] signedRecord = IPNS.createSignedRecord(value, expiry, 1, ttlNanos, publisher);
+        node1.publishPresignedRecord(pub, signedRecord).join();
+        node1.publishPresignedRecord(pub, signedRecord).join();
+        node1.publishPresignedRecord(pub, signedRecord).join();
+
         byte[] res = node1.resolveValue(publisher.publicKey()).join();
         Assert.assertTrue(Arrays.equals(res, value));
 
