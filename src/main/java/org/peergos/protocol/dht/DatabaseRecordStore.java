@@ -61,7 +61,7 @@ public class DatabaseRecordStore implements RecordStore {
     }
 
     @Override
-    public Optional<IpnsRecord> get(Cid peerId) {
+    public Optional<IpnsRecord> get(Multihash peerId) {
         String selectSQL = "SELECT raw, sequence, ttlNanos, expiryUTC, val FROM " + RECORD_TABLE + " WHERE peerId=?";
         try (PreparedStatement pstmt = connection.prepareStatement(selectSQL)) {
             pstmt.setString(1, hashToKey(peerId));

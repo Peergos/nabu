@@ -95,17 +95,22 @@ public class IPNS {
         }
     }
 
-    public static Optional<IpnsMapping> validateIpnsEntry(Dht.Message msg) {
+    public static Optional<IpnsMapping> parseAndValidateIpnsEntry(Dht.Message msg) {
         if (! msg.hasRecord() || msg.getRecord().getValue().size() > IPNS.MAX_RECORD_SIZE)
             return Optional.empty();
         if (! msg.getKey().equals(msg.getRecord().getKey()))
             return Optional.empty();
-        if (! msg.getRecord().getKey().startsWith(ByteString.copyFrom("/ipns/".getBytes(StandardCharsets.UTF_8))))
+        byte[] entryBytes = msg.getRecord().getValue().toByteArray();
+        return parseAndValidateIpnsEntry(msg.getRecord().getKey().toByteArray(), entryBytes);
+    }
+
+    public static Optional<IpnsMapping> parseAndValidateIpnsEntry(byte[] key, byte[] entryBytes) {
+        if (! Arrays.equals(Arrays.copyOfRange(key, 0, 6), "/ipns/".getBytes(StandardCharsets.UTF_8)))
             return Optional.empty();
-        byte[] cidBytes = msg.getRecord().getKey().substring(6).toByteArray();
+        byte[] cidBytes = Arrays.copyOfRange(key, 6, key.length);
         Multihash signer = Multihash.deserialize(cidBytes);
         try {
-            Ipns.IpnsEntry entry = Ipns.IpnsEntry.parseFrom(msg.getRecord().getValue());
+            Ipns.IpnsEntry entry = Ipns.IpnsEntry.parseFrom(entryBytes);
             if (! entry.hasSignatureV2() || ! entry.hasData())
                 return Optional.empty();
             PubKey pub;
@@ -137,7 +142,6 @@ public class IPNS {
             LocalDateTime expiry = LocalDateTime.parse(new String(validity).substring(0, validity.length - 1), IPNS.rfc3339nano);
             if (expiry.isBefore(LocalDateTime.now()))
                 return Optional.empty();
-            byte[] entryBytes = msg.getRecord().getValue().toByteArray();
             IpnsRecord record = new IpnsRecord(entryBytes, entry.getSequence(), entry.getTtl(), expiry, entry.getValue().toByteArray());
             return Optional.of(new IpnsMapping(signer, record));
         } catch (InvalidProtocolBufferException e) {

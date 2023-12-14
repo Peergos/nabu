@@ -20,7 +20,7 @@ public class GetResult {
                 .map(PeerAddresses::fromProtobuf)
                 .collect(Collectors.toList());
         Optional<IpnsMapping> record = msg.hasRecord() ?
-                IPNS.validateIpnsEntry(msg) :
+                IPNS.parseAndValidateIpnsEntry(msg) :
                 Optional.empty();
         return new GetResult(record, closerPeers);
     }

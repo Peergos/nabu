@@ -331,10 +331,19 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     public CompletableFuture<Void> publishValue(Multihash publisher,
                                                 byte[] signedRecord,
                                                 Host us) {
+        byte[] key = IPNS.getKey(publisher);
+        Optional<IpnsMapping> parsed = IPNS.parseAndValidateIpnsEntry(key, signedRecord);
+        if (parsed.isEmpty() || !parsed.get().publisher.equals(publisher))
+            throw new IllegalStateException("Tried to publish invalid INS record for " + publisher);
+        Optional<IpnsRecord> existing = engine.getRecord(publisher);
+        // don't overwrite 'newer' record
+        if (existing.isEmpty() || parsed.get().value.compareTo(existing.get()) > 0) {
+            engine.addRecord(publisher, parsed.get().value);
+        }
+
         Set<Multihash> publishes = Collections.synchronizedSet(new HashSet<>());
         int minPublishes = 20;
 
-        byte[] key = IPNS.getKey(publisher);
         Id keyId = Id.create(Hash.sha256(key), 256);
         SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
         List<PeerAddresses> localClosest = engine.getKClosestPeers(key);
