@@ -87,7 +87,7 @@ public class KademliaTest {
 
             List<PrivKey> signers = new ArrayList<>();
             long publishTotal = 0, resolveTotal = 0;
-            int iterations = 10;
+            int iterations = 25;
             for (int i = 0; i < iterations; i++) {
                 // publish mapping from node 1
                 PrivKey signer = Ed25519Kt.generateEd25519KeyPair().getFirst();
@@ -96,7 +96,7 @@ public class KademliaTest {
                 long p0 = System.currentTimeMillis();
                 dht1.publishIpnsValue(signer, pub, value, 1, node1).join();
                 long p1 = System.currentTimeMillis();
-                System.out.println("Publish took " + (p1-p0) + "ms");
+                System.out.println("Publish took " + printSeconds(p1-p0) + "s");
                 publishTotal += p1-p0;
 
                 // retrieve it from node 2
@@ -104,7 +104,7 @@ public class KademliaTest {
                 String res = dht2.resolveIpnsValue(pub, node2, 1).orTimeout(10, TimeUnit.SECONDS).join();
                 long t1 = System.currentTimeMillis();
                 Assert.assertTrue(res.equals("/ipfs/" + value));
-                System.out.println("Resolved in " + (t1 - t0) + "ms");
+                System.out.println("Resolved in " + printSeconds(t1 - t0) + "s");
                 resolveTotal += t1-t0;
             }
             System.out.println("Publish av: " + publishTotal/iterations + ", resolve av: " + resolveTotal/iterations);
@@ -116,12 +116,16 @@ public class KademliaTest {
                 String res = dht2.resolveIpnsValue(pub, node2, 1).orTimeout(10, TimeUnit.SECONDS).join();
                 long t1 = System.currentTimeMillis();
                 Assert.assertTrue(res.equals("/ipfs/" + value));
-                System.out.println("Resolved again in " + (t1 - t0) + "ms");
+                System.out.println("Resolved again in " + printSeconds(t1 - t0) + "s");
             }
         } finally {
             node1.stop();
             node2.stop();
         }
+    }
+
+    public static String printSeconds(long millis) {
+        return millis / 1000 + "." + (millis % 1000)/100;
     }
 
     @Test

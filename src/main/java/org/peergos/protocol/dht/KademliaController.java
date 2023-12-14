@@ -20,10 +20,10 @@ public interface KademliaController {
 
     CompletableFuture<Boolean> send(Dht.Message msg);
 
-    default CompletableFuture<List<PeerAddresses>> closerPeers(Multihash peerID) {
+    default CompletableFuture<List<PeerAddresses>> closerPeers(byte[] key) {
         return rpc(Dht.Message.newBuilder()
                 .setType(Dht.Message.MessageType.FIND_NODE)
-                .setKey(ByteString.copyFrom(peerID.toBytes()))
+                .setKey(ByteString.copyFrom(key))
                 .build())
                 .thenApply(resp -> resp.getCloserPeersList().stream()
                         .map(PeerAddresses::fromProtobuf)
@@ -45,31 +45,6 @@ public interface KademliaController {
                 .setKey(ByteString.copyFrom(block.bareMultihash().toBytes()))
                 .build())
                 .thenApply(Providers::fromProtobuf);
-    }
-
-    default CompletableFuture<Boolean> putValue(String pathToPublish, LocalDateTime expiry, long sequence,
-                                                long ttlNanos, Multihash peerId, PrivKey ourKey) {
-        byte[] cborEntryData = IPNS.createCborDataForIpnsEntry(pathToPublish, expiry,
-                Ipns.IpnsEntry.ValidityType.EOL_VALUE, sequence, ttlNanos);
-        String expiryString = IPNS.formatExpiry(expiry);
-        byte[] signature = ourKey.sign(IPNS.createSigV2Data(cborEntryData));
-        PubKey pubKey = ourKey.publicKey();
-        byte[] pubKeyProtobuf = Crypto.PublicKey.newBuilder()
-                .setType(pubKey.getKeyType())
-                .setData(ByteString.copyFrom(pubKey.raw()))
-                .build()
-                .toByteArray();
-        byte[] ipnsEntry = Ipns.IpnsEntry.newBuilder()
-                .setSequence(sequence)
-                .setTtl(ttlNanos)
-                .setValue(ByteString.copyFrom(pathToPublish.getBytes()))
-                .setValidityType(Ipns.IpnsEntry.ValidityType.EOL)
-                .setValidity(ByteString.copyFrom(expiryString.getBytes()))
-                .setData(ByteString.copyFrom(cborEntryData))
-                .setSignatureV2(ByteString.copyFrom(signature))
-                .setPubKey(ByteString.copyFrom(pubKeyProtobuf)) // not needed with Ed25519
-                .build().toByteArray();
-        return putValue(peerId, ipnsEntry);
     }
 
     default CompletableFuture<Boolean> putValue(Multihash peerId, byte[] value) {

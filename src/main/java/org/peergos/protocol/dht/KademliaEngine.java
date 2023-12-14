@@ -3,7 +3,6 @@ package org.peergos.protocol.dht;
 import com.google.protobuf.*;
 import com.offbynull.kademlia.*;
 import io.ipfs.cid.*;
-import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.Stream;
@@ -97,12 +96,25 @@ public class KademliaEngine {
                 .collect(Collectors.toList());
     }
 
+    public void addRecord(Multihash publisher, IpnsRecord record) {
+        ipnsStore.put(publisher, record);
+    }
+
+    public Optional<IpnsRecord> getRecord(Multihash publisher) {
+        return ipnsStore.get(publisher);
+    }
+
     public void receiveRequest(Dht.Message msg, PeerId source, Stream stream) {
         responderReceivedBytes.inc(msg.getSerializedSize());
         switch (msg.getType()) {
             case PUT_VALUE: {
-                Optional<IpnsMapping> mapping = IPNS.validateIpnsEntry(msg);
+                Optional<IpnsMapping> mapping = IPNS.parseAndValidateIpnsEntry(msg);
                 if (mapping.isPresent()) {
+                    Optional<IpnsRecord> existing = ipnsStore.get(mapping.get().publisher);
+                    if (existing.isPresent() && mapping.get().value.compareTo(existing.get()) < 0) {
+                        // don't add 'older' record
+                        return;
+                    }
                     ipnsStore.put(mapping.get().publisher, mapping.get().value);
                     stream.writeAndFlush(msg);
                     responderSentBytes.inc(msg.getSerializedSize());

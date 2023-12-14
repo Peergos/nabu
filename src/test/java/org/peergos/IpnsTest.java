@@ -2,7 +2,6 @@ package org.peergos;
 
 import io.ipfs.api.*;
 import io.ipfs.cid.*;
-import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
@@ -48,8 +47,9 @@ public class IpnsTest {
 
             for (int i = 0; i < 10; i++) {
                 try {
+                    byte[] value = IPNS.createSignedRecord(pathToPublish.getBytes(), expiry, sequence, ttl, node1.getPrivKey());
                     success = dht.dial(node1, address2).getController().join()
-                            .putValue(pathToPublish, expiry, sequence, ttl, node1Id, node1.getPrivKey())
+                            .putValue(node1Id, value)
                             .orTimeout(2, TimeUnit.SECONDS).join();
                     break;
                 } catch (Exception timeout) {

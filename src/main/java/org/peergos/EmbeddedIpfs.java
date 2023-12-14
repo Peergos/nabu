@@ -4,6 +4,7 @@ import io.ipfs.cid.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
+import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
@@ -22,12 +23,14 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
+import org.peergos.protocol.ipns.*;
 import org.peergos.util.Logging;
 
 import java.nio.file.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.*;
@@ -96,6 +99,27 @@ public class EmbeddedIpfs {
                         blocksFound.stream(),
                         blocks.get(remote, peers, addToLocal).stream())
                 .collect(Collectors.toList());
+    }
+
+    public CompletableFuture<Void> publishValue(PrivKey priv, byte[] value, long sequence, int hoursTtl) {
+        Multihash pub = Multihash.deserialize(PeerId.fromPubKey(priv.publicKey()).getBytes());
+        LocalDateTime expiry = LocalDateTime.now().plusHours(hoursTtl);
+        long ttlNanos = hoursTtl * 3600_000_000_000L;
+        byte[] signedRecord = IPNS.createSignedRecord(value, expiry, sequence, ttlNanos, priv);
+        return dht.publishValue(pub, signedRecord, node);
+    }
+
+    public CompletableFuture<Void> publishPresignedRecord(Multihash pub, byte[] presignedRecord) {
+        return dht.publishValue(pub, presignedRecord, node);
+    }
+
+    public CompletableFuture<byte[]> resolveValue(PubKey pub, int minResults) {
+        Multihash publisher = Multihash.deserialize(PeerId.fromPubKey(pub).getBytes());
+        List<IpnsRecord> candidates = dht.resolveValue(publisher, minResults, node);
+        List<IpnsRecord> records = candidates.stream().sorted().collect(Collectors.toList());
+        if (records.isEmpty())
+            return CompletableFuture.failedFuture(new IllegalStateException("Couldn't resolve IPNS value for " + pub));
+        return CompletableFuture.completedFuture(records.get(records.size() - 1).value);
     }
 
     public void start() {
