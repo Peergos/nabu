@@ -51,7 +51,7 @@ public class EmbeddedIpfsTest {
         PrivKey publisher = Ed25519Kt.generateEd25519KeyPair().getFirst();
         byte[] value = "This is a test".getBytes();
         node1.publishValue(publisher, value, 1, 24).join();
-        byte[] res = node1.resolveValue(publisher.publicKey()).join();
+        byte[] res = node1.resolveValue(publisher.publicKey(), 5).join();
         Assert.assertTrue(Arrays.equals(res, value));
 
         node1.stop();
@@ -73,7 +73,7 @@ public class EmbeddedIpfsTest {
         node1.publishPresignedRecord(pub, signedRecord).join();
         node1.publishPresignedRecord(pub, signedRecord).join();
 
-        byte[] res = node1.resolveValue(publisher.publicKey()).join();
+        byte[] res = node1.resolveValue(publisher.publicKey(), 5).join();
         Assert.assertTrue(Arrays.equals(res, value));
 
         // publish an updated value with same expiry
@@ -83,7 +83,7 @@ public class EmbeddedIpfsTest {
         node1.publishPresignedRecord(pub, signedRecord2).join();
         node1.publishPresignedRecord(pub, signedRecord2).join();
 
-        byte[] res2 = node1.resolveValue(publisher.publicKey()).join();
+        byte[] res2 = node1.resolveValue(publisher.publicKey(), 5).join();
         Assert.assertTrue(Arrays.equals(res2, value2));
 
         // publish an updated value with earlier expiry
@@ -93,7 +93,7 @@ public class EmbeddedIpfsTest {
         node1.publishPresignedRecord(pub, signedRecord3).join();
         node1.publishPresignedRecord(pub, signedRecord3).join();
 
-        byte[] res3 = node1.resolveValue(publisher.publicKey()).join();
+        byte[] res3 = node1.resolveValue(publisher.publicKey(), 5).join();
         Assert.assertTrue(Arrays.equals(res3, value3));
 
         node1.stop();

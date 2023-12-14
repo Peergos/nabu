@@ -432,6 +432,9 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     public List<IpnsRecord> resolveValue(Multihash publisher, int minResults, Host us) {
         byte[] key = IPNS.getKey(publisher);
         List<IpnsRecord> candidates = new ArrayList<>();
+        Optional<IpnsRecord> local = engine.getRecord(publisher);
+        local.ifPresent(candidates::add);
+
         Id keyId = Id.create(Hash.sha256(key), 256);
         SortedSet<RoutingEntry> toQuery = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
         List<PeerAddresses> localClosest = engine.getKClosestPeers(key);
