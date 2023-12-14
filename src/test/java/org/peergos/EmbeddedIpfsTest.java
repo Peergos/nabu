@@ -86,6 +86,16 @@ public class EmbeddedIpfsTest {
         byte[] res2 = node1.resolveValue(publisher.publicKey()).join();
         Assert.assertTrue(Arrays.equals(res2, value2));
 
+        // publish an updated value with earlier expiry
+        byte[] value3 = "3rd value to put in IPNS".getBytes();
+        byte[] signedRecord3 = IPNS.createSignedRecord(value3, expiry.minusDays(1), 3, ttlNanos, publisher);
+        node1.publishPresignedRecord(pub, signedRecord3).join();
+        node1.publishPresignedRecord(pub, signedRecord3).join();
+        node1.publishPresignedRecord(pub, signedRecord3).join();
+
+        byte[] res3 = node1.resolveValue(publisher.publicKey()).join();
+        Assert.assertTrue(Arrays.equals(res3, value3));
+
         node1.stop();
     }
 
