@@ -6,6 +6,7 @@ import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
+import io.libp2p.core.multiformats.Protocol;
 import io.libp2p.core.multistream.*;
 import io.libp2p.etc.types.*;
 import io.libp2p.protocol.*;
@@ -147,7 +148,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         Id keyId = Id.create(Hash.sha256(key), 256);
         SortedSet<RoutingEntry> closest = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
         SortedSet<RoutingEntry> toQuery = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
-        List<PeerAddresses> localClosest = engine.getKClosestPeers(key);
+        List<PeerAddresses> localClosest = engine.getKClosestPeers(key, maxCount);
         if (maxCount == 1) {
             Optional<PeerAddresses> match = localClosest.stream().filter(p -> Arrays.equals(p.peerId.toBytes(), key)).findFirst();
             if (match.isPresent())
@@ -161,6 +162,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         int queryParallelism = 3;
         while (true) {
             List<RoutingEntry> thisRound = toQuery.stream()
+                    .filter(r -> hasTransportOverlap(r.addresses)) // don't waste time trying to dial nodes we can't
                     .limit(queryParallelism)
                     .collect(Collectors.toList());
             List<Future<List<PeerAddresses>>> futures = thisRound.stream()
@@ -207,7 +209,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         providers.addAll(engine.getProviders(block));
 
         SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> b.key.getSharedPrefixLength(keyId) - a.key.getSharedPrefixLength(keyId));
-        toQuery.addAll(engine.getKClosestPeers(key).stream()
+        toQuery.addAll(engine.getKClosestPeers(key, 20).stream()
                 .map(p -> new RoutingEntry(Id.create(Hash.sha256(p.peerId.toBytes()), 256), p))
                 .collect(Collectors.toList()));
 
@@ -304,11 +306,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         return CompletableFuture.allOf(provides.toArray(new CompletableFuture[0]));
     }
 
-    public CompletableFuture<Void> publishIpnsValue(PrivKey priv,
-                                                    Multihash publisher,
-                                                    Multihash value,
-                                                    long sequence,
-                                                    Host us) {
+    public CompletableFuture<Integer> publishIpnsValue(PrivKey priv,
+                                                       Multihash publisher,
+                                                       Multihash value,
+                                                       long sequence,
+                                                       Host us) {
         int hours = 1;
         LocalDateTime expiry = LocalDateTime.now().plusHours(hours);
         long ttlNanos = hours * 3600_000_000_000L;
@@ -328,9 +330,13 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         return false;
     }
 
-    public CompletableFuture<Void> publishValue(Multihash publisher,
-                                                byte[] signedRecord,
-                                                Host us) {
+    private boolean hasTransportOverlap(PeerAddresses p) {
+        return p.addresses.stream().anyMatch(a -> a.has(Protocol.TCP) && ! a.has(Protocol.P2PCIRCUIT));
+    }
+
+    public CompletableFuture<Integer> publishValue(Multihash publisher,
+                                                   byte[] signedRecord,
+                                                   Host us) {
         byte[] key = IPNS.getKey(publisher);
         Optional<IpnsMapping> parsed = IPNS.parseAndValidateIpnsEntry(key, signedRecord);
         if (parsed.isEmpty() || !parsed.get().publisher.equals(publisher))
@@ -342,11 +348,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         }
 
         Set<Multihash> publishes = Collections.synchronizedSet(new HashSet<>());
-        int minPublishes = 20;
+        int minPublishes = 40;
 
         Id keyId = Id.create(Hash.sha256(key), 256);
         SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
-        List<PeerAddresses> localClosest = engine.getKClosestPeers(key);
+        List<PeerAddresses> localClosest = engine.getKClosestPeers(key, minPublishes);
         int queryParallelism = 3;
         toQuery.addAll(localClosest.stream()
                 .limit(queryParallelism)
@@ -356,6 +362,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         while (! toQuery.isEmpty()) {
             int remaining = toQuery.size() - 3;
             List<RoutingEntry> thisRound = toQuery.stream()
+                    .filter(r -> hasTransportOverlap(r.addresses)) // don't waste time trying to dial nodes we can't
                     .limit(queryParallelism)
                     .collect(Collectors.toList());
             List<? extends Future<List<RoutingEntry>>> futures = thisRound.stream()
@@ -381,6 +388,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     .collect(Collectors.toList());
             futures.forEach(f -> {
                 try {
+                    if (publishes.size() >= minPublishes)
+                        return;
                     toQuery.addAll(f.get());
                 } catch (Exception e) {}
             });
@@ -389,6 +398,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 break;
             if (toQuery.size() == remaining) {
                 // publish to closest remaining nodes
+                System.out.println("Publishing to further nodes, so far only " + publishes.size());
                 while (publishes.size() < minPublishes) {
                     List<RoutingEntry> closest = toQuery.stream()
                     .limit(minPublishes - publishes.size() + 5)
@@ -412,7 +422,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 break;
             }
         }
-        return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(publishes.size());
     }
 
     public CompletableFuture<String> resolveIpnsValue(Multihash publisher, Host us, int minResults) {
@@ -437,7 +447,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
 
         Id keyId = Id.create(Hash.sha256(key), 256);
         SortedSet<RoutingEntry> toQuery = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
-        List<PeerAddresses> localClosest = engine.getKClosestPeers(key);
+        List<PeerAddresses> localClosest = engine.getKClosestPeers(key, 20);
         int queryParallelism = 3;
         toQuery.addAll(localClosest.stream()
                 .limit(queryParallelism)
@@ -447,6 +457,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         while (! toQuery.isEmpty()) {
             int remaining = toQuery.size() - 3;
             List<RoutingEntry> thisRound = toQuery.stream()
+                    .filter(r -> hasTransportOverlap(r.addresses)) // don't waste time trying to dial nodes we can't
                     .limit(queryParallelism)
                     .collect(Collectors.toList());
             List<? extends Future<?>> futures = thisRound.stream()
@@ -469,6 +480,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     .collect(Collectors.toList());
             futures.forEach(f -> {
                 try {
+                    if (candidates.size() >= minResults)
+                        return;
                     f.get();
                 } catch (Exception e) {}
             });

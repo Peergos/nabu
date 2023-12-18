@@ -72,7 +72,7 @@ public class KademliaTest {
         node2.start().join();
         IdentifyBuilder.addIdentifyProtocol(node2);
 
-        Cid value = blockstore1.put("Provide me.".getBytes(), Cid.Codec.Raw).join();
+        Cid value = blockstore1.put("Publiah me.".getBytes(), Cid.Codec.Raw).join();
 
         try {
             // bootstrap node 1
@@ -94,9 +94,9 @@ public class KademliaTest {
                 signers.add(signer);
                 Multihash pub = Multihash.deserialize(PeerId.fromPubKey(signer.publicKey()).getBytes());
                 long p0 = System.currentTimeMillis();
-                dht1.publishIpnsValue(signer, pub, value, 1, node1).join();
+                int publishes = dht1.publishIpnsValue(signer, pub, value, 1, node1).join();
                 long p1 = System.currentTimeMillis();
-                System.out.println("Publish took " + printSeconds(p1-p0) + "s");
+                System.out.println("Publish took " + printSeconds(p1-p0) + "s to " + publishes + " peers.");
                 publishTotal += p1-p0;
 
                 // retrieve it from node 2
@@ -107,7 +107,8 @@ public class KademliaTest {
                 System.out.println("Resolved in " + printSeconds(t1 - t0) + "s");
                 resolveTotal += t1-t0;
             }
-            System.out.println("Publish av: " + publishTotal/iterations + ", resolve av: " + resolveTotal/iterations);
+            System.out.println("Publish av: " + printSeconds(publishTotal/iterations)
+                    + ", resolve av: " + printSeconds(resolveTotal/iterations));
 
             // retrieve all again
             for (PrivKey signer : signers) {
@@ -142,7 +143,7 @@ public class KademliaTest {
                 addrs.addAddrs(peer, 0, new Multiaddr[]{new Multiaddr("/ip4/127.0.0.1/tcp/4001/p2p/" + peer.toBase58())});
             }
         }
-        List<PeerAddresses> closest = kad.getKClosestPeers(new byte[32]);
+        List<PeerAddresses> closest = kad.getKClosestPeers(new byte[32], 20);
         Assert.assertTrue(closest.size() <= 20);
         for (PeerAddresses addr : closest) {
             Assert.assertTrue(addr.addresses.size() == 1);

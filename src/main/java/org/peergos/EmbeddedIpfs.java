@@ -101,7 +101,7 @@ public class EmbeddedIpfs {
                 .collect(Collectors.toList());
     }
 
-    public CompletableFuture<Void> publishValue(PrivKey priv, byte[] value, long sequence, int hoursTtl) {
+    public CompletableFuture<Integer> publishValue(PrivKey priv, byte[] value, long sequence, int hoursTtl) {
         Multihash pub = Multihash.deserialize(PeerId.fromPubKey(priv.publicKey()).getBytes());
         LocalDateTime expiry = LocalDateTime.now().plusHours(hoursTtl);
         long ttlNanos = hoursTtl * 3600_000_000_000L;
@@ -109,7 +109,7 @@ public class EmbeddedIpfs {
         return dht.publishValue(pub, signedRecord, node);
     }
 
-    public CompletableFuture<Void> publishPresignedRecord(Multihash pub, byte[] presignedRecord) {
+    public CompletableFuture<Integer> publishPresignedRecord(Multihash pub, byte[] presignedRecord) {
         return dht.publishValue(pub, presignedRecord, node);
     }
 
