@@ -348,7 +348,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         }
 
         Set<Multihash> publishes = Collections.synchronizedSet(new HashSet<>());
-        int minPublishes = 40;
+        int minPublishes = 30;
 
         Id keyId = Id.create(Hash.sha256(key), 256);
         SortedSet<RoutingEntry> toQuery = new TreeSet<>((a, b) -> compareKeys(a, b, keyId));
