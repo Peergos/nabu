@@ -435,7 +435,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
 
     private Optional<GetResult> getValueFromPeer(PeerAddresses peer, Multihash publisher, Host us) {
         try {
-            return Optional.of(dialPeer(peer, us).join().getValue(publisher).join());
+            return Optional.of(dialPeer(peer, us).orTimeout(1, TimeUnit.SECONDS).join()
+                    .getValue(publisher).orTimeout(1, TimeUnit.SECONDS).join());
         } catch (Exception e) {}
         return Optional.empty();
     }
@@ -450,14 +451,14 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         List<PeerAddresses> localClosest = engine.getKClosestPeers(key, 20);
         int queryParallelism = 3;
         toQuery.addAll(localClosest.stream()
-                .limit(queryParallelism)
+                .filter(p -> hasTransportOverlap(p)) // don't waste time trying to dial nodes we can't
                 .map(p -> new RoutingEntry(Id.create(Hash.sha256(p.peerId.toBytes()), 256), p))
                 .collect(Collectors.toList()));
         Set<Multihash> queried = Collections.synchronizedSet(new HashSet<>());
+        int countdown = 20;
         while (! toQuery.isEmpty()) {
             int remaining = toQuery.size() - 3;
             List<RoutingEntry> thisRound = toQuery.stream()
-                    .filter(r -> hasTransportOverlap(r.addresses)) // don't waste time trying to dial nodes we can't
                     .limit(queryParallelism)
                     .collect(Collectors.toList());
             List<? extends Future<?>> futures = thisRound.stream()
@@ -469,7 +470,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                                     if (g.record.isPresent() && g.record.get().publisher.equals(publisher))
                                         candidates.add(g.record.get().value);
                                     for (PeerAddresses peer : g.closerPeers) {
-                                        if (! queried.contains(peer.peerId)) {
+                                        if (! queried.contains(peer.peerId) && hasTransportOverlap(peer)) {
                                             Id peerKey = Id.create(Hash.sha256(IPNS.getKey(peer.peerId)), 256);
                                             RoutingEntry e = new RoutingEntry(peerKey, peer);
                                             toQuery.add(e);
@@ -489,6 +490,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             if (candidates.size() >= minResults)
                 break;
             if (toQuery.size() == remaining)
+                countdown--;
+            if (countdown <= 0)
                 break;
         }
         return candidates;

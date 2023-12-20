@@ -122,6 +122,12 @@ public class EmbeddedIpfs {
         return CompletableFuture.completedFuture(records.get(records.size() - 1).value);
     }
 
+    public List<IpnsRecord> resolveRecords(PubKey pub, int minResults) {
+        Multihash publisher = Multihash.deserialize(PeerId.fromPubKey(pub).getBytes());
+        List<IpnsRecord> candidates = dht.resolveValue(publisher, minResults, node);
+        return candidates.stream().sorted().collect(Collectors.toList());
+    }
+
     public void start() {
         LOG.info("Starting IPFS...");
         Thread shutdownHook = new Thread(() -> {
