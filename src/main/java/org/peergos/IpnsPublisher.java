@@ -33,15 +33,20 @@ public class IpnsPublisher {
                     .map(line -> KeyKt.unmarshalPrivateKey(ArrayOps.hexToBytes(line.split(" ")[0])))
                     .collect(Collectors.toList());
 
+            System.out.println("Resolving " + keys.size() + " keys");
             for (int c=0; c < 100; c++) {
                 long t0 = System.currentTimeMillis();
                 List<Integer> recordCounts = resolve(keys, ipfs);
-                Files.write(Paths.get("publish-resolve-counts-" + LocalDateTime.now().withNano(0) + ".txt"), recordCounts.stream()
-                        .map(i -> i.toString())
-                        .collect(Collectors.toList()));
+                Path resultsFile = Paths.get("publish-resolve-counts-" + LocalDateTime.now().withNano(0) + ".txt");
+                Files.write(resultsFile,
+                        recordCounts.stream()
+                                .map(Object::toString)
+                                .collect(Collectors.toList()));
                 long t1 = System.currentTimeMillis();
-                System.out.println("Resolved " + recordCounts.stream().filter(n -> n > 0).count() + "/" + recordCounts.size()
-                        + " in " + (t1-t0)/1000 + "s");
+                String total = "Resolved " + recordCounts.stream().filter(n -> n > 0).count() + "/" + recordCounts.size()
+                        + " in " + (t1 - t0) / 1000 + "s";
+                System.out.println(total);
+                Files.write(resultsFile, total.getBytes(), StandardOpenOption.APPEND);
             }
         } else {
             keys = IntStream.range(0, keycount)
@@ -104,9 +109,13 @@ public class IpnsPublisher {
 
     public static List<Integer> resolve(List<PrivKey> publishers, EmbeddedIpfs ipfs) {
         List<Integer> res = new ArrayList<>();
+        int done = 0;
         for (PrivKey publisher : publishers) {
             List<IpnsRecord> records = ipfs.resolveRecords(publisher.publicKey(), 30);
             res.add(records.size());
+            done++;
+            if (done % 10 == 0)
+                System.out.println("resolved " + done);
         }
         return res;
     }
