@@ -18,18 +18,19 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import java.util.stream.*;
+import java.util.stream.Stream;
 
 public class IpnsPublisher {
-    private static final ExecutorService ioExec = Executors.newFixedThreadPool(20);
+    private static final ExecutorService ioExec = Executors.newFixedThreadPool(10);
     public static void main(String[] a) throws Exception {
-        Path keysFile = Paths.get("publishers.txt");
+        Path publishFile = Paths.get("publishers.txt");
         List<PrivKey> keys;
         int keycount = 1000;
         EmbeddedIpfs ipfs = startIpfs();
-        if (keysFile.toFile().exists()) {
-            List<String> lines = Files.readAllLines(keysFile);
+        if (publishFile.toFile().exists()) {
+            List<String> lines = Files.readAllLines(publishFile);
             keys = lines.stream()
-                    .map(line -> KeyKt.unmarshalPrivateKey(ArrayOps.hexToBytes(line)))
+                    .map(line -> KeyKt.unmarshalPrivateKey(ArrayOps.hexToBytes(line.split(" ")[0])))
                     .collect(Collectors.toList());
 
             for (int c=0; c < 100; c++) {
@@ -46,40 +47,59 @@ public class IpnsPublisher {
             keys = IntStream.range(0, keycount)
                     .mapToObj(i -> Ed25519Kt.generateEd25519KeyPair().getFirst())
                     .collect(Collectors.toList());
-            Files.write(keysFile, keys.stream().map(k -> ArrayOps.bytesToHex(k.bytes())).collect(Collectors.toList()));
             long t0 = System.currentTimeMillis();
-            List<Integer> publishCounts = publish(keys, "The result".getBytes(), ipfs);
+            publish(keys, "The result".getBytes(), ipfs).forEach(res -> {
+                try {
+                    Files.write(publishFile, res.toString().getBytes(),
+                            publishFile.toFile().exists() ?
+                                    StandardOpenOption.APPEND :
+                                    StandardOpenOption.CREATE_NEW);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
             long t1 = System.currentTimeMillis();
             System.out.println("Published all in " + (t1-t0)/1000 + "s");
-            Files.write(Paths.get("publish-counts.txt"), publishCounts.stream()
-                    .map(i -> i.toString())
-                    .collect(Collectors.toList()));
         }
         ipfs.stop().join();
         System.exit(0);
     }
 
-    public static List<Integer> publish(List<PrivKey> publishers, byte[] value, EmbeddedIpfs ipfs) throws IOException {
+    public static class PublishResult {
+        public final PrivKey priv;
+        public final Multihash pub;
+        public final byte[] record;
+        public final int publishCount;
+
+        public PublishResult(PrivKey priv, Multihash pub, byte[] record, int publishCount) {
+            this.priv = priv;
+            this.pub = pub;
+            this.record = record;
+            this.publishCount = publishCount;
+        }
+
+        @Override
+        public String toString() {
+            return ArrayOps.bytesToHex(priv.bytes()) + " " + pub + " " + ArrayOps.bytesToHex(record)
+                    + " " + publishCount + "\n";
+        }
+    }
+
+    public static Stream<PublishResult> publish(List<PrivKey> publishers, byte[] value, EmbeddedIpfs ipfs) throws IOException {
         LocalDateTime expiry = LocalDateTime.now().plusDays(7);
         AtomicLong done = new AtomicLong(0);
         long ttlNanos = 7L * 24 * 3600 * 1000_000_000;
-        List<Pair<Multihash, byte[]>> values = publishers.stream()
-                .map(p -> new Pair<>(Multihash.deserialize(PeerId.fromPubKey(p.publicKey()).getBytes()),
-                        IPNS.createSignedRecord(value, expiry, 1, ttlNanos, p)))
-                .collect(Collectors.toList());
-        Files.write(Paths.get("publish-values.txt"), values.stream()
-                .map(v -> ArrayOps.bytesToHex(v.right))
-                .collect(Collectors.toList()));
-        List<CompletableFuture<Integer>> futs = values.stream()
-                .map(v -> CompletableFuture.supplyAsync(() -> {
-                    Integer res = ipfs.publishPresignedRecord(v.left, v.right).join();
-                    System.out.println(done.incrementAndGet());
-                    return res;
-                }, ioExec))
-                .collect(Collectors.toList());
-        return futs.stream()
-                .map(CompletableFuture::join)
-                .collect(Collectors.toList());
+        return publishers.stream()
+                .map(p -> {
+                    Multihash pub = Multihash.deserialize(PeerId.fromPubKey(p.publicKey()).getBytes());
+                    byte[] record = IPNS.createSignedRecord(value, expiry, 1, ttlNanos, p);
+                    return CompletableFuture.supplyAsync(() -> {
+                        int count = ipfs.publishPresignedRecord(pub, record).join();
+                        System.out.println(done.incrementAndGet());
+                        return new PublishResult(p, pub, record, count);
+                    }, ioExec);
+                })
+                .map(CompletableFuture::join);
     }
 
     public static List<Integer> resolve(List<PrivKey> publishers, EmbeddedIpfs ipfs) {
