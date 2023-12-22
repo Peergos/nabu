@@ -47,6 +47,12 @@ public class IpnsPublisher {
                         + " in " + (t1 - t0) / 1000 + "s";
                 System.out.println(total);
                 Files.write(resultsFile, total.getBytes(), StandardOpenOption.APPEND);
+                String fails = "\nFailed " + IntStream.range(0, recordCounts.size())
+                        .filter(i -> recordCounts.get(i) == 0)
+                        .mapToObj(i -> i)
+                        .collect(Collectors.toList());
+                System.out.println(fails);
+                Files.write(resultsFile, fails.getBytes(), StandardOpenOption.APPEND);
             }
         } else {
             keys = IntStream.range(0, keycount)
