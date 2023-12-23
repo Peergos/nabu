@@ -16,7 +16,6 @@ import java.nio.file.*;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.*;
 import java.util.stream.*;
 import java.util.stream.Stream;
 
@@ -31,6 +30,12 @@ public class IpnsPublisher {
             List<String> lines = Files.readAllLines(publishFile);
             keys = lines.stream()
                     .map(line -> KeyKt.unmarshalPrivateKey(ArrayOps.hexToBytes(line.split(" ")[0])))
+                    .collect(Collectors.toList());
+            List<PublishResult> records = lines.stream()
+                    .map(line -> new PublishResult(KeyKt.unmarshalPrivateKey(ArrayOps.hexToBytes(line.split(" ")[0])),
+                            Multihash.fromBase58(line.split(" ")[1]),
+                            ArrayOps.hexToBytes(line.split(" ")[2]),
+                            0))
                     .collect(Collectors.toList());
 
             System.out.println("Resolving " + keys.size() + " keys");
@@ -53,15 +58,18 @@ public class IpnsPublisher {
                         .collect(Collectors.toList());
                 System.out.println(fails);
                 Files.write(resultsFile, fails.getBytes(), StandardOpenOption.APPEND);
+                publish(records, ipfs);
             }
         } else {
             keys = IntStream.range(0, keycount)
                     .mapToObj(i -> Ed25519Kt.generateEd25519KeyPair().getFirst())
                     .collect(Collectors.toList());
             long t0 = System.currentTimeMillis();
-            publish(keys, "The result".getBytes(), ipfs).forEach(res -> {
+            List<CompletableFuture<PublishResult>> futs = publish(keys, "The result".getBytes(), ipfs)
+                    .collect(Collectors.toList());
+            futs.forEach(res -> {
                 try {
-                    Files.write(publishFile, res.toString().getBytes(),
+                    Files.write(publishFile, res.join().toString().getBytes(),
                             publishFile.toFile().exists() ?
                                     StandardOpenOption.APPEND :
                                     StandardOpenOption.CREATE_NEW);
@@ -96,21 +104,28 @@ public class IpnsPublisher {
         }
     }
 
-    public static Stream<PublishResult> publish(List<PrivKey> publishers, byte[] value, EmbeddedIpfs ipfs) throws IOException {
+    public static Stream<CompletableFuture<PublishResult>> publish(List<PrivKey> publishers, byte[] value, EmbeddedIpfs ipfs) throws IOException {
         LocalDateTime expiry = LocalDateTime.now().plusDays(7);
-        AtomicLong done = new AtomicLong(0);
         long ttlNanos = 7L * 24 * 3600 * 1000_000_000;
-        return publishers.stream()
+        List<PublishResult> signed = publishers.stream()
                 .map(p -> {
                     Multihash pub = Multihash.deserialize(PeerId.fromPubKey(p.publicKey()).getBytes());
                     byte[] record = IPNS.createSignedRecord(value, expiry, 1, ttlNanos, p);
-                    return CompletableFuture.supplyAsync(() -> {
-                        int count = ipfs.publishPresignedRecord(pub, record).join();
-                        System.out.println(done.incrementAndGet());
-                        return new PublishResult(p, pub, record, count);
-                    }, ioExec);
-                })
-                .map(CompletableFuture::join);
+                    return new PublishResult(p, pub, record, 0);
+                }).collect(Collectors.toList());
+        return publish(signed, ipfs);
+    }
+
+    public static Stream<CompletableFuture<PublishResult>> publish(List<PublishResult> pubs, EmbeddedIpfs ipfs) {
+        return pubs.stream()
+                .map(p -> publish(p, ipfs));
+    }
+
+    public static CompletableFuture<PublishResult> publish(PublishResult signed, EmbeddedIpfs ipfs) {
+        return CompletableFuture.supplyAsync(() -> {
+            int count = ipfs.publishPresignedRecord(signed.pub, signed.record).join();
+            return new PublishResult(signed.priv, signed.pub, signed.record, count);
+        }, ioExec);
     }
 
     public static List<Integer> resolve(List<PrivKey> publishers, EmbeddedIpfs ipfs) {
