@@ -23,9 +23,9 @@ public class IpnsPublisher {
     private static final ExecutorService ioExec = Executors.newFixedThreadPool(10);
     public static void main(String[] a) throws Exception {
         Path publishFile = Paths.get("publishers.txt");
-        List<PrivKey> keys;
         int keycount = 1000;
-        EmbeddedIpfs ipfs = startIpfs();
+        EmbeddedIpfs publisher = startIpfs();
+        EmbeddedIpfs resolver = startIpfs();
         if (publishFile.toFile().exists()) {
             List<String> lines = Files.readAllLines(publishFile);
             List<PublishResult> records = lines.stream()
@@ -38,7 +38,7 @@ public class IpnsPublisher {
             System.out.println("Resolving " + records.size() + " keys");
             for (int c=0; c < 100; c++) {
                 long t0 = System.currentTimeMillis();
-                List<Integer> recordCounts = resolveAndRepublish(records, ipfs);
+                List<Integer> recordCounts = resolveAndRepublish(records, resolver, publisher);
                 Path resultsFile = Paths.get("publish-resolve-counts-" + LocalDateTime.now().withNano(0) + ".txt");
                 Files.write(resultsFile,
                         recordCounts.stream()
@@ -57,11 +57,11 @@ public class IpnsPublisher {
                 Files.write(resultsFile, fails.getBytes(), StandardOpenOption.APPEND);
             }
         } else {
-            keys = IntStream.range(0, keycount)
+            List<PrivKey> keys = IntStream.range(0, keycount)
                     .mapToObj(i -> Ed25519Kt.generateEd25519KeyPair().getFirst())
                     .collect(Collectors.toList());
             long t0 = System.currentTimeMillis();
-            List<CompletableFuture<PublishResult>> futs = publish(keys, "The result".getBytes(), ipfs)
+            List<CompletableFuture<PublishResult>> futs = publish(keys, "The result".getBytes(), publisher)
                     .collect(Collectors.toList());
             futs.forEach(res -> {
                 try {
@@ -76,7 +76,7 @@ public class IpnsPublisher {
             long t1 = System.currentTimeMillis();
             System.out.println("Published all in " + (t1-t0)/1000 + "s");
         }
-        ipfs.stop().join();
+        publisher.stop().join();
         System.exit(0);
     }
 
@@ -124,16 +124,18 @@ public class IpnsPublisher {
         }, ioExec);
     }
 
-    public static List<Integer> resolveAndRepublish(List<PublishResult> publishers, EmbeddedIpfs ipfs) {
+    public static List<Integer> resolveAndRepublish(List<PublishResult> publishers,
+                                                    EmbeddedIpfs resolver,
+                                                    EmbeddedIpfs publisher) {
         List<Integer> res = new ArrayList<>();
         int done = 0;
         for (PublishResult pub : publishers) {
-            List<IpnsRecord> records = ipfs.resolveRecords(pub.priv.publicKey(), 30);
+            List<IpnsRecord> records = resolver.resolveRecords(pub.priv.publicKey(), 30);
             res.add(records.size());
             done++;
             if (done % 10 == 0)
                 System.out.println("resolved " + done);
-            CompletableFuture.supplyAsync(() -> ipfs.publishPresignedRecord(pub.pub, pub.record));
+            CompletableFuture.supplyAsync(() -> publisher.publishPresignedRecord(pub.pub, pub.record));
         }
         return res;
     }
