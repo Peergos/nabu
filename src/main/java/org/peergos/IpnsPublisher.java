@@ -28,9 +28,6 @@ public class IpnsPublisher {
         EmbeddedIpfs ipfs = startIpfs();
         if (publishFile.toFile().exists()) {
             List<String> lines = Files.readAllLines(publishFile);
-            keys = lines.stream()
-                    .map(line -> KeyKt.unmarshalPrivateKey(ArrayOps.hexToBytes(line.split(" ")[0])))
-                    .collect(Collectors.toList());
             List<PublishResult> records = lines.stream()
                     .map(line -> new PublishResult(KeyKt.unmarshalPrivateKey(ArrayOps.hexToBytes(line.split(" ")[0])),
                             Multihash.fromBase58(line.split(" ")[1]),
@@ -38,10 +35,10 @@ public class IpnsPublisher {
                             0))
                     .collect(Collectors.toList());
 
-            System.out.println("Resolving " + keys.size() + " keys");
+            System.out.println("Resolving " + records.size() + " keys");
             for (int c=0; c < 100; c++) {
                 long t0 = System.currentTimeMillis();
-                List<Integer> recordCounts = resolve(keys, ipfs);
+                List<Integer> recordCounts = resolveAndRepublish(records, ipfs);
                 Path resultsFile = Paths.get("publish-resolve-counts-" + LocalDateTime.now().withNano(0) + ".txt");
                 Files.write(resultsFile,
                         recordCounts.stream()
@@ -58,7 +55,6 @@ public class IpnsPublisher {
                         .collect(Collectors.toList());
                 System.out.println(fails);
                 Files.write(resultsFile, fails.getBytes(), StandardOpenOption.APPEND);
-                publish(records, ipfs);
             }
         } else {
             keys = IntStream.range(0, keycount)
@@ -128,15 +124,16 @@ public class IpnsPublisher {
         }, ioExec);
     }
 
-    public static List<Integer> resolve(List<PrivKey> publishers, EmbeddedIpfs ipfs) {
+    public static List<Integer> resolveAndRepublish(List<PublishResult> publishers, EmbeddedIpfs ipfs) {
         List<Integer> res = new ArrayList<>();
         int done = 0;
-        for (PrivKey publisher : publishers) {
-            List<IpnsRecord> records = ipfs.resolveRecords(publisher.publicKey(), 30);
+        for (PublishResult pub : publishers) {
+            List<IpnsRecord> records = ipfs.resolveRecords(pub.priv.publicKey(), 30);
             res.add(records.size());
             done++;
             if (done % 10 == 0)
                 System.out.println("resolved " + done);
+            CompletableFuture.supplyAsync(() -> ipfs.publishPresignedRecord(pub.pub, pub.record));
         }
         return res;
     }
