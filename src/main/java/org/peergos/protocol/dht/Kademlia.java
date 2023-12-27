@@ -319,15 +319,15 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         return publishValue(publisher, signedRecord, us);
     }
 
-    private boolean putValue(Multihash publisher,
-                             byte[] signedRecord,
-                             PeerAddresses peer,
-                             Host us) {
+    private CompletableFuture<Boolean> putValue(Multihash publisher,
+                                                byte[] signedRecord,
+                                                PeerAddresses peer,
+                                                Host us) {
         try {
             return dialPeer(peer, us).join()
-                    .putValue(publisher, signedRecord).join();
+                    .putValue(publisher, signedRecord);
         } catch (Exception e) {}
-        return false;
+        return CompletableFuture.completedFuture(false);
     }
 
     private boolean hasTransportOverlap(PeerAddresses p) {
@@ -378,10 +378,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                                     more.add(e);
                                 }
                             }
-                            ioExec.submit(() -> {
-                                if (putValue(publisher, signedRecord, r.addresses, us))
-                                    publishes.add(r.addresses.peerId);
-                            });
+                            ioExec.submit(() -> putValue(publisher, signedRecord, r.addresses, us)
+                                    .thenAccept(done -> {
+                                        if (done)
+                                            publishes.add(r.addresses.peerId);
+                                    }));
                             return more;
                         }).join());
                     })
@@ -407,10 +408,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                             .map(r -> {
                                 toQuery.remove(r);
                                 queried.add(r.addresses.peerId);
-                                return ioExec.submit(() -> {
-                                    if (putValue(publisher, signedRecord, r.addresses, us))
-                                        publishes.add(r.addresses.peerId);
-                                });
+                                return ioExec.submit(() -> putValue(publisher, signedRecord, r.addresses, us)
+                                        .thenAccept(done -> {
+                                            if (done)
+                                                publishes.add(r.addresses.peerId);
+                                        }));
                             })
                             .collect(Collectors.toList());
                     lastFutures.forEach(f -> {
@@ -433,16 +435,21 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         return CompletableFuture.completedFuture(new String(records.get(records.size() - 1).value));
     }
 
-    private Optional<GetResult> getValueFromPeer(PeerAddresses peer, Multihash publisher, Host us) {
+    private CompletableFuture<Optional<GetResult>> getValueFromPeer(PeerAddresses peer, Multihash publisher, Host us) {
         try {
-            return Optional.of(dialPeer(peer, us).orTimeout(1, TimeUnit.SECONDS).join()
-                    .getValue(publisher).orTimeout(1, TimeUnit.SECONDS).join());
-        } catch (Exception e) {}
-        return Optional.empty();
+            return dialPeer(peer, us)
+                    .orTimeout(1, TimeUnit.SECONDS)
+                    .join()
+                    .getValue(publisher)
+                    .orTimeout(1, TimeUnit.SECONDS)
+                    .thenApply(Optional::of);
+        } catch (Exception e) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
     }
     public List<IpnsRecord> resolveValue(Multihash publisher, int minResults, Host us) {
         byte[] key = IPNS.getKey(publisher);
-        List<IpnsRecord> candidates = new ArrayList<>();
+        List<IpnsRecord> candidates = Collections.synchronizedList(new ArrayList<>());
         Optional<IpnsRecord> local = engine.getRecord(publisher);
         local.ifPresent(candidates::add);
 
@@ -465,8 +472,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     .map(r -> {
                         toQuery.remove(r);
                         queried.add(r.addresses.peerId);
-                        return ioExec.submit(() -> getValueFromPeer(r.addresses, publisher, us)
-                                .ifPresent(g -> {
+                        return ioExec.submit(() -> getValueFromPeer(r.addresses, publisher, us).thenAccept(get ->
+                                get.ifPresent(g -> {
                                     if (g.record.isPresent() && g.record.get().publisher.equals(publisher))
                                         candidates.add(g.record.get().value);
                                     for (PeerAddresses peer : g.closerPeers) {
@@ -476,7 +483,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                                             toQuery.add(e);
                                         }
                                     }
-                                }));
+                                })));
                     })
                     .collect(Collectors.toList());
             futures.forEach(f -> {

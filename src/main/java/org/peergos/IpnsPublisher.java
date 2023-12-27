@@ -134,7 +134,7 @@ public class IpnsPublisher {
             res.add(records.size());
             done++;
             if (done % 10 == 0)
-                System.out.println("resolved " + done);
+                System.out.println("resolved " + res.stream().filter(c -> c > 0).count() + " / " + done);
             CompletableFuture.supplyAsync(() -> publisher.publishPresignedRecord(pub.pub, pub.record));
         }
         return res;
