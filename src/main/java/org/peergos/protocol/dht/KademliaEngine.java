@@ -43,6 +43,7 @@ public class KademliaEngine {
             .help("Total sent bytes in kademlia findNode protocol responder")
             .register();
 
+    private static final int BUCKET_SIZE = 20;
     private final ProviderStore providersStore;
     private final RecordStore ipnsStore;
     public final Router router;
@@ -81,8 +82,7 @@ public class KademliaEngine {
                 .collect(Collectors.toSet());
     }
 
-    public List<PeerAddresses> getKClosestPeers(byte[] key) {
-        int k = 20;
+    public List<PeerAddresses> getKClosestPeers(byte[] key, int k) {
         List<Node> nodes;
         synchronized (this) {
             nodes = router.find(Id.create(Hash.sha256(key), 256), k, false);
@@ -130,7 +130,7 @@ public class KademliaEngine {
                     builder = builder.setRecord(Dht.Record.newBuilder()
                             .setKey(msg.getKey())
                             .setValue(ByteString.copyFrom(ipnsRecord.get().raw)).build());
-                builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
+                builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray(), BUCKET_SIZE)
                         .stream()
                         .map(p -> p.toProtobuf(a -> isPublic(a)))
                         .collect(Collectors.toList()));
@@ -163,7 +163,7 @@ public class KademliaEngine {
                 Dht.Message.Builder builder = msg.toBuilder();
                 builder = builder.addAllProviderPeers(providers.stream()
                         .collect(Collectors.toList()));
-                builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray())
+                builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray(), BUCKET_SIZE)
                         .stream()
                         .map(p -> p.toProtobuf(a -> isPublic(a)))
                         .collect(Collectors.toList()));
@@ -177,7 +177,7 @@ public class KademliaEngine {
                 Dht.Message.Builder builder = msg.toBuilder();
                 Multihash sourcePeer = Multihash.deserialize(source.getBytes());
                 byte[] target = msg.getKey().toByteArray();
-                builder = builder.addAllCloserPeers(getKClosestPeers(target)
+                builder = builder.addAllCloserPeers(getKClosestPeers(target, BUCKET_SIZE)
                         .stream()
                         .filter(p -> ! p.peerId.equals(sourcePeer)) // don't tell a peer about themselves
                         .map(p -> p.toProtobuf(a -> isPublic(a)))
