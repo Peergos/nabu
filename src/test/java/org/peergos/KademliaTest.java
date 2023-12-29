@@ -72,7 +72,7 @@ public class KademliaTest {
         node2.start().join();
         IdentifyBuilder.addIdentifyProtocol(node2);
 
-        Cid value = blockstore1.put("Publiah me.".getBytes(), Cid.Codec.Raw).join();
+        Cid value = blockstore1.put("Publish me.".getBytes(), Cid.Codec.Raw).join();
 
         try {
             // bootstrap node 1
