@@ -84,6 +84,26 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 }
             }
         }, "Kademlia bootstrap").start();
+        new Thread(() -> {
+            while (true) {
+                try {
+                    PeerId next = engine.getPeerToRefresh();
+                    if (next == null)
+                        Thread.sleep(1_000);
+                    else {
+                        try {
+                            KademliaController ctr = dial(us, next, addressBook.get(next).join().toArray(new Multiaddr[0]))
+                                    .getController().join();
+                            List<PeerAddresses> res = ctr.closerPeers(next.getBytes()).join();
+                        } catch (Exception e) {
+                            engine.markStale(next);
+                        }
+                    }
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            }
+        }, "Kademlia liveness").start();
     }
 
     private boolean connectTo(Host us, PeerAddresses peer) {

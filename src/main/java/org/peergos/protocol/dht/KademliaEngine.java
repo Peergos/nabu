@@ -13,11 +13,13 @@ import org.peergos.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.dht.pb.*;
 import org.peergos.protocol.ipns.*;
+import org.peergos.util.*;
 
 import java.io.*;
 import java.net.*;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.stream.*;
 
 public class KademliaEngine {
@@ -44,6 +46,7 @@ public class KademliaEngine {
             .register();
 
     private static final int BUCKET_SIZE = 20;
+    private static final long REFRESH_PERIOD = 600_000_000_000L;
     private final ProviderStore providersStore;
     private final RecordStore ipnsStore;
     public final Router router;
@@ -51,6 +54,8 @@ public class KademliaEngine {
     private final Multihash ourPeerId;
     private final byte[] ourPeerIdBytes;
     private final Blockstore blocks;
+    private final LinkedBlockingQueue<PeerId> toRefresh = new LinkedBlockingQueue<>();
+    private final LRUCache<PeerId, Long> lastQueryTime = new LRUCache<>(1_000);
 
     public KademliaEngine(Multihash ourPeerId, ProviderStore providersStore, RecordStore ipnsStore, Blockstore blocks) {
         this.providersStore = providersStore;
@@ -66,11 +71,28 @@ public class KademliaEngine {
     }
 
     public synchronized void addOutgoingConnection(PeerId peer) {
+        lastQueryTime.put(peer, System.nanoTime());
         addToRoutingTable(peer);
     }
 
     public synchronized void addIncomingConnection(PeerId peer) {
         // don't auto add incoming kademlia connections to routing table
+    }
+
+    public void markStale(PeerId peer) {
+        router.stale(new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
+    }
+
+    public PeerId getPeerToRefresh() {
+        return toRefresh.poll();
+    }
+
+    private void refresh(List<PeerAddresses> peers) {
+        for (PeerAddresses peer : peers) {
+            PeerId id = new PeerId(peer.peerId.toBytes());
+            if (! lastQueryTime.containsKey(id) || lastQueryTime.get(id) < System.nanoTime() - REFRESH_PERIOD)
+                toRefresh.add(id);
+        }
     }
 
     private void addToRoutingTable(PeerId peer) {
@@ -183,12 +205,15 @@ public class KademliaEngine {
                     // Only return ourselves (without addresses) if they are querying for us
                     // This is because all Go peers query for this to check live-ness
                     builder = builder.addCloserPeers(new PeerAddresses(ourPeerId, Collections.emptyList()).toProtobuf());
-                } else
-                    builder = builder.addAllCloserPeers(getKClosestPeers(target, BUCKET_SIZE)
+                } else {
+                    List<PeerAddresses> kClosestPeers = getKClosestPeers(target, BUCKET_SIZE);
+                    refresh(kClosestPeers);
+                    builder = builder.addAllCloserPeers(kClosestPeers
                             .stream()
                             .filter(p -> ! p.peerId.equals(sourcePeer)) // don't tell a peer about themselves
                             .map(p -> p.toProtobuf(a -> isPublic(a)))
                             .collect(Collectors.toList()));
+                }
                 Dht.Message reply = builder.build();
                 stream.writeAndFlush(reply);
                 responderSentBytes.inc(reply.getSerializedSize());
