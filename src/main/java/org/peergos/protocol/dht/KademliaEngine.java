@@ -49,12 +49,14 @@ public class KademliaEngine {
     public final Router router;
     private AddressBook addressBook;
     private final Multihash ourPeerId;
+    private final byte[] ourPeerIdBytes;
     private final Blockstore blocks;
 
     public KademliaEngine(Multihash ourPeerId, ProviderStore providersStore, RecordStore ipnsStore, Blockstore blocks) {
         this.providersStore = providersStore;
         this.ipnsStore = ipnsStore;
         this.ourPeerId = ourPeerId;
+        this.ourPeerIdBytes = ourPeerId.toBytes();
         this.router = new Router(Id.create(ourPeerId.bareMultihash().toBytes(), 256), 2, 2, 2);
         this.blocks = blocks;
     }
@@ -177,11 +179,16 @@ public class KademliaEngine {
                 Dht.Message.Builder builder = msg.toBuilder();
                 Multihash sourcePeer = Multihash.deserialize(source.getBytes());
                 byte[] target = msg.getKey().toByteArray();
-                builder = builder.addAllCloserPeers(getKClosestPeers(target, BUCKET_SIZE)
-                        .stream()
-                        .filter(p -> ! p.peerId.equals(sourcePeer)) // don't tell a peer about themselves
-                        .map(p -> p.toProtobuf(a -> isPublic(a)))
-                        .collect(Collectors.toList()));
+                if (Arrays.equals(target, ourPeerIdBytes)) {
+                    // Only return ourselves (without addresses) if they are querying for us
+                    // This is because all Go peers query for this to check live-ness
+                    builder = builder.addCloserPeers(new PeerAddresses(ourPeerId, Collections.emptyList()).toProtobuf());
+                } else
+                    builder = builder.addAllCloserPeers(getKClosestPeers(target, BUCKET_SIZE)
+                            .stream()
+                            .filter(p -> ! p.peerId.equals(sourcePeer)) // don't tell a peer about themselves
+                            .map(p -> p.toProtobuf(a -> isPublic(a)))
+                            .collect(Collectors.toList()));
                 Dht.Message reply = builder.build();
                 stream.writeAndFlush(reply);
                 responderSentBytes.inc(reply.getSerializedSize());
