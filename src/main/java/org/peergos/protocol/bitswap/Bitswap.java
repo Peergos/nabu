@@ -20,6 +20,7 @@ import java.util.stream.*;
 public class Bitswap extends StrictProtocolBinding<BitswapController> implements AddressBookConsumer, ConnectionHandler {
     private static final Logger LOG = Logging.LOG();
     public static int MAX_MESSAGE_SIZE = 2*1024*1024;
+    public static final String PROTOCOL_ID = "/ipfs/bitswap/1.2.0";
 
     private final BitswapEngine engine;
     private final LRUCache<PeerId, Boolean> connected = new LRUCache<>(100);
@@ -27,7 +28,7 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
     private AddressBook addrs;
 
     public Bitswap(BitswapEngine engine) {
-        super("/ipfs/bitswap/1.2.0", new BitswapProtocol(engine));
+        super(PROTOCOL_ID, new BitswapProtocol(engine));
         this.engine = engine;
     }
 

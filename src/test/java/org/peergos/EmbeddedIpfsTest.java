@@ -124,6 +124,7 @@ public class EmbeddedIpfsTest {
         PrivKey privKey = builder.getPrivateKey();
         PeerId peerId = builder.getPeerId();
         IdentitySection id = new IdentitySection(privKey.bytes(), peerId);
-        return EmbeddedIpfs.build(new RamRecordStore(), new RamBlockstore(), true, swarmAddresses, bootstrap, id, blockRequestAuthoriser, Optional.empty());
+        return EmbeddedIpfs.build(new RamRecordStore(), new RamBlockstore(), true, swarmAddresses, bootstrap,
+                id, blockRequestAuthoriser, Optional.empty(), Optional.empty());
     }
 }

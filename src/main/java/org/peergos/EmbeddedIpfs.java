@@ -216,7 +216,8 @@ public class EmbeddedIpfs {
                                      List<MultiAddress> bootstrap,
                                      IdentitySection identity,
                                      BlockRequestAuthoriser authoriser,
-                                     Optional<HttpProtocol.HttpRequestProcessor> handler) {
+                                     Optional<HttpProtocol.HttpRequestProcessor> handler,
+                                     Optional<String> bitswapProtocolId) {
         Blockstore blockstore = provideBlocks ?
                 new ProvidingBlockstore(blocks) :
                 blocks;
@@ -231,7 +232,7 @@ public class EmbeddedIpfs {
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blockstore), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
-        Bitswap bitswap = new Bitswap(new BitswapEngine(blockstore, authoriser, Bitswap.MAX_MESSAGE_SIZE, true));
+        Bitswap bitswap = new Bitswap(bitswapProtocolId.orElse(Bitswap.PROTOCOL_ID), new BitswapEngine(blockstore, authoriser, Bitswap.MAX_MESSAGE_SIZE, true));
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
         List<ProtocolBinding> protocols = new ArrayList<>();
