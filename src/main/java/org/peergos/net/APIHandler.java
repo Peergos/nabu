@@ -13,7 +13,7 @@ import java.util.stream.*;
 
 public class APIHandler extends Handler {
     public static final String API_URL = "/api/v0/";
-    public static final Version CURRENT_VERSION = Version.parse("0.7.0");
+    public static final Version CURRENT_VERSION = Version.parse("0.7.2");
     private static final Logger LOG = Logging.LOG();
 
     private static final boolean LOGGING = true;
