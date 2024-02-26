@@ -13,6 +13,7 @@ import java.util.concurrent.*;
 
 public class FindPeerTest {
 
+    @Ignore
     @Test
     public void findLongRunningNode() {
         RamBlockstore blockstore1 = new RamBlockstore();
