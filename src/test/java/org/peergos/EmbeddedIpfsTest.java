@@ -125,6 +125,6 @@ public class EmbeddedIpfsTest {
         PeerId peerId = builder.getPeerId();
         IdentitySection id = new IdentitySection(privKey.bytes(), peerId);
         return EmbeddedIpfs.build(new RamRecordStore(), new RamBlockstore(), true, swarmAddresses, bootstrap,
-                id, blockRequestAuthoriser, Optional.empty(), Optional.empty());
+                id, blockRequestAuthoriser, Optional.empty());
     }
 }
