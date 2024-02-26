@@ -147,7 +147,7 @@ public class IpnsPublisher {
         IdentitySection id = new IdentitySection(privKey.bytes(), peerId);
         EmbeddedIpfs ipfs = EmbeddedIpfs.build(new RamRecordStore(), new RamBlockstore(), false,
                 List.of(new MultiAddress("/ip6/::/tcp/0")), Config.defaultBootstrapNodes, id,
-                (c, s, au) -> CompletableFuture.completedFuture(true), Optional.empty(), Optional.empty());
+                (c, s, au) -> CompletableFuture.completedFuture(true), Optional.empty());
         ipfs.start();
         return ipfs;
     }

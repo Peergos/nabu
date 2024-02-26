@@ -59,8 +59,7 @@ public class Nabu {
                 config.bootstrap.getBootstrapAddresses(),
                 config.identity,
                 authoriser,
-                config.addresses.proxyTargetAddress.map(Nabu::proxyHandler),
-                Optional.empty()
+                config.addresses.proxyTargetAddress.map(Nabu::proxyHandler)
         );
         ipfs.start();
         String apiAddressArg = "Addresses.API";
