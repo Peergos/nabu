@@ -216,8 +216,21 @@ public class EmbeddedIpfs {
                                      List<MultiAddress> bootstrap,
                                      IdentitySection identity,
                                      BlockRequestAuthoriser authoriser,
+                                     Optional<HttpProtocol.HttpRequestProcessor> handler) {
+        return build(records, blocks, provideBlocks, swarmAddresses, bootstrap, identity, authoriser, handler,
+                Optional.empty(), Optional.empty());
+    }
+
+    public static EmbeddedIpfs build(RecordStore records,
+                                     Blockstore blocks,
+                                     boolean provideBlocks,
+                                     List<MultiAddress> swarmAddresses,
+                                     List<MultiAddress> bootstrap,
+                                     IdentitySection identity,
+                                     BlockRequestAuthoriser authoriser,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler,
-                                     Optional<String> bitswapProtocolId) {
+                                     Optional<String> bitswapProtocolId,
+                                     Optional<Integer> maxBitswapMsgSize) {
         Blockstore blockstore = provideBlocks ?
                 new ProvidingBlockstore(blocks) :
                 blocks;
@@ -232,7 +245,8 @@ public class EmbeddedIpfs {
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blockstore), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
-        Bitswap bitswap = new Bitswap(bitswapProtocolId.orElse(Bitswap.PROTOCOL_ID), new BitswapEngine(blockstore, authoriser, Bitswap.MAX_MESSAGE_SIZE, true));
+        Bitswap bitswap = new Bitswap(bitswapProtocolId.orElse(Bitswap.PROTOCOL_ID),
+                new BitswapEngine(blockstore, authoriser, maxBitswapMsgSize.orElse(Bitswap.MAX_MESSAGE_SIZE), true));
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
         List<ProtocolBinding> protocols = new ArrayList<>();

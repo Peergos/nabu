@@ -333,7 +333,7 @@ public class BitswapEngine {
         for (int i=0; i < blocks.size(); i++) {
             MessageOuterClass.Message.Block block = blocks.get(i);
             int blockSize = block.getSerializedSize();
-            if (blockSize + messageSize > Bitswap.MAX_MESSAGE_SIZE) {
+            if (blockSize + messageSize > maxMessageSize) {
                 sender.accept(builder.build());
                 builder = MessageOuterClass.Message.newBuilder();
                 messageSize = 0;
