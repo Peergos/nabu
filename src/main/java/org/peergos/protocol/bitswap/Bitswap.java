@@ -42,6 +42,10 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
         this.addrs = addrs;
     }
 
+    public int maxBlockSize() {
+        return engine.maxMessageSize();
+    }
+
     @Override
     public void handleConnection(@NotNull Connection connection) {
         // add all outgoing connections to an LRU of candidates

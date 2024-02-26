@@ -31,9 +31,11 @@ public class APIHandler extends Handler {
     public static final String FIND_PROVS = "dht/findprovs";
 
     private final EmbeddedIpfs ipfs;
+    private final int maxBlockSize;
 
     public APIHandler(EmbeddedIpfs ipfs) {
         this.ipfs = ipfs;
+        this.maxBlockSize = ipfs.maxBlockSize();
     }
 
     public void handleCallToAPI(HttpExchange httpExchange) {
@@ -109,7 +111,7 @@ public class APIHandler extends Handler {
                         throw new APIException("Multiple input not supported");
                     }
                     byte[] block = data.get(0);
-                    if (block.length >  1024 * 1024 * 2) { //todo what should the limit be?
+                    if (block.length > maxBlockSize) {
                         throw new APIException("Block too large");
                     }
                     Cid cid = ipfs.blockstore.put(block, Cid.Codec.lookupIPLDName(reqFormat)).join();
