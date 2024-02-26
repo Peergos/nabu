@@ -12,6 +12,7 @@ import org.junit.Test;
 import org.peergos.blockstore.*;
 import org.peergos.client.NabuClient;
 import org.peergos.net.APIHandler;
+import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.dht.Kademlia;
 import org.peergos.protocol.dht.RamProviderStore;
 import org.peergos.protocol.dht.RamRecordStore;
@@ -45,7 +46,7 @@ public class HandlerTest {
             apiServer = HttpServer.create(localAPIAddress, 500);
             Blockstore blocks = new TypeLimitedBlockstore(new RamBlockstore(), Set.of(Cid.Codec.Raw));
             EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(blocks), null, null,
-                    null, Optional.empty(), Collections.emptyList(), Optional.empty());
+                    new Bitswap(new BitswapEngine(null, null, Bitswap.MAX_MESSAGE_SIZE)), Optional.empty(), Collections.emptyList(), Optional.empty());
             apiServer.createContext(APIHandler.API_URL, new APIHandler(ipfs));
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
@@ -124,7 +125,8 @@ public class HandlerTest {
             InetSocketAddress localAPIAddress = new InetSocketAddress(apiAddress.getHost(), apiAddress.getPort());
 
             apiServer = HttpServer.create(localAPIAddress, 500);
-            EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(new RamBlockstore()), null, null, null, Optional.empty(), Collections.emptyList(), Optional.empty());
+            EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(new RamBlockstore()), null,
+                    null, new Bitswap(new BitswapEngine(null, null, Bitswap.MAX_MESSAGE_SIZE)), Optional.empty(), Collections.emptyList(), Optional.empty());
             apiServer.createContext(APIHandler.API_URL, new APIHandler(ipfs));
             apiServer.setExecutor(Executors.newFixedThreadPool(50));
             apiServer.start();
