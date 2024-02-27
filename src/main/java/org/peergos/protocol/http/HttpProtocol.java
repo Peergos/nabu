@@ -19,7 +19,7 @@ import java.util.concurrent.*;
 import java.util.function.*;
 
 public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
-    private static final int MAX_BODY_SIZE = 2 * 1024 * 1024; // TODO remove this and make it fully streaming
+    private static final int MAX_BODY_SIZE = 8 * 1024 * 1024; // TODO remove this and make it fully streaming
 
     public static class Binding extends StrictProtocolBinding<HttpController> {
         public Binding(SocketAddress proxyTarget) {
