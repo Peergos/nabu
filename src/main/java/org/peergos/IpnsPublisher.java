@@ -65,7 +65,13 @@ public class IpnsPublisher {
             long t0 = System.currentTimeMillis();
             List<CompletableFuture<PublishResult>> futs = publish(keys, value, publisher, publishFile)
                     .collect(Collectors.toList());
-            futs.forEach(res -> res.join());
+            int done = 0;
+            for (CompletableFuture<PublishResult> fut : futs) {
+                fut.join();
+                done++;
+                if (done % 10 == 0)
+                    System.out.println("published " + done + " / " + keycount);
+            }
             long t1 = System.currentTimeMillis();
             System.out.println("Published all in " + (t1-t0)/1000 + "s");
         }
