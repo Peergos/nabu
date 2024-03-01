@@ -60,19 +60,12 @@ public class IpnsPublisher {
             List<PrivKey> keys = IntStream.range(0, keycount)
                     .mapToObj(i -> Ed25519Kt.generateEd25519KeyPair().getFirst())
                     .collect(Collectors.toList());
+            byte[] value = new byte[1024];
+            new Random(28).nextBytes(value);
             long t0 = System.currentTimeMillis();
-            List<CompletableFuture<PublishResult>> futs = publish(keys, "The result".getBytes(), publisher)
+            List<CompletableFuture<PublishResult>> futs = publish(keys, value, publisher, publishFile)
                     .collect(Collectors.toList());
-            futs.forEach(res -> {
-                try {
-                    Files.write(publishFile, res.join().toString().getBytes(),
-                            publishFile.toFile().exists() ?
-                                    StandardOpenOption.APPEND :
-                                    StandardOpenOption.CREATE_NEW);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
+            futs.forEach(res -> res.join());
             long t1 = System.currentTimeMillis();
             System.out.println("Published all in " + (t1-t0)/1000 + "s");
         }
@@ -100,7 +93,10 @@ public class IpnsPublisher {
         }
     }
 
-    public static Stream<CompletableFuture<PublishResult>> publish(List<PrivKey> publishers, byte[] value, EmbeddedIpfs ipfs) throws IOException {
+    public static Stream<CompletableFuture<PublishResult>> publish(List<PrivKey> publishers,
+                                                                   byte[] value,
+                                                                   EmbeddedIpfs ipfs,
+                                                                   Path publishFile) throws IOException {
         LocalDateTime expiry = LocalDateTime.now().plusDays(7);
         long ttlNanos = 7L * 24 * 3600 * 1000_000_000;
         List<PublishResult> signed = publishers.stream()
@@ -109,6 +105,12 @@ public class IpnsPublisher {
                     byte[] record = IPNS.createSignedRecord(value, expiry, 1, ttlNanos, p);
                     return new PublishResult(p, pub, record, 0);
                 }).collect(Collectors.toList());
+        for (PublishResult rec : signed) {
+            Files.write(publishFile, rec.toString().getBytes(),
+                    publishFile.toFile().exists() ?
+                            StandardOpenOption.APPEND :
+                            StandardOpenOption.CREATE_NEW);
+        }
         return publish(signed, ipfs);
     }
 
