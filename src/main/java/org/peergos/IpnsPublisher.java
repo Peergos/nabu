@@ -16,15 +16,15 @@ import java.nio.file.*;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
 import java.util.stream.*;
 import java.util.stream.Stream;
 
 public class IpnsPublisher {
-    private static final ExecutorService ioExec = Executors.newFixedThreadPool(10);
+    private static final ExecutorService ioExec = Executors.newFixedThreadPool(50);
     public static void main(String[] a) throws Exception {
         Path publishFile = Paths.get("publishers.txt");
         int keycount = 1000;
-        EmbeddedIpfs publisher = startIpfs();
         EmbeddedIpfs resolver = startIpfs();
         if (publishFile.toFile().exists()) {
             List<String> lines = Files.readAllLines(publishFile);
@@ -38,7 +38,7 @@ public class IpnsPublisher {
             System.out.println("Resolving " + records.size() + " keys");
             for (int c=0; c < 100; c++) {
                 long t0 = System.currentTimeMillis();
-                List<Integer> recordCounts = resolveAndRepublish(records, resolver, publisher);
+                List<Integer> recordCounts = resolveAndRepublish(records, resolver, resolver);
                 Path resultsFile = Paths.get("publish-resolve-counts-" + LocalDateTime.now().withNano(0) + ".txt");
                 Files.write(resultsFile,
                         recordCounts.stream()
@@ -56,12 +56,14 @@ public class IpnsPublisher {
                 System.out.println(fails);
                 Files.write(resultsFile, fails.getBytes(), StandardOpenOption.APPEND);
             }
+            resolver.stop().join();
         } else {
             List<PrivKey> keys = IntStream.range(0, keycount)
                     .mapToObj(i -> Ed25519Kt.generateEd25519KeyPair().getFirst())
                     .collect(Collectors.toList());
             byte[] value = new byte[1024];
             new Random(28).nextBytes(value);
+            EmbeddedIpfs publisher = startIpfs();
             long t0 = System.currentTimeMillis();
             List<CompletableFuture<PublishResult>> futs = publish(keys, value, publisher, publishFile)
                     .collect(Collectors.toList());
@@ -74,8 +76,8 @@ public class IpnsPublisher {
             }
             long t1 = System.currentTimeMillis();
             System.out.println("Published all in " + (t1-t0)/1000 + "s");
+            publisher.stop().join();
         }
-        publisher.stop().join();
         System.exit(0);
     }
 
@@ -135,17 +137,20 @@ public class IpnsPublisher {
     public static List<Integer> resolveAndRepublish(List<PublishResult> publishers,
                                                     EmbeddedIpfs resolver,
                                                     EmbeddedIpfs publisher) {
-        List<Integer> res = new ArrayList<>();
-        int done = 0;
-        for (PublishResult pub : publishers) {
+        AtomicInteger done = new AtomicInteger(0);
+        AtomicInteger successes = new AtomicInteger(0);
+        List<CompletableFuture<Integer>> futs = publishers.stream().map(pub -> CompletableFuture.supplyAsync(() -> {
             List<IpnsRecord> records = resolver.resolveRecords(pub.priv.publicKey(), 30);
-            res.add(records.size());
-            done++;
-            if (done % 10 == 0)
-                System.out.println("resolved " + res.stream().filter(c -> c > 0).count() + " / " + done);
-            CompletableFuture.supplyAsync(() -> publisher.publishPresignedRecord(pub.pub, pub.record));
-        }
-        return res;
+            int success = records.isEmpty() ? successes.get() : successes.incrementAndGet();
+            int total = done.incrementAndGet();
+            if (total % 10 == 0)
+                System.out.println("resolved " + success + " / " + done);
+            publisher.publishPresignedRecord(pub.pub, pub.record).join();
+            return records.size();
+        }, ioExec)).collect(Collectors.toList());
+        return futs.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
     }
 
     public static EmbeddedIpfs startIpfs() {
