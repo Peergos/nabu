@@ -24,7 +24,6 @@ public class IpnsPublisher {
     private static final ExecutorService ioExec = Executors.newFixedThreadPool(50);
     public static void main(String[] a) throws Exception {
         Path publishFile = Paths.get("publishers.txt");
-        int keycount = 1000;
         EmbeddedIpfs resolver = startIpfs();
         if (publishFile.toFile().exists()) {
             List<String> lines = Files.readAllLines(publishFile);
@@ -58,6 +57,7 @@ public class IpnsPublisher {
             }
             resolver.stop().join();
         } else {
+            int keycount = 1000;
             List<PrivKey> keys = IntStream.range(0, keycount)
                     .mapToObj(i -> Ed25519Kt.generateEd25519KeyPair().getFirst())
                     .collect(Collectors.toList());
@@ -140,13 +140,18 @@ public class IpnsPublisher {
         AtomicInteger done = new AtomicInteger(0);
         AtomicInteger successes = new AtomicInteger(0);
         List<CompletableFuture<Integer>> futs = publishers.stream().map(pub -> CompletableFuture.supplyAsync(() -> {
-            List<IpnsRecord> records = resolver.resolveRecords(pub.priv.publicKey(), 30);
-            int success = records.isEmpty() ? successes.get() : successes.incrementAndGet();
-            int total = done.incrementAndGet();
-            if (total % 10 == 0)
-                System.out.println("resolved " + success + " / " + done);
-            publisher.publishPresignedRecord(pub.pub, pub.record).join();
-            return records.size();
+            try {
+                List<IpnsRecord> records = resolver.resolveRecords(pub.priv.publicKey(), 30);
+                int success = records.isEmpty() ? successes.get() : successes.incrementAndGet();
+                int total = done.incrementAndGet();
+                if (total % 10 == 0)
+                    System.out.println("resolved " + success + " / " + done);
+                publisher.publishPresignedRecord(pub.pub, pub.record).join();
+                return records.size();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return 0;
+            }
         }, ioExec)).collect(Collectors.toList());
         return futs.stream()
                 .map(CompletableFuture::join)

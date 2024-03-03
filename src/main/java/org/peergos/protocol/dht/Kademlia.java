@@ -365,11 +365,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     .filter(r -> hasTransportOverlap(r.addresses)) // don't waste time trying to dial nodes we can't
                     .limit(queryParallelism)
                     .collect(Collectors.toList());
-            List<? extends Future<List<RoutingEntry>>> futures = thisRound.stream()
+            List<? extends CompletableFuture<List<RoutingEntry>>> futures = thisRound.stream()
                     .map(r -> {
                         toQuery.remove(r);
                         queried.add(r.addresses.peerId);
-                        return ioExec.submit(() -> getCloserPeers(key, r.addresses, us).thenApply(res -> {
+                        return CompletableFuture.supplyAsync(() -> getCloserPeers(key, r.addresses, us).thenApply(res -> {
                             List<RoutingEntry> more = new ArrayList<>();
                             for (PeerAddresses peer : res) {
                                 if (! queried.contains(peer.peerId)) {
@@ -378,20 +378,20 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                                     more.add(e);
                                 }
                             }
-                            ioExec.submit(() -> putValue(publisher, signedRecord, r.addresses, us)
+                            CompletableFuture.supplyAsync(() -> putValue(publisher, signedRecord, r.addresses, us)
                                     .thenAccept(done -> {
                                         if (done)
                                             publishes.add(r.addresses.peerId);
-                                    }));
+                                    }), ioExec);
                             return more;
-                        }).join());
+                        }).join(), ioExec);
                     })
                     .collect(Collectors.toList());
             futures.forEach(f -> {
                 try {
                     if (publishes.size() >= minPublishes)
                         return;
-                    toQuery.addAll(f.get());
+                    toQuery.addAll(f.orTimeout(2, TimeUnit.SECONDS).join());
                 } catch (Exception e) {}
             });
             // exit early if we have enough results
@@ -400,24 +400,24 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             if (toQuery.size() == remaining) {
                 // publish to closest remaining nodes
                 System.out.println("Publishing to further nodes, so far only " + publishes.size());
-                while (publishes.size() < minPublishes) {
+                while (publishes.size() < minPublishes && !toQuery.isEmpty()) {
                     List<RoutingEntry> closest = toQuery.stream()
                     .limit(minPublishes - publishes.size() + 5)
                     .collect(Collectors.toList());
-                    List<? extends Future<?>> lastFutures = closest.stream()
+                    List<? extends CompletableFuture<?>> lastFutures = closest.stream()
                             .map(r -> {
                                 toQuery.remove(r);
                                 queried.add(r.addresses.peerId);
-                                return ioExec.submit(() -> putValue(publisher, signedRecord, r.addresses, us)
+                                return CompletableFuture.supplyAsync(() -> putValue(publisher, signedRecord, r.addresses, us)
                                         .thenAccept(done -> {
                                             if (done)
                                                 publishes.add(r.addresses.peerId);
-                                        }));
+                                        }), ioExec);
                             })
                             .collect(Collectors.toList());
                     lastFutures.forEach(f -> {
                         try {
-                            f.get();
+                            f.orTimeout(2, TimeUnit.SECONDS).join();
                         } catch (Exception e) {}
                     });
                 }
@@ -468,29 +468,30 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             List<RoutingEntry> thisRound = toQuery.stream()
                     .limit(queryParallelism)
                     .collect(Collectors.toList());
-            List<? extends Future<?>> futures = thisRound.stream()
+            List<CompletableFuture<CompletableFuture<Void>>> futures = thisRound.stream()
                     .map(r -> {
                         toQuery.remove(r);
                         queried.add(r.addresses.peerId);
-                        return ioExec.submit(() -> getValueFromPeer(r.addresses, publisher, us).thenAccept(get ->
+                        return CompletableFuture.supplyAsync(() -> getValueFromPeer(r.addresses, publisher, us).thenAccept(get ->
                                 get.ifPresent(g -> {
                                     if (g.record.isPresent() && g.record.get().publisher.equals(publisher))
                                         candidates.add(g.record.get().value);
                                     for (PeerAddresses peer : g.closerPeers) {
-                                        if (! queried.contains(peer.peerId) && hasTransportOverlap(peer)) {
+                                        if (!queried.contains(peer.peerId) && hasTransportOverlap(peer)) {
                                             Id peerKey = Id.create(Hash.sha256(IPNS.getKey(peer.peerId)), 256);
                                             RoutingEntry e = new RoutingEntry(peerKey, peer);
                                             toQuery.add(e);
                                         }
                                     }
-                                })));
+                                })), ioExec);
                     })
                     .collect(Collectors.toList());
             futures.forEach(f -> {
                 try {
                     if (candidates.size() >= minResults)
                         return;
-                    f.get();
+                    f.orTimeout(5, TimeUnit.SECONDS).join()
+                            .orTimeout(5, TimeUnit.SECONDS).join();
                 } catch (Exception e) {}
             });
             // exit early if we have enough results
