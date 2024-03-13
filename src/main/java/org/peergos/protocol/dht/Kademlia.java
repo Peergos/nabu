@@ -18,6 +18,7 @@ import org.peergos.util.Logging;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
 import java.util.function.*;
 import java.util.logging.*;
 import java.util.stream.*;
@@ -73,9 +74,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         return successes;
     }
 
+    private AtomicBoolean running = new AtomicBoolean(false);
     public void startBootstrapThread(Host us) {
+        running.set(true);
         new Thread(() -> {
-            while (true) {
+            while (running.get()) {
                 try {
                     bootstrap(us);
                     Thread.sleep(BOOTSTRAP_PERIOD_MILLIS);
@@ -84,6 +87,10 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 }
             }
         }, "Kademlia bootstrap").start();
+    }
+
+    public void stopBootstrapThread() {
+        running.set(false);
     }
 
     private boolean connectTo(Host us, PeerAddresses peer) {

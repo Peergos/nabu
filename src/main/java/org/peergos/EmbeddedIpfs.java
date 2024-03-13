@@ -160,6 +160,7 @@ public class EmbeddedIpfs {
             records.close();
         }
         blockProvider.ifPresent(b -> b.stop());
+        dht.stopBootstrapThread();
         return node != null ? node.stop() : CompletableFuture.completedFuture(null);
     }
 
