@@ -23,11 +23,13 @@ public class AggregatedMetrics {
     public static final Counter API_BLOCK_GET  = build("api_block_get", "Total calls to block/get.");
     public static final Counter API_BLOCK_PUT  = build("api_block_put", "Total calls to block/put.");
     public static final Counter API_BLOCK_RM  = build("api_block_rm", "Total calls to block/rm.");
+    public static final Counter API_BLOCK_RM_BULK  = build("api_block_rm_bulk", "Total calls to block/rm/bulk.");
     public static final Counter API_BLOCK_STAT  = build("api_block_stat", "Total calls to block/stat.");
     public static final Counter API_REFS_LOCAL  = build("api_refs_local", "Total calls to refs/local.");
     public static final Counter API_BLOCK_HAS  = build("api_block_has", "Total calls to block/has.");
     public static final Counter API_BLOOM_ADD  = build("api_bloom_add", "Total calls to bloom/add.");
     public static final Counter API_FIND_PROVS  = build("api_dht_findprovs", "Total calls to dht/findprovs.");
+    public static final Counter API_IPNS_GET  = build("api_ipns_get", "Total calls to ipns/get.");
 
     public static void startExporter(String address, int port) throws IOException {
         LOG.info("Starting metrics server at " + address + ":" + port);
