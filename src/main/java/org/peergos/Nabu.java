@@ -49,7 +49,7 @@ public class Nabu {
         LOG.info("Starting Nabu version: " + APIHandler.CURRENT_VERSION);
         BlockRequestAuthoriser authoriser = (c, p, a) -> CompletableFuture.completedFuture(true);
 
-        Path datastorePath = ipfsPath.resolve("datastore").resolve("h2.datastore");
+        Path datastorePath = ipfsPath.resolve("datastore").resolve("h2-v2.datastore");
         DatabaseRecordStore records = new DatabaseRecordStore(datastorePath.toAbsolutePath().toString());
         BlockMetadataStore meta = buildBlockMetadata(args);
         EmbeddedIpfs ipfs = EmbeddedIpfs.build(records,
