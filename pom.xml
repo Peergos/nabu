@@ -6,7 +6,7 @@
 
     <groupId>com.github.peergos</groupId>
     <artifactId>nabu</artifactId>
-    <version>v0.7.5</version>
+    <version>v0.7.6</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -142,7 +142,7 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-http2</artifactId>
-            <version>4.1.90.Final</version>
+            <version>4.1.108.Final</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -196,7 +196,7 @@
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <version>2.1.214</version>
+            <version>2.2.224</version>
         </dependency>
         <dependency>
             <groupId>io.prometheus</groupId>
