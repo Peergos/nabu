@@ -255,11 +255,7 @@ public class APIHandler extends Handler {
                         throw new APIException("argument \"signer\" is required");
                     }
                     Multihash signer = Multihash.fromBase58(args.get(0));
-                    if (signer.getType() != Multihash.Type.id)
-                        throw new IllegalStateException("Can only resolve Ed25519 ipns mappings");
-                    byte[] pubKeymaterial = Arrays.copyOfRange(signer.getHash(), 4, 36);
-                    io.libp2p.core.crypto.PubKey pub = new Ed25519PublicKey(new org.bouncycastle.crypto.params.Ed25519PublicKeyParameters(pubKeymaterial, 0));
-                    List<IpnsRecord> records = ipfs.resolveRecords(pub, 1)
+                    List<IpnsRecord> records = ipfs.resolveRecords(signer, 1)
                             .stream()
                             .sorted()
                             .collect(Collectors.toList());

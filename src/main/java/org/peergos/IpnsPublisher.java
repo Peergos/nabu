@@ -141,7 +141,7 @@ public class IpnsPublisher {
         AtomicInteger successes = new AtomicInteger(0);
         List<CompletableFuture<Integer>> futs = publishers.stream().map(pub -> CompletableFuture.supplyAsync(() -> {
             try {
-                List<IpnsRecord> records = resolver.resolveRecords(pub.priv.publicKey(), 30);
+                List<IpnsRecord> records = resolver.resolveRecords(pub.pub, 30);
                 int success = records.isEmpty() ? successes.get() : successes.incrementAndGet();
                 int total = done.incrementAndGet();
                 if (total % 10 == 0)
