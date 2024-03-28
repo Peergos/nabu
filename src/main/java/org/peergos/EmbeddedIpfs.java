@@ -126,8 +126,7 @@ public class EmbeddedIpfs {
         return CompletableFuture.completedFuture(records.get(records.size() - 1).value);
     }
 
-    public List<IpnsRecord> resolveRecords(PubKey pub, int minResults) {
-        Multihash publisher = Multihash.deserialize(PeerId.fromPubKey(pub).getBytes());
+    public List<IpnsRecord> resolveRecords(Multihash publisher, int minResults) {
         List<IpnsRecord> candidates = dht.resolveValue(publisher, minResults, node);
         return candidates.stream().sorted().collect(Collectors.toList());
     }
