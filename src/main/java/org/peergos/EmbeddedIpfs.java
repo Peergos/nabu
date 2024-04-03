@@ -146,6 +146,8 @@ public class EmbeddedIpfs {
         IdentifyBuilder.addIdentifyProtocol(node);
         LOG.info("Node started and listening on " + node.listenAddresses());
         LOG.info("Bootstrapping IPFS routing table");
+        if (bootstrap.isEmpty())
+            LOG.warning("Starting with empty bootstrap list - you will not join the global dht");
         int connections = dht.bootstrapRoutingTable(node, bootstrap, addr -> !addr.contains("/wss/"));
         LOG.info("Bootstrapping IPFS kademlia");
         dht.bootstrap(node);

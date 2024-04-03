@@ -155,7 +155,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         Id keyId = Id.create(Hash.sha256(key), 256);
         SortedSet<RoutingEntry> closest = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
         SortedSet<RoutingEntry> toQuery = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
-        List<PeerAddresses> localClosest = engine.getKClosestPeers(key, maxCount);
+        List<PeerAddresses> localClosest = engine.getKClosestPeers(key, Math.max(6, maxCount));
         if (maxCount == 1) {
             Optional<PeerAddresses> match = localClosest.stream().filter(p -> Arrays.equals(p.peerId.toBytes(), key)).findFirst();
             if (match.isPresent())
