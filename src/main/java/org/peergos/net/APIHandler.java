@@ -5,6 +5,7 @@ import io.ipfs.multihash.*;
 import io.libp2p.core.PeerId;
 import io.libp2p.crypto.keys.*;
 import org.peergos.*;
+import org.peergos.cbor.*;
 import org.peergos.protocol.ipns.*;
 import org.peergos.protocol.ipns.pb.*;
 import org.peergos.util.*;
@@ -30,6 +31,7 @@ public class APIHandler extends Handler {
     public static final String RM = "block/rm";
     public static final String RM_BULK = "block/rm/bulk";
     public static final String STAT = "block/stat";
+    public static final String BULK_STAT = "block/stat/bulk";
     public static final String REFS_LOCAL = "refs/local";
     public static final String BLOOM_ADD = "bloom/add";
     public static final String HAS = "block/has";
@@ -90,6 +92,31 @@ public class APIHandler extends Handler {
                     List<HashedBlock> block = ipfs.getBlocks(List.of(new Want(Cid.decode(args.get(0)), auth)), peers, addToBlockstore);
                     if (! block.isEmpty()) {
                         replyBytes(httpExchange, block.get(0).block);
+                    } else {
+                        try {
+                            httpExchange.sendResponseHeaders(400, 0);
+                        } catch (IOException ioe) {
+                            HttpUtil.replyError(httpExchange, ioe);
+                        }
+                    }
+                    break;
+                }
+                case BULK_STAT: {
+                    AggregatedMetrics.API_BLOCK_STAT_BULK.inc();
+                    Map<String, Object> json = (Map<String, Object>) JSONParser.parse(new String(readFully(httpExchange.getRequestBody())));
+                    List<Want> wants = ((List<Map<String, String>>)json.get("wants"))
+                            .stream()
+                            .map(Want::fromJson)
+                            .collect(Collectors.toList());
+                    Set<PeerId> peers = Optional.ofNullable(params.get("peers"))
+                            .map(p -> p.stream().map(PeerId::fromBase58).collect(Collectors.toSet()))
+                            .orElse(Collections.emptySet());
+                    List<HashedBlock> blocks = ipfs.getBlocks(wants, peers, true);
+                    if (wants.size() == blocks.size()) {
+                        List<List<String>> links = blocks.stream()
+                                .map(b -> CborObject.getLinks(b.hash, b.block).stream().map(Cid::toString).collect(Collectors.toList()))
+                                .collect(Collectors.toList());
+                        replyJson(httpExchange, JSONParser.toString(links));
                     } else {
                         try {
                             httpExchange.sendResponseHeaders(400, 0);
