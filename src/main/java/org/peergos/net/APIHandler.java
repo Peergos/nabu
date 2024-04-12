@@ -116,7 +116,11 @@ public class APIHandler extends Handler {
                         List<List<String>> links = blocks.stream()
                                 .map(b -> b.hash.codec.equals(Cid.Codec.Raw) ?
                                         Collections.<String>emptyList() :
-                                        CborObject.getLinks(b.hash, b.block).stream().map(Cid::toString).collect(Collectors.toList()))
+                                        CborObject.getLinks(b.hash, b.block)
+                                                .stream()
+                                                .filter(c -> c.getType() != Multihash.Type.id)
+                                                .map(Cid::toString)
+                                                .collect(Collectors.toList()))
                                 .collect(Collectors.toList());
                         replyJson(httpExchange, JSONParser.toString(links));
                     } else {
