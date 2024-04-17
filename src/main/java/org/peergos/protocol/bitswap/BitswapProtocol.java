@@ -5,7 +5,7 @@ import io.libp2p.protocol.*;
 import io.prometheus.client.*;
 import org.jetbrains.annotations.*;
 import org.peergos.protocol.bitswap.pb.*;
-import org.peergos.util.Logging;
+import org.peergos.util.*;
 
 import java.util.concurrent.*;
 import java.util.logging.*;
@@ -36,7 +36,7 @@ public class BitswapProtocol extends ProtobufProtocolHandler<BitswapController> 
     private final BitswapEngine engine;
 
     public BitswapProtocol(BitswapEngine engine) {
-        super(MessageOuterClass.Message.getDefaultInstance(), engine.maxMessageSize(), engine.maxMessageSize());
+        super(MessageOuterClass.Message.getDefaultInstance(), engine.maxMessageSize(), Long.MAX_VALUE);
         this.engine = engine;
     }
 
@@ -77,6 +77,11 @@ public class BitswapProtocol extends ProtobufProtocolHandler<BitswapController> 
         public void onMessage(@NotNull Stream stream, MessageOuterClass.Message msg) {
             receivedBytes.inc(msg.getSerializedSize());
             engine.receiveMessage(msg, stream, sentBytes);
+        }
+
+        @Override
+        public void onException(@Nullable Throwable cause) {
+            LOG.log(Level.WARNING, cause.getMessage(), cause);
         }
     }
 }
