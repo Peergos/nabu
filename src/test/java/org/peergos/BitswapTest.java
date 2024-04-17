@@ -47,6 +47,42 @@ public class BitswapTest {
     }
 
     @Test
+    public void getTenBlocks() {
+        HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
+                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
+        Host node1 = builder1.build();
+        RamBlockstore blockstore2 = new RamBlockstore();
+        HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
+                new RamProviderStore(1000), new RamRecordStore(), blockstore2, (c, p, a) -> CompletableFuture.completedFuture(true));
+        Host node2 = builder2.build();
+        node1.start().join();
+        node2.start().join();
+        try {
+            Multiaddr address2 = node2.listenAddresses().get(0);
+            List<Cid> hashes = new ArrayList<>();
+            Random random = new Random(28);
+            for (int i=0; i < 10; i++) {
+                byte[] blockData = new byte[1024*1024];
+                random.nextBytes(blockData);
+                Cid hash = blockstore2.put(blockData, Cid.Codec.Raw).join();
+                hashes.add(hash);
+            }
+
+            Bitswap bitswap1 = builder1.getBitswap().get();
+            node1.getAddressBook().addAddrs(address2.getPeerId(), 0, address2).join();
+            List<HashedBlock> receivedBlocks = bitswap1.get(hashes.stream().map(Want::new).collect(Collectors.toList()), node1, Set.of(address2.getPeerId()), false)
+                    .stream()
+                    .map(f -> f.join())
+                    .collect(Collectors.toList());
+            if (receivedBlocks.size() != hashes.size())
+                throw new IllegalStateException("Incorrect number of blocks returned!");
+        } finally {
+            node1.stop();
+            node2.stop();
+        }
+    }
+
+    @Test
     public void blockFlooder() {
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
                 new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));

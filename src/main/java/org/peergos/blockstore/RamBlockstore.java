@@ -4,6 +4,7 @@ import io.ipfs.cid.*;
 import io.ipfs.multihash.*;
 import org.peergos.*;
 import org.peergos.blockstore.metadatadb.BlockMetadata;
+import org.peergos.cbor.*;
 import org.peergos.util.*;
 
 import java.util.*;
@@ -60,7 +61,7 @@ public class RamBlockstore implements Blockstore {
 
     @Override
     public CompletableFuture<BlockMetadata> getBlockMetadata(Cid h) {
-        throw new IllegalStateException("Unsupported operation!");
+        byte[] block = get(h).join().get();
+        return Futures.of(new BlockMetadata(block.length, CborObject.getLinks(h, block)));
     }
-
 }

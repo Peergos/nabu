@@ -25,6 +25,7 @@ public class AggregatedMetrics {
     public static final Counter API_BLOCK_RM  = build("api_block_rm", "Total calls to block/rm.");
     public static final Counter API_BLOCK_RM_BULK  = build("api_block_rm_bulk", "Total calls to block/rm/bulk.");
     public static final Counter API_BLOCK_STAT  = build("api_block_stat", "Total calls to block/stat.");
+    public static final Counter API_BLOCK_STAT_BULK  = build("api_block_stat_bulk", "Total calls to block/stat/bulk.");
     public static final Counter API_REFS_LOCAL  = build("api_refs_local", "Total calls to refs/local.");
     public static final Counter API_BLOCK_HAS  = build("api_block_has", "Total calls to block/has.");
     public static final Counter API_BLOOM_ADD  = build("api_bloom_add", "Total calls to bloom/add.");
