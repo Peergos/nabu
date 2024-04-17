@@ -6,7 +6,7 @@
 
     <groupId>com.github.peergos</groupId>
     <artifactId>nabu</artifactId>
-    <version>v0.7.6</version>
+    <version>v0.7.7</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
