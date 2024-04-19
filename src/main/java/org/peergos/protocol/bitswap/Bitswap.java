@@ -124,7 +124,7 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
         Map<Want, PeerId> haves = engine.getHaves();
         // broadcast to all connected bitswap peers if none are supplied
         Set<PeerId> audience = peers.isEmpty() ? getBroadcastAudience() : peers;
-        LOG.info("Send wants: " + wants.size() + " to " + audience);
+        LOG.info("Send wants: " + wants.size() + " to " + audience + " cids: " + wants.stream().limit(2).map(w -> w.cid).collect(Collectors.toList()));
         List<MessageOuterClass.Message.Wantlist.Entry> wantsProto = wants.stream()
                 .map(want -> MessageOuterClass.Message.Wantlist.Entry.newBuilder()
                         .setWantType(audience.size() <= 2 || haves.containsKey(want) ?
