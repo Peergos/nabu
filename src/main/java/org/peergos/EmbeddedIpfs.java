@@ -27,6 +27,7 @@ import org.peergos.protocol.http.*;
 import org.peergos.protocol.ipns.*;
 import org.peergos.util.Logging;
 
+import java.io.*;
 import java.net.*;
 import java.nio.file.*;
 import java.sql.Connection;
@@ -51,6 +52,7 @@ public class EmbeddedIpfs {
     public final Optional<HttpProtocol.Binding> p2pHttp;
     private final List<MultiAddress> bootstrap;
     private final Optional<PeriodicBlockProvider> blockProvider;
+    private final List<MDnsDiscovery> mdns = new ArrayList<>();
 
     public EmbeddedIpfs(Host node,
                         Blockstore blockstore,
@@ -154,18 +156,30 @@ public class EmbeddedIpfs {
         LOG.info("Bootstrapping IPFS kademlia");
         dht.bootstrap(node);
         dht.startBootstrapThread(node);
-        InetAddress address = null;
-        MDnsDiscovery mdns = new MDnsDiscovery(node, "_ipfs-discovery._udp.local.", 60, address);
-        mdns.getNewPeerFoundListeners().add(peerInfo -> {
-            PeerId remote = PeerId.fromBase58(peerInfo.getPeerId().toBase58().substring(1)); // Not what's wrong with peerInfo, but this works
-            if (! remote.equals(node.getPeerId())) {
-                LOG.info(node.getPeerId() + " found local peer: " + peerInfo.getPeerId().toBase58() + ", addrs: " + peerInfo.getAddresses());
-                KademliaController ctr = dht.dial(node, remote, peerInfo.getAddresses().toArray(new Multiaddr[0])).getController().join();
-                ctr.closerPeers(node.getPeerId().getBytes()).join();
+
+        try {
+            List<InetAddress> ourAddrs = Collections.list(NetworkInterface.getNetworkInterfaces()).stream()
+                    .flatMap(net -> net.getInterfaceAddresses().stream()
+                            .map(InterfaceAddress::getAddress))
+                    .collect(Collectors.toList());
+            for (InetAddress addr: ourAddrs) {
+                LOG.info("MDNS using " + addr);
+                MDnsDiscovery mdns = new MDnsDiscovery(node, "_ipfs-discovery._udp.local.", 60, addr);
+                this.mdns.add(mdns);
+                mdns.getNewPeerFoundListeners().add(peerInfo -> {
+                    PeerId remote = PeerId.fromBase58(peerInfo.getPeerId().toBase58().substring(1)); // Not what's wrong with peerInfo, but this works
+                    if (!remote.equals(node.getPeerId())) {
+                        LOG.info(node.getPeerId() + " found local peer: " + peerInfo.getPeerId().toBase58() + ", addrs: " + peerInfo.getAddresses());
+                        KademliaController ctr = dht.dial(node, remote, peerInfo.getAddresses().toArray(new Multiaddr[0])).getController().join();
+                        ctr.closerPeers(node.getPeerId().getBytes()).join();
+                    }
+                    return null;
+                });
+                mdns.start();
             }
-            return null;
-        });
-        mdns.start();
+        } catch (IOException e) {
+            LOG.log(Level.INFO, e.getMessage(), e);
+        }
 
         blockProvider.ifPresent(p -> p.start());
     }
@@ -176,6 +190,9 @@ public class EmbeddedIpfs {
         }
         blockProvider.ifPresent(b -> b.stop());
         dht.stopBootstrapThread();
+        for (MDnsDiscovery m : mdns) {
+            m.stop();
+        }
         return node != null ? node.stop() : CompletableFuture.completedFuture(null);
     }
 
