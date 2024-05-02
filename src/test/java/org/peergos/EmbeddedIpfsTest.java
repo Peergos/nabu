@@ -44,6 +44,25 @@ public class EmbeddedIpfsTest {
     }
 
     @Test
+    public void mdnsDiscovery() throws Exception {
+        EmbeddedIpfs node1 = build(Collections.emptyList(), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
+        node1.start();
+        EmbeddedIpfs node2 = build(Collections.emptyList(), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
+        node2.start();
+
+        Thread.sleep(5_000);
+        Cid block = node2.blockstore.put(new byte[1024], Cid.Codec.Raw).join();
+        PeerId peerId2 = node2.node.getPeerId();
+        List<HashedBlock> retrieved = ForkJoinPool.commonPool().submit(
+                () -> node1.getBlocks(List.of(new Want(block)), Set.of(peerId2), false))
+                .get(5, TimeUnit.SECONDS);
+        Assert.assertTrue(retrieved.size() == 1);
+
+        node1.stop();
+        node2.stop();
+    }
+
+    @Test
     public void publishValue() throws Exception {
         EmbeddedIpfs node1 = build(BootstrapTest.BOOTSTRAP_NODES, List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
         node1.start();
