@@ -165,6 +165,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 .map(p -> new RoutingEntry(Id.create(Hash.sha256(p.peerId.toBytes()), 256), p))
                 .collect(Collectors.toList()));
         toQuery.addAll(closest);
+        if (toQuery.isEmpty())
+            LOG.info("Couldn't find any local peers in kademlia routing table");
         Set<Multihash> queried = Collections.synchronizedSet(new HashSet<>());
         int queryParallelism = 3;
         while (true) {
