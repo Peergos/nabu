@@ -96,6 +96,13 @@
             <groupId>redis.clients</groupId>
             <artifactId>jedis</artifactId>
             <version>4.3.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                    <!-- newest slf4j-api is removed as it conflicts with Spring Boot's logger and disables our logs -->
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.github.multiformats</groupId>
@@ -136,11 +143,25 @@
             <groupId>com.github.dnsjava</groupId>
             <artifactId>dnsjava</artifactId>
             <version>v3.5.2</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                    <!-- newest slf4j-api is removed as it conflicts with Spring Boot's logger and disables our logs -->
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.offbynull.portmapper</groupId>
             <artifactId>portmapper</artifactId>
             <version>2.0.6</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                    <!-- newest slf4j-api is removed as it conflicts with Spring Boot's logger and disables our logs -->
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
