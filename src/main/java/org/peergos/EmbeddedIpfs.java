@@ -170,8 +170,10 @@ public class EmbeddedIpfs {
                     PeerId remote = PeerId.fromBase58(peerInfo.getPeerId().toBase58().substring(1)); // Not what's wrong with peerInfo, but this works
                     if (!remote.equals(node.getPeerId())) {
                         LOG.info(node.getPeerId() + " found local peer: " + peerInfo.getPeerId().toBase58() + ", addrs: " + peerInfo.getAddresses());
-                        KademliaController ctr = dht.dial(node, remote, peerInfo.getAddresses().toArray(new Multiaddr[0])).getController().join();
+                        Multiaddr[] remoteAddrs = peerInfo.getAddresses().toArray(new Multiaddr[0]);
+                        KademliaController ctr = dht.dial(node, remote, remoteAddrs).getController().join();
                         ctr.closerPeers(node.getPeerId().getBytes()).join();
+                        node.getAddressBook().addAddrs(remote, 0, remoteAddrs);
                     }
                     return null;
                 });
