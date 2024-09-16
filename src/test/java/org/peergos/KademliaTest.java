@@ -23,13 +23,13 @@ public class KademliaTest {
                 new RamProviderStore(1000), new RamRecordStore(), blockstore1, (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node1);
+        IdentifyBuilder.addIdentifyProtocol(node1, Collections.emptyList());
 
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
                 new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node2 = builder2.build();
         node2.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node2);
+        IdentifyBuilder.addIdentifyProtocol(node2, Collections.emptyList());
 
         try {
             // bootstrap node 2
@@ -64,13 +64,13 @@ public class KademliaTest {
                 new RamProviderStore(1000), new RamRecordStore(), blockstore1, (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node1);
+        IdentifyBuilder.addIdentifyProtocol(node1, Collections.emptyList());
 
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
                 new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node2 = builder2.build();
         node2.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node2);
+        IdentifyBuilder.addIdentifyProtocol(node2, Collections.emptyList());
 
         Cid value = blockstore1.put("Publish me.".getBytes(), Cid.Codec.Raw).join();
 

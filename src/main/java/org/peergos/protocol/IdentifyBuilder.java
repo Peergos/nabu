@@ -15,12 +15,12 @@ import java.util.stream.Stream;
 
 public class IdentifyBuilder {
 
-    public static void addIdentifyProtocol(Host node) {
+    public static void addIdentifyProtocol(Host node, List<Multiaddr> announceAddresses) {
         IdentifyOuterClass.Identify.Builder identifyBuilder = IdentifyOuterClass.Identify.newBuilder()
                 .setProtocolVersion("ipfs/0.1.0")
                 .setAgentVersion("nabu/v0.1.0")
                 .setPublicKey(ByteArrayExtKt.toProtobuf(node.getPrivKey().publicKey().bytes()))
-                .addAllListenAddrs(node.listenAddresses().stream()
+                .addAllListenAddrs(Stream.concat(node.listenAddresses().stream(), announceAddresses.stream())
                         .flatMap(a -> expandWildcardAddresses(a).stream())
                         .map(Multiaddr::serialize)
                         .map(ByteArrayExtKt::toProtobuf)

@@ -26,7 +26,7 @@ public class KuboPingTest {
                 .addMuxers(List.of(StreamMuxerProtocol.getYamux()))
                 .build();
         node1.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node1);
+        IdentifyBuilder.addIdentifyProtocol(node1, Collections.emptyList());
         try {
             IPFS kubo = new IPFS("localhost", 5001);
             Multiaddr address2 = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kubo.id().get("ID"));
