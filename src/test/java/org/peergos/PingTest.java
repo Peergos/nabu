@@ -62,8 +62,8 @@ public class PingTest {
                 new Bitswap(new BitswapEngine(new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true), Bitswap.MAX_MESSAGE_SIZE))));
         node1.start().join();
         node2.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node1);
-        IdentifyBuilder.addIdentifyProtocol(node2);
+        IdentifyBuilder.addIdentifyProtocol(node1, Collections.emptyList());
+        IdentifyBuilder.addIdentifyProtocol(node2, Collections.emptyList());
 
         Assert.assertTrue(new Multihash(Multihash.Type.id, node1Keys.publicKey().bytes()).toString().equals(node1.getPeerId().toString()));
         Assert.assertTrue(new Multihash(Multihash.Type.sha2_256, Hash.sha256(node2Keys.publicKey().bytes())).toString().equals(node2.getPeerId().toString()));
@@ -87,9 +87,9 @@ public class PingTest {
         Host node1 = HostBuilder.build(TestPorts.getPort(), List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true), Bitswap.MAX_MESSAGE_SIZE))));
         Host node2 = HostBuilder.build(TestPorts.getPort(), List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true), Bitswap.MAX_MESSAGE_SIZE))));
         node1.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node1);
+        IdentifyBuilder.addIdentifyProtocol(node1, Collections.emptyList());
         node2.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node2);
+        IdentifyBuilder.addIdentifyProtocol(node2, Collections.emptyList());
         try {
             // ping from 1 to 2
             Multiaddr address2 = node2.listenAddresses().get(0);

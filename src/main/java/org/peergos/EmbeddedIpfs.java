@@ -52,6 +52,7 @@ public class EmbeddedIpfs {
     public final Optional<HttpProtocol.Binding> p2pHttp;
     private final List<MultiAddress> bootstrap;
     private final Optional<PeriodicBlockProvider> blockProvider;
+    private final List<MultiAddress> announce;
     private final List<MDnsDiscovery> mdns = new ArrayList<>();
 
     public EmbeddedIpfs(Host node,
@@ -61,7 +62,8 @@ public class EmbeddedIpfs {
                         Bitswap bitswap,
                         Optional<HttpProtocol.Binding> p2pHttp,
                         List<MultiAddress> bootstrap,
-                        Optional<BlockingDeque<Cid>> newBlockProvider) {
+                        Optional<BlockingDeque<Cid>> newBlockProvider,
+                        List<MultiAddress> announce) {
         this.node = node;
         this.blockstore = blockstore;
         this.records = records;
@@ -72,6 +74,7 @@ public class EmbeddedIpfs {
         this.blocks = new BitswapBlockService(node, bitswap, dht);
         this.blockProvider = newBlockProvider.map(q -> new PeriodicBlockProvider(22 * 3600_000L,
                 () -> blockstore.refs(false).join().stream(), node, dht, q));
+        this.announce = announce;
     }
 
     public int maxBlockSize() {
@@ -147,7 +150,10 @@ public class EmbeddedIpfs {
         });
         Runtime.getRuntime().addShutdownHook(shutdownHook);
         node.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node);
+        IdentifyBuilder.addIdentifyProtocol(node, announce.stream()
+                .map(MultiAddress::toString)
+                .map(Multiaddr::new)
+                .collect(Collectors.toList()));
         LOG.info("Node started and listening on " + node.listenAddresses());
         LOG.info("Bootstrapping IPFS routing table");
         if (bootstrap.isEmpty())
@@ -246,8 +252,8 @@ public class EmbeddedIpfs {
                                      IdentitySection identity,
                                      BlockRequestAuthoriser authoriser,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler) {
-        return build(records, blocks, provideBlocks, swarmAddresses, bootstrap, identity, authoriser, handler,
-                Optional.empty(), Optional.empty());
+        return build(records, blocks, provideBlocks, swarmAddresses, bootstrap, identity, Collections.emptyList(),
+                authoriser, handler, Optional.empty(), Optional.empty());
     }
 
     public static EmbeddedIpfs build(RecordStore records,
@@ -256,6 +262,7 @@ public class EmbeddedIpfs {
                                      List<MultiAddress> swarmAddresses,
                                      List<MultiAddress> bootstrap,
                                      IdentitySection identity,
+                                     List<MultiAddress> announce,
                                      BlockRequestAuthoriser authoriser,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler,
                                      Optional<String> bitswapProtocolId,
@@ -291,7 +298,7 @@ public class EmbeddedIpfs {
         Optional<BlockingDeque<Cid>> newBlockProvider = provideBlocks ?
                 Optional.of(((ProvidingBlockstore)blockstore).toPublish) :
                 Optional.empty();
-        return new EmbeddedIpfs(node, blockstore, records, dht, bitswap, httpHandler, bootstrap, newBlockProvider);
+        return new EmbeddedIpfs(node, blockstore, records, dht, bitswap, httpHandler, bootstrap, newBlockProvider, announce);
     }
 
     public static Multiaddr[] getAddresses(Host node, Kademlia dht, Multihash targetNodeId) throws ConnectionException {

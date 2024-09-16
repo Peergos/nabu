@@ -26,7 +26,7 @@ public class BitswapMirrorTest {
                 new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node1);
+        IdentifyBuilder.addIdentifyProtocol(node1, Collections.emptyList());
         IPFS kubo = new IPFS("localhost", 5001);
         Multiaddr kuboAddress = Multiaddr.fromString("/ip4/127.0.0.1/tcp/4001/p2p/" + kubo.id().get("ID"));
         preloadBlocksToKubo(kubo);

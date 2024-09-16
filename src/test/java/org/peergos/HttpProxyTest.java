@@ -12,11 +12,9 @@ import org.peergos.protocol.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
 import org.peergos.util.*;
-import org.peergos.util.HttpUtil;
 
 import java.io.*;
 import java.net.*;
-import java.nio.charset.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.zip.*;
@@ -99,7 +97,7 @@ public class HttpProxyTest {
                 .addProtocol(new HttpProtocol.Binding(unusedProxyTarget));
         Host node1 = builder1.build();
         node1.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node1);
+        IdentifyBuilder.addIdentifyProtocol(node1, Collections.emptyList());
         Kademlia dht = builder1.getWanDht().get();
         dht.bootstrapRoutingTable(node1, BootstrapTest.BOOTSTRAP_NODES, a -> true);
         System.out.println("Bootstrapping node...");

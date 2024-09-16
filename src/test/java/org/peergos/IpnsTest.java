@@ -26,7 +26,7 @@ public class IpnsTest {
                 new RamProviderStore(1000), new RamRecordStore(), blockstore1, (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node1);
+        IdentifyBuilder.addIdentifyProtocol(node1, Collections.emptyList());
         Multihash node1Id = Multihash.deserialize(node1.getPeerId().getBytes());
 
         try {
@@ -73,7 +73,7 @@ public class IpnsTest {
                 new RamProviderStore(1000), new RamRecordStore(), blockstore1, (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
-        IdentifyBuilder.addIdentifyProtocol(node1);
+        IdentifyBuilder.addIdentifyProtocol(node1, Collections.emptyList());
 
         try {
             IPFS kubo = new IPFS("localhost", 5001);
