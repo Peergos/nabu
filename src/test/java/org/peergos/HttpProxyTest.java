@@ -77,7 +77,7 @@ public class HttpProxyTest {
 
                 ByteArrayOutputStream bout = new ByteArrayOutputStream();
                 resp.content().readBytes(bout, resp.headers().getInt("content-length"));
-                Assert.assertTrue(resp.headers().get(headerName).equals(headerValue));
+                Assert.assertEquals(resp.headers().get(headerName), headerValue);
                 resp.release();
                 byte[] replyBody = bout.toByteArray();
                 equal(replyBody, httpReply);

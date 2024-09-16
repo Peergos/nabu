@@ -27,8 +27,6 @@ import org.peergos.protocol.http.*;
 import org.peergos.protocol.ipns.*;
 import org.peergos.util.Logging;
 
-import java.io.*;
-import java.net.*;
 import java.nio.file.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -145,7 +143,7 @@ public class EmbeddedIpfs {
             try {
                 this.stop().join();
             } catch (Exception ex) {
-                ex.printStackTrace();
+                LOG.info(ex.getMessage());
             }
         });
         Runtime.getRuntime().addShutdownHook(shutdownHook);
@@ -179,14 +177,14 @@ public class EmbeddedIpfs {
         });
         mdns.start();
 
-        blockProvider.ifPresent(p -> p.start());
+        blockProvider.ifPresent(PeriodicBlockProvider::start);
     }
 
     public CompletableFuture<Void> stop() throws Exception {
         if (records != null) {
             records.close();
         }
-        blockProvider.ifPresent(b -> b.stop());
+        blockProvider.ifPresent(PeriodicBlockProvider::stop);
         dht.stopBootstrapThread();
         for (MDnsDiscovery m : mdns) {
             m.stop();
