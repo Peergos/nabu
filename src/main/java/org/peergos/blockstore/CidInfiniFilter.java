@@ -35,13 +35,18 @@ public class CidInfiniFilter implements Filter {
     public static CidInfiniFilter build(Blockstore bs, double falsePositiveRate) {
         List<Cid> refs = bs.refs(false).join();
         int nBlocks = refs.size()*5/4; //  increase by 25% to avoid expansion during build
+        CidInfiniFilter infini = build(nBlocks, falsePositiveRate);
+        refs.forEach(c -> infini.add(c));
+        return infini;
+    }
+
+    public static CidInfiniFilter build(int nBlocks, double falsePositiveRate) {
         int nextPowerOfTwo = Math.max(17, (int) (1 + Math.log(nBlocks) / Math.log(2)));
         double expansionAlpha = 0.8;
         int bitsPerEntry = (int)(4 - Math.log(falsePositiveRate / expansionAlpha) / Math.log(2) + 1);
         LOG.info("Using infini filter of initial size " + ((double)(bitsPerEntry * (1 << nextPowerOfTwo) / 8) / 1024 / 1024) + " MiB");
         ChainedInfiniFilter infini = new ChainedInfiniFilter(nextPowerOfTwo, bitsPerEntry);
         infini.set_expand_autonomously(true);
-        refs.forEach(c -> infini.insert(c.toBytes(), true));
         return new CidInfiniFilter(infini);
     }
 }
