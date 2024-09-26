@@ -349,7 +349,7 @@ public class S3Blockstore implements Blockstore {
                 LOG.log(Level.WARNING, msg, e);
             }
             failedBlockGets.inc();
-            throw new RuntimeException(e.getMessage(), e);
+            return Futures.errored(e);
         } finally {
             readTimer.observeDuration();
         }

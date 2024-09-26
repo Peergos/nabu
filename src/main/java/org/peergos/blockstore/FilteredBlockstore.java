@@ -8,27 +8,48 @@ import org.peergos.util.*;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.*;
 
 public class FilteredBlockstore implements Blockstore {
 
     private final Blockstore blocks;
-    private final Filter filter;
+    private final Filter present;
+    private volatile Filter absent;
+    private final AtomicLong absentCount = new AtomicLong(0);
 
-    public FilteredBlockstore(Blockstore blocks, Filter filter) {
+    public FilteredBlockstore(Blockstore blocks, Filter present) {
         this.blocks = blocks;
-        this.filter = filter;
+        this.present = present;
+        this.absent = buildAbsentFilter();
     }
 
     public CompletableFuture<Boolean> bloomAdd(Cid cid) {
-        filter.add(cid);
+        present.add(cid);
         return CompletableFuture.completedFuture(true);
+    }
+
+    private static Filter buildAbsentFilter() {
+        return CidInfiniFilter.build(1_000, 0.001);
+    }
+
+    private void addAbsentBlock(Cid c) {
+        if (absentCount.get() > 10_000) {
+            absentCount.set(0);
+            absent = buildAbsentFilter();
+        }
+        absentCount.incrementAndGet();
+        absent.add(c);
     }
 
     @Override
     public CompletableFuture<Boolean> has(Cid c) {
-        if (filter.has(c))
-            return blocks.has(c);
+        if (present.has(c) && ! absent.has(c))
+            return blocks.has(c).thenApply(res -> {
+                if (! res)
+                    addAbsentBlock(c);
+                return false;
+            });
         return CompletableFuture.completedFuture(false);
     }
 
@@ -40,15 +61,19 @@ public class FilteredBlockstore implements Blockstore {
 
     @Override
     public CompletableFuture<Optional<byte[]>> get(Cid c) {
-        if (filter.has(c))
-            return blocks.get(c);
+        if (present.has(c) && ! absent.has(c)) {
+            return blocks.get(c).exceptionally(t -> {
+                addAbsentBlock(c);
+                return Optional.empty();
+            });
+        }
         return CompletableFuture.completedFuture(Optional.empty());
     }
 
     @Override
     public CompletableFuture<Cid> put(byte[] block, Cid.Codec codec) {
         return blocks.put(block, codec)
-                .thenApply(filter::add);
+                .thenApply(present::add);
     }
 
     @Override
