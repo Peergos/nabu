@@ -131,10 +131,22 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         List<Connection> allConns = us.getNetwork().getConnections();
         Set<Connection> activeConns = us.getStreams().stream().map(s -> s.getConnection()).collect(Collectors.toSet());
         List<Connection> toClose = allConns.stream().filter(c -> !activeConns.contains(c)).collect(Collectors.toList());
-        LOG.info("Closing " + toClose.size() + " / " + allConns.size() + " connections...");
         for (Connection conn : toClose) {
             conn.close();
         }
+    }
+
+    private static <V> CompletableFuture<V> closeAfter(CompletableFuture<io.libp2p.core.Stream> sf, Supplier<CompletableFuture<V>> query) {
+        CompletableFuture<V> res = new CompletableFuture<>();
+        query.get().thenAccept(v -> {
+            sf.thenAccept(s -> s.close());
+            res.complete(v);
+        }).exceptionally(t -> {
+            sf.thenAccept(s -> s.close());
+            res.completeExceptionally(t);
+            return null;
+        });
+        return res;
     }
 
     static class RoutingEntry {
@@ -287,11 +299,10 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     }
 
     private CompletableFuture<List<PeerAddresses>> getCloserPeers(byte[] key, PeerAddresses target, Host us) {
-        StreamPromise<? extends KademliaController> conn = null;
         try {
-            conn = dialPeer(target, us);
+            StreamPromise<? extends KademliaController> conn = dialPeer(target, us);
             KademliaController contr = conn.getController().orTimeout(2, TimeUnit.SECONDS).join();
-            return contr.closerPeers(key);
+            return closeAfter(conn.getStream(), () -> contr.closerPeers(key));
         } catch (Exception e) {
             // we can't dial quic only nodes until it's implemented
             if (target.addresses.stream().allMatch(a -> a.toString().contains("quic")))
@@ -303,9 +314,6 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             else if (e.getCause() instanceof ConnectionClosedException) {}
             else
                 e.printStackTrace();
-        } finally {
-            if (conn != null)
-                conn.getStream().thenApply(s -> s.close());
         }
         return CompletableFuture.completedFuture(Collections.emptyList());
     }
@@ -365,15 +373,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                                                 byte[] signedRecord,
                                                 PeerAddresses peer,
                                                 Host us) {
-        StreamPromise<? extends KademliaController> conn = null;
         try {
-            conn = dialPeer(peer, us);
-            return conn.getController().join()
-                    .putValue(publisher, signedRecord);
-        } catch (Exception e) {} finally {
-            if (conn != null)
-                conn.getStream().thenApply(s -> s.close());
-        }
+            StreamPromise<? extends KademliaController> conn = dialPeer(peer, us);
+            return closeAfter(conn.getStream(), () -> conn.getController().join()
+                    .putValue(publisher, signedRecord));
+        } catch (Exception e) {}
         return CompletableFuture.completedFuture(false);
     }
 

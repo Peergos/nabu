@@ -15,6 +15,7 @@ import java.net.*;
 import java.util.*;
 import java.util.function.*;
 import java.util.stream.*;
+import java.util.stream.Stream;
 
 public class PeerAddresses {
     public final Multihash peerId;
@@ -57,7 +58,13 @@ public class PeerAddresses {
         Multihash peerId = Multihash.deserialize(peer.getId().toByteArray());
         List<Multiaddr> addrs = peer.getAddrsList()
                 .stream()
-                .map(b -> Multiaddr.deserialize(b.toByteArray()))
+                .flatMap(b -> {
+                    try {
+                        return Stream.of(Multiaddr.deserialize(b.toByteArray()));
+                    } catch (Exception e) {
+                        return Stream.empty();
+                    }
+                })
                 .collect(Collectors.toList());
         return new PeerAddresses(peerId, addrs);
     }
