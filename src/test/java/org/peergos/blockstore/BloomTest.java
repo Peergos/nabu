@@ -33,6 +33,10 @@ public class BloomTest {
         long t4 = System.currentTimeMillis();
         System.out.println("Doubling filter size took: " + (t4-t3)+ "ms");
 
+        for (Cid ref : bs.refs(false).join()) {
+            Assert.assertTrue(filtered.has(ref).join());
+        }
+
         checkFalsePositiveRate(bloom, 14);
     }
 

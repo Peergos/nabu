@@ -48,7 +48,7 @@ public class FilteredBlockstore implements Blockstore {
             return blocks.has(c).thenApply(res -> {
                 if (! res)
                     addAbsentBlock(c);
-                return false;
+                return res;
             });
         return CompletableFuture.completedFuture(false);
     }
