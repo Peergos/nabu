@@ -198,6 +198,7 @@ public class KademliaEngine {
             case PING: {break;} // Not used any more
             default: throw new IllegalStateException("Unknown message kademlia type: " + msg.getType());
         }
+        stream.getConnection().close();
     }
 
     public static boolean isPublic(Multiaddr addr) {
