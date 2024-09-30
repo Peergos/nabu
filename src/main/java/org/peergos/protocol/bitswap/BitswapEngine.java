@@ -158,7 +158,12 @@ public class BitswapEngine {
         int presentBlocks = 0;
         if (msg.hasWantlist()) {
             for (MessageOuterClass.Message.Wantlist.Entry e : msg.getWantlist().getEntriesList()) {
-                Cid c = Cid.cast(e.getBlock().toByteArray());
+                Cid c;
+                try {
+                    c = Cid.cast(e.getBlock().toByteArray());
+                } catch (Exception ex) {
+                    continue;
+                }
                 Optional<String> auth = e.getAuth().isEmpty() ? Optional.empty() : Optional.of(ArrayOps.bytesToHex(e.getAuth().toByteArray()));
                 boolean isCancel = e.getCancel();
                 boolean sendDontHave = e.getSendDontHave();
