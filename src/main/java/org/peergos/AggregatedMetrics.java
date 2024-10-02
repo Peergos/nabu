@@ -22,6 +22,7 @@ public class AggregatedMetrics {
     public static final Counter API_VERSION  = build("api_version", "Total calls to version.");
     public static final Counter API_BLOCK_GET  = build("api_block_get", "Total calls to block/get.");
     public static final Counter API_BLOCK_PUT  = build("api_block_put", "Total calls to block/put.");
+    public static final Counter API_BLOCK_PUT_BULK  = build("api_block_put_bulk", "Total calls to block/put/bulk.");
     public static final Counter API_BLOCK_RM  = build("api_block_rm", "Total calls to block/rm.");
     public static final Counter API_BLOCK_RM_BULK  = build("api_block_rm_bulk", "Total calls to block/rm/bulk.");
     public static final Counter API_BLOCK_STAT  = build("api_block_stat", "Total calls to block/stat.");

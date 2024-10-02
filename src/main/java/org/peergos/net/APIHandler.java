@@ -28,6 +28,7 @@ public class APIHandler extends Handler {
     public static final String VERSION = "version";
     public static final String GET = "block/get";
     public static final String PUT = "block/put";
+    public static final String BULK_PUT = "block/put/bulk";
     public static final String RM = "block/rm";
     public static final String RM_BULK = "block/rm/bulk";
     public static final String STAT = "block/stat";
@@ -147,6 +148,30 @@ public class APIHandler extends Handler {
                             .findAny()
                             .get();
                     List<byte[]> data = MultipartReceiver.extractFiles(httpExchange.getRequestBody(), boundary);
+                    if (data.size() != 1) {
+                        throw new APIException("Multiple input not supported");
+                    }
+                    byte[] block = data.get(0);
+                    if (block.length > maxBlockSize) {
+                        throw new APIException("Block too large");
+                    }
+                    Cid cid = ipfs.blockstore.put(block, Cid.Codec.lookupIPLDName(reqFormat)).join();
+                    Map res = new HashMap<>();
+                    res.put("Hash", cid.toString());
+                    replyJson(httpExchange, JSONParser.toString(res));
+                    break;
+                }
+                case BULK_PUT: {
+                    AggregatedMetrics.API_BLOCK_PUT_BULK.inc();
+                    List<String> format = params.get("format");
+                    Optional<String> formatOpt = format !=null && format.size() == 1 ? Optional.of(format.get(0)) : Optional.empty();
+                    if (formatOpt.isEmpty()) {
+                        throw new APIException("argument \"format\" is required");
+                    }
+                    String reqFormat = formatOpt.get().toLowerCase();
+                    int size = Integer.parseInt(httpExchange.getRequestHeaders().get("Content-Length").get(0));
+
+                    List<byte[]> data = ((CborObject.CborList)CborObject.fromByteArray(httpExchange.getRequestBody().readNBytes(size))).map(b -> ((CborObject.CborByteArray)b).value);
                     if (data.size() != 1) {
                         throw new APIException("Multiple input not supported");
                     }
