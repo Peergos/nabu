@@ -1,8 +1,5 @@
 package org.peergos.protocol.http;
 
-import io.ipfs.cid.*;
-import io.ipfs.multibase.*;
-import io.ipfs.multihash.*;
 import io.libp2p.core.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
@@ -48,9 +45,9 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             CompletableFuture<FullHttpResponse> req = queue.poll();
             if (req != null) {
                 req.complete(msg.retain());
-                req.thenAccept(x -> msg.release());
-            } else
+            } else {
                 msg.release();
+            }
             stream.close();
         }
 
@@ -125,9 +122,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         fut.addListener(x -> {
             if (x.isSuccess())
                 ch.writeAndFlush(retained).addListener(f -> {
-                    if (!f.isSuccess()) {
-                        retained.release();
-                    }
+                    retained.release();
                 });
             else
                 retained.release();

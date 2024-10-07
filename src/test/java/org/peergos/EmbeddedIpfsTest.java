@@ -82,7 +82,7 @@ public class EmbeddedIpfsTest {
                 .collect(Collectors.toList()), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())), Optional.of(http2));
         node2.start();
 
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 1000; i++) {
             ByteBuf largeBody = Unpooled.buffer(2 * 1024 * 1024);
             DefaultFullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/hey", largeBody);
             HttpProtocol.HttpController http = node2.p2pHttp.get().dial(node2.node, node1.node.getPeerId(), node1.node.listenAddresses().toArray(Multiaddr[]::new))
@@ -93,6 +93,7 @@ public class EmbeddedIpfsTest {
             resp.content().readBytes(bout, contentLength);
             byte[] body = bout.toByteArray();
             Assert.assertTrue("Correct response", Arrays.equals(body, replyBytes));
+            resp.release();
             resp.release();
         }
 
