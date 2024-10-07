@@ -46,9 +46,11 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         @Override
         public void onMessage(@NotNull Stream stream, FullHttpResponse msg) {
             CompletableFuture<FullHttpResponse> req = queue.poll();
-            if (req != null)
-                req.complete(msg.copy());
-            msg.release();
+            if (req != null) {
+                req.complete(msg.retain());
+                req.thenAccept(x -> msg.release());
+            } else
+                msg.release();
             stream.close();
         }
 
@@ -86,7 +88,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
 
         private void sendReply(HttpContent reply, Stream p2pstream) {
-            p2pstream.writeAndFlush(reply.copy());
+            p2pstream.writeAndFlush(reply.retain());
         }
 
         @Override
@@ -120,7 +122,16 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         Channel ch = fut.channel();
 
         FullHttpRequest retained = msg.retain();
-        fut.addListener(x -> ch.writeAndFlush(retained));
+        fut.addListener(x -> {
+            if (x.isSuccess())
+                ch.writeAndFlush(retained).addListener(f -> {
+                    if (!f.isSuccess()) {
+                        retained.release();
+                    }
+                });
+            else
+                retained.release();
+        });
     }
 
     private static final long TRAFFIC_LIMIT = Long.MAX_VALUE; // This is the total inbound or outbound traffic allowed, not a rate

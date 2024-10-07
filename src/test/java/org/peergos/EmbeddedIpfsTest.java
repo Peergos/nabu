@@ -1,5 +1,6 @@
 package org.peergos;
 
+import com.sun.net.httpserver.HttpServer;
 import identify.pb.*;
 import io.ipfs.cid.*;
 import io.ipfs.multiaddr.*;
@@ -9,12 +10,22 @@ import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.crypto.keys.*;
 import io.libp2p.protocol.*;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpVersion;
 import org.junit.*;
 import org.peergos.blockstore.*;
 import org.peergos.config.*;
 import org.peergos.protocol.dht.*;
+import org.peergos.protocol.http.HttpProtocol;
 import org.peergos.protocol.ipns.*;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -38,6 +49,52 @@ public class EmbeddedIpfsTest {
                 () -> node1.getBlocks(List.of(new Want(block)), Set.of(peerId2), false))
                 .get(5, TimeUnit.SECONDS);
         Assert.assertTrue(retrieved.size() == 1);
+
+        node1.stop();
+        node2.stop();
+    }
+
+    @Test
+    public void largeWrite() throws Exception {
+        System.setProperty("io.netty.leakDetection.level", "advanced");
+        // Start proxy target
+        InetSocketAddress proxyTarget = new InetSocketAddress("localhost", 7777);
+        HttpServer target = HttpServer.create(proxyTarget, 20);
+        String reply = "AllGood";
+        byte[] replyBytes = reply.getBytes();
+        target.createContext("/", ex -> {
+            ex.sendResponseHeaders(200, replyBytes.length);
+            OutputStream out = ex.getResponseBody();
+            out.write(replyBytes);
+            out.flush();
+            out.close();
+        });
+        target.start();
+
+        HttpProtocol.HttpRequestProcessor http1 = (s, req, h) -> HttpProtocol.proxyRequest(req, proxyTarget, h);
+        EmbeddedIpfs node1 = build(Collections.emptyList(), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())), Optional.of(http1));
+        node1.start();
+
+        HttpProtocol.HttpRequestProcessor http2 = (s, req, h) -> HttpProtocol.proxyRequest(req, new InetSocketAddress("localhost", 7778), h);
+        EmbeddedIpfs node2 = build(node1.node.listenAddresses()
+                .stream()
+                .map(a -> new MultiAddress(a.toString()))
+                .collect(Collectors.toList()), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())), Optional.of(http2));
+        node2.start();
+
+        for (int i = 0; i < 100; i++) {
+            ByteBuf largeBody = Unpooled.buffer(2 * 1024 * 1024);
+            DefaultFullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/hey", largeBody);
+            HttpProtocol.HttpController http = node2.p2pHttp.get().dial(node2.node, node1.node.getPeerId(), node1.node.listenAddresses().toArray(Multiaddr[]::new))
+                    .getController().join();
+            FullHttpResponse resp = http.send(req).join();
+            ByteArrayOutputStream bout = new ByteArrayOutputStream();
+            int contentLength = resp.headers().getInt("content-length");
+            resp.content().readBytes(bout, contentLength);
+            byte[] body = bout.toByteArray();
+            Assert.assertTrue("Correct response", Arrays.equals(body, replyBytes));
+            resp.release();
+        }
 
         node1.stop();
         node2.stop();
@@ -138,12 +195,16 @@ public class EmbeddedIpfsTest {
     }
 
     public static EmbeddedIpfs build(List<MultiAddress> bootstrap, List<MultiAddress> swarmAddresses) {
+        return build(bootstrap, swarmAddresses, Optional.empty());
+    }
+
+    public static EmbeddedIpfs build(List<MultiAddress> bootstrap, List<MultiAddress> swarmAddresses, Optional<HttpProtocol.HttpRequestProcessor> http) {
         BlockRequestAuthoriser blockRequestAuthoriser = (c, p, a) -> CompletableFuture.completedFuture(true);
         HostBuilder builder = new HostBuilder().generateIdentity();
         PrivKey privKey = builder.getPrivateKey();
         PeerId peerId = builder.getPeerId();
         IdentitySection id = new IdentitySection(privKey.bytes(), peerId);
         return EmbeddedIpfs.build(new RamRecordStore(), new RamBlockstore(), true, swarmAddresses, bootstrap,
-                id, blockRequestAuthoriser, Optional.empty());
+                id, blockRequestAuthoriser, http);
     }
 }
