@@ -35,6 +35,7 @@ public class CidInfiniFilter implements Filter {
     public static CidInfiniFilter build(Blockstore bs, double falsePositiveRate) {
         List<Cid> refs = bs.refs(false).join();
         int nBlocks = refs.size()*5/4; //  increase by 25% to avoid expansion during build
+        LOG.info("Building infini filter for " + nBlocks + " blocks with false positive rate: " + falsePositiveRate);
         CidInfiniFilter infini = build(nBlocks, falsePositiveRate);
         refs.forEach(c -> infini.add(c));
         return infini;
