@@ -12,13 +12,21 @@ public class InfiniTest {
     @Test
     public void infini() {
         RamBlockstore bs = new RamBlockstore();
-        int nBlocks = 1_000_000;
+        int nBlocks = 3_700_000;
         addRandomBlocks(nBlocks, bs);
 
+        System.gc();
+        System.gc();
+        long prior = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
         long t1 = System.currentTimeMillis();
-        CidInfiniFilter infini = CidInfiniFilter.build(bs, 0.01);
+        CidInfiniFilter infini = CidInfiniFilter.build(bs, 0.001);
         long t2 = System.currentTimeMillis();
-        System.out.println("Building filter took: " + (t2-t1)+ "ms");
+        System.gc();
+        System.gc();
+        long post = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        long filterMb = (post - prior) / 1024 / 1024;
+        System.out.println("Building filter took: " + (t2-t1)+ "ms, and used " + filterMb + " MB of RAM");
+        Assert.assertTrue(filterMb == 14);
         List<Cid> refs = bs.refs(false).join();
         for (Cid ref : refs) {
             Assert.assertTrue(infini.has(ref));
