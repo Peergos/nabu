@@ -487,21 +487,21 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     }
 
     private CompletableFuture<Optional<GetResult>> getValueFromPeer(PeerAddresses peer, Multihash publisher, Host us) {
-        StreamPromise<? extends KademliaController> conn = null;
         try {
-            conn = dialPeer(peer, us);
+            StreamPromise<? extends KademliaController> conn = dialPeer(peer, us);
             return conn
                     .getController()
                     .orTimeout(1, TimeUnit.SECONDS)
                     .join()
                     .getValue(publisher)
                     .orTimeout(1, TimeUnit.SECONDS)
+                    .thenApply(x -> {
+                        conn.getStream().thenApply(s -> s.close());
+                        return x;
+                    })
                     .thenApply(Optional::of);
         } catch (Exception e) {
             return CompletableFuture.completedFuture(Optional.empty());
-        } finally {
-            if (conn != null)
-                conn.getStream().thenApply(s -> s.close());
         }
     }
     public List<IpnsRecord> resolveValue(Multihash publisher, int minResults, Host us) {
