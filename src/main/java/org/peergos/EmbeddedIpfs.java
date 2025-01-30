@@ -16,6 +16,7 @@ import org.peergos.blockstore.metadatadb.CachingBlockMetadataStore;
 import org.peergos.blockstore.metadatadb.sql.H2BlockMetadataCommands;
 import org.peergos.blockstore.metadatadb.sql.UncloseableConnection;
 import org.peergos.blockstore.s3.S3Blockstore;
+import org.peergos.cbor.Cborable;
 import org.peergos.config.*;
 import org.peergos.net.ConnectionException;
 import org.peergos.protocol.*;
@@ -110,11 +111,11 @@ public class EmbeddedIpfs {
                 .collect(Collectors.toList());
     }
 
-    public CompletableFuture<Integer> publishValue(PrivKey priv, byte[] value, long sequence, int hoursTtl) {
+    public CompletableFuture<Integer> publishValue(PrivKey priv, byte[] value, Optional<String> extraDataKeySuffix, Optional<Cborable> extraData, long sequence, int hoursTtl) {
         Multihash pub = Multihash.deserialize(PeerId.fromPubKey(priv.publicKey()).getBytes());
         LocalDateTime expiry = LocalDateTime.now().plusHours(hoursTtl);
         long ttlNanos = hoursTtl * 3600_000_000_000L;
-        byte[] signedRecord = IPNS.createSignedRecord(value, expiry, sequence, ttlNanos, priv);
+        byte[] signedRecord = IPNS.createSignedRecord(value, expiry, sequence, ttlNanos, extraDataKeySuffix, extraData, priv);
         return dht.publishValue(pub, signedRecord, node);
     }
 

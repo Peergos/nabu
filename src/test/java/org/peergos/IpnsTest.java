@@ -47,7 +47,7 @@ public class IpnsTest {
 
             for (int i = 0; i < 10; i++) {
                 try {
-                    byte[] value = IPNS.createSignedRecord(pathToPublish.getBytes(), expiry, sequence, ttl, node1.getPrivKey());
+                    byte[] value = IPNS.createSignedRecord(pathToPublish.getBytes(), expiry, sequence, ttl, Optional.empty(), Optional.empty(), node1.getPrivKey());
                     success = dht.dial(node1, address2).getController().join()
                             .putValue(node1Id, value)
                             .orTimeout(2, TimeUnit.SECONDS).join();

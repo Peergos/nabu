@@ -365,7 +365,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         LocalDateTime expiry = LocalDateTime.now().plusHours(hours);
         long ttlNanos = hours * 3600_000_000_000L;
         byte[] publishValue = ("/ipfs/" + value).getBytes();
-        byte[] signedRecord = IPNS.createSignedRecord(publishValue, expiry, sequence, ttlNanos, priv);
+        byte[] signedRecord = IPNS.createSignedRecord(publishValue, expiry, sequence, ttlNanos, Optional.empty(), Optional.empty(), priv);
         return publishValue(publisher, signedRecord, us);
     }
 

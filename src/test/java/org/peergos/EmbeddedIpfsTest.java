@@ -127,7 +127,7 @@ public class EmbeddedIpfsTest {
 
         PrivKey publisher = Ed25519Kt.generateEd25519KeyPair().getFirst();
         byte[] value = "This is a test".getBytes();
-        node1.publishValue(publisher, value, 1, 24).join();
+        node1.publishValue(publisher, value, Optional.empty(), Optional.empty(), 1, 24).join();
         byte[] res = node1.resolveValue(publisher.publicKey(), 5).join();
         Assert.assertTrue(Arrays.equals(res, value));
 
@@ -145,7 +145,7 @@ public class EmbeddedIpfsTest {
         long hoursTtl = 24*365;
         LocalDateTime expiry = LocalDateTime.now().plusHours(hoursTtl);
         long ttlNanos = hoursTtl * 3600_000_000_000L;
-        byte[] signedRecord = IPNS.createSignedRecord(value, expiry, 1, ttlNanos, publisher);
+        byte[] signedRecord = IPNS.createSignedRecord(value, expiry, 1, ttlNanos, Optional.empty(), Optional.empty(), publisher);
         node1.publishPresignedRecord(pub, signedRecord).join();
         node1.publishPresignedRecord(pub, signedRecord).join();
         node1.publishPresignedRecord(pub, signedRecord).join();
@@ -155,7 +155,7 @@ public class EmbeddedIpfsTest {
 
         // publish an updated value with same expiry
         byte[] value2 = "Updated value".getBytes();
-        byte[] signedRecord2 = IPNS.createSignedRecord(value2, expiry, 2, ttlNanos, publisher);
+        byte[] signedRecord2 = IPNS.createSignedRecord(value2, expiry, 2, ttlNanos, Optional.empty(), Optional.empty(), publisher);
         node1.publishPresignedRecord(pub, signedRecord2).join();
         node1.publishPresignedRecord(pub, signedRecord2).join();
         node1.publishPresignedRecord(pub, signedRecord2).join();
@@ -165,7 +165,7 @@ public class EmbeddedIpfsTest {
 
         // publish an updated value with earlier expiry
         byte[] value3 = "3rd value to put in IPNS".getBytes();
-        byte[] signedRecord3 = IPNS.createSignedRecord(value3, expiry.minusDays(1), 3, ttlNanos, publisher);
+        byte[] signedRecord3 = IPNS.createSignedRecord(value3, expiry.minusDays(1), 3, ttlNanos, Optional.empty(), Optional.empty(), publisher);
         node1.publishPresignedRecord(pub, signedRecord3).join();
         node1.publishPresignedRecord(pub, signedRecord3).join();
         node1.publishPresignedRecord(pub, signedRecord3).join();

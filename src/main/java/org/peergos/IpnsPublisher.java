@@ -1,11 +1,14 @@
 package org.peergos;
 
+import io.ipfs.cid.Cid;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.*;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
 import io.libp2p.crypto.keys.*;
 import org.peergos.blockstore.*;
+import org.peergos.cbor.CborObject;
+import org.peergos.cbor.Cborable;
 import org.peergos.config.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.ipns.*;
@@ -62,10 +65,12 @@ public class IpnsPublisher {
             List<PrivKey> keys = IntStream.range(0, keycount)
                     .mapToObj(i -> Ed25519Kt.generateEd25519KeyPair().getFirst())
                     .collect(Collectors.toList());
-            byte[] value = new byte[1024];
-            new Random(28).nextBytes(value);
+            byte[] extraData = new byte[1024];
+            new Random(28).nextBytes(extraData);
+            Cid staticValue = new Cid(1, Cid.Codec.Raw, Multihash.Type.id, new byte[0]);
+            byte[] value = staticValue.toBytes();
             long t0 = System.currentTimeMillis();
-            List<CompletableFuture<PublishResult>> futs = publish(keys, value, publisher, publishFile)
+            List<CompletableFuture<PublishResult>> futs = publish(keys, value, new CborObject.CborByteArray(extraData), publisher, publishFile)
                     .collect(Collectors.toList());
             int done = 0;
             for (CompletableFuture<PublishResult> fut : futs) {
@@ -103,6 +108,7 @@ public class IpnsPublisher {
 
     public static Stream<CompletableFuture<PublishResult>> publish(List<PrivKey> publishers,
                                                                    byte[] value,
+                                                                   Cborable extraData,
                                                                    EmbeddedIpfs ipfs,
                                                                    Path publishFile) throws IOException {
         LocalDateTime expiry = LocalDateTime.now().plusDays(7);
@@ -110,7 +116,7 @@ public class IpnsPublisher {
         List<PublishResult> signed = publishers.stream()
                 .map(p -> {
                     Multihash pub = Multihash.deserialize(PeerId.fromPubKey(p.publicKey()).getBytes());
-                    byte[] record = IPNS.createSignedRecord(value, expiry, 1, ttlNanos, p);
+                    byte[] record = IPNS.createSignedRecord(value, expiry, 1, ttlNanos, Optional.of("peergos_rr"), Optional.of(extraData), p);
                     return new PublishResult(p, pub, record, 0);
                 }).collect(Collectors.toList());
         for (PublishResult rec : signed) {
@@ -142,7 +148,8 @@ public class IpnsPublisher {
         List<CompletableFuture<Integer>> futs = publishers.stream().map(pub -> CompletableFuture.supplyAsync(() -> {
             try {
                 List<IpnsRecord> records = resolver.resolveRecords(pub.pub, 30);
-                int success = records.isEmpty() ? successes.get() : successes.incrementAndGet();
+                List<IpnsRecord> correct = records.stream().filter(r -> Arrays.equals(r.raw, pub.record)).collect(Collectors.toList());
+                int success = correct.isEmpty() ? successes.get() : successes.incrementAndGet();
                 int total = done.incrementAndGet();
                 if (total % 10 == 0)
                     System.out.println("resolved " + success + " / " + done);

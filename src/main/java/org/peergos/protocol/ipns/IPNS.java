@@ -38,9 +38,11 @@ public class IPNS {
                                             LocalDateTime expiry,
                                             long sequence,
                                             long ttlNanos,
+                                            Optional<String> extraDataKeySuffix,
+                                            Optional<Cborable> extraData,
                                             PrivKey ourKey) {
         byte[] cborEntryData = IPNS.createCborDataForIpnsEntry(value, expiry,
-                Ipns.IpnsEntry.ValidityType.EOL_VALUE, sequence, ttlNanos);
+                Ipns.IpnsEntry.ValidityType.EOL_VALUE, sequence, ttlNanos, extraDataKeySuffix, extraData);
         String expiryString = IPNS.formatExpiry(expiry);
         byte[] signature = ourKey.sign(IPNS.createSigV2Data(cborEntryData));
         PubKey pubKey = ourKey.publicKey();
@@ -73,7 +75,9 @@ public class IPNS {
                                                     LocalDateTime expiry,
                                                     long validityType,
                                                     long sequence,
-                                                    long ttl) {
+                                                    long ttl,
+                                                    Optional<String> extraDataKeySuffix,
+                                                    Optional<Cborable> extraData) {
         SortedMap<String, Cborable> state = new TreeMap<>();
         state.put("TTL", new CborObject.CborLong(ttl));
         state.put("Value", new CborObject.CborByteArray(value));
@@ -81,6 +85,7 @@ public class IPNS {
         String expiryString = formatExpiry(expiry);
         state.put("Validity", new CborObject.CborByteArray(expiryString.getBytes(StandardCharsets.UTF_8)));
         state.put("ValidityType", new CborObject.CborLong(validityType));
+        extraData.ifPresent(e -> state.put("_" + extraDataKeySuffix.get(), e));
         return CborObject.CborMap.build(state).serialize();
     }
 
