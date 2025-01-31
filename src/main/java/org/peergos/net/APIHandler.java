@@ -295,10 +295,10 @@ public class APIHandler extends Handler {
                     if (records.isEmpty())
                         throw new IllegalStateException("Couldn't resolve " + signer);
                     IpnsRecord latest = records.get(records.size() - 1);
-                    Ipns.IpnsEntry entry = Ipns.IpnsEntry.parseFrom(ByteBuffer.wrap(latest.raw));
+                    IpnsMapping mapping = new IpnsMapping(signer, latest);
                     Map<String,  Object> res = new HashMap<>();
-                    res.put("sig", ArrayOps.bytesToHex(entry.getSignatureV2().toByteArray()));
-                    res.put("data", ArrayOps.bytesToHex(entry.getData().toByteArray()));
+                    res.put("sig", ArrayOps.bytesToHex(mapping.getSignature()));
+                    res.put("data", ArrayOps.bytesToHex(mapping.getData()));
                     String json = JSONParser.toString(res);
                     replyJson(httpExchange, json);
                     break;
