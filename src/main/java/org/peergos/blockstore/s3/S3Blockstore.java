@@ -417,6 +417,8 @@ public class S3Blockstore implements Blockstore {
 
     @Override
     public CompletableFuture<Long> count(boolean useBlockstore) {
+        if (!useBlockstore)
+            return Futures.of(blockMetadata.size());
         AtomicLong result = new AtomicLong(0);
         applyToAll(obj -> result.incrementAndGet(), Long.MAX_VALUE);
         return Futures.of(result.get());
@@ -424,7 +426,10 @@ public class S3Blockstore implements Blockstore {
 
     @Override
     public CompletableFuture<Boolean> applyToAll(Consumer<Cid> action, boolean useBlockstore) {
-        applyToAll(obj -> action.accept(keyToHash(obj.key)), Long.MAX_VALUE);
+        if (! useBlockstore)
+            blockMetadata.applyToAll(action);
+        else
+            applyToAll(obj -> action.accept(keyToHash(obj.key)), Long.MAX_VALUE);
         return Futures.of(true);
     }
 
