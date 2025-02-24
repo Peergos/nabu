@@ -9,6 +9,7 @@ import org.peergos.util.*;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import java.util.stream.*;
 
 public class RamBlockstore implements Blockstore {
@@ -57,6 +58,17 @@ public class RamBlockstore implements Blockstore {
     @Override
     public CompletableFuture<List<Cid>> refs(boolean useBlockstore) {
         return CompletableFuture.completedFuture(new ArrayList(blocks.keySet()));
+    }
+
+    @Override
+    public CompletableFuture<Long> count(boolean useBlockstore) {
+        return Futures.of((long)blocks.size());
+    }
+
+    @Override
+    public CompletableFuture<Boolean> applyToAll(Consumer<Cid> action, boolean useBlockstore) {
+        blocks.keySet().stream().forEach(action);
+        return Futures.of(true);
     }
 
     @Override

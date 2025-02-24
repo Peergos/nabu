@@ -415,6 +415,19 @@ public class S3Blockstore implements Blockstore {
         return CompletableFuture.completedFuture(blockMetadata.list().collect(Collectors.toList()));
     }
 
+    @Override
+    public CompletableFuture<Long> count(boolean useBlockstore) {
+        AtomicLong result = new AtomicLong(0);
+        applyToAll(obj -> result.incrementAndGet(), Long.MAX_VALUE);
+        return Futures.of(result.get());
+    }
+
+    @Override
+    public CompletableFuture<Boolean> applyToAll(Consumer<Cid> action, boolean useBlockstore) {
+        applyToAll(obj -> action.accept(keyToHash(obj.key)), Long.MAX_VALUE);
+        return Futures.of(true);
+    }
+
     public CompletableFuture<List<Cid>> directRefs() {
         List<Cid> cidList = new ArrayList<>();
         applyToAll(obj -> cidList.add(keyToHash(obj.key)), Integer.MAX_VALUE);

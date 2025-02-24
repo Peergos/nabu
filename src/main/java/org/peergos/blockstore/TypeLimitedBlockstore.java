@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.stream.*;
 
 public class TypeLimitedBlockstore implements Blockstore {
@@ -74,6 +75,16 @@ public class TypeLimitedBlockstore implements Blockstore {
         return blocks.refs(useBlockstore).thenApply(res -> res.stream()
                 .filter(c -> allowedCodecs.contains(c.codec))
                 .collect(Collectors.toList()));
+    }
+
+    @Override
+    public CompletableFuture<Long> count(boolean useBlockstore) {
+        return blocks.count(useBlockstore);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> applyToAll(Consumer<Cid> action, boolean useBlockstore) {
+        return blocks.applyToAll(action, useBlockstore);
     }
 
     @Override

@@ -8,6 +8,7 @@ import org.peergos.blockstore.metadatadb.BlockMetadataStore;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 public interface Blockstore {
 
@@ -32,7 +33,11 @@ public interface Blockstore {
 
     CompletableFuture<Boolean> rm(Cid c);
 
+    CompletableFuture<Long> count(boolean useBlockstore);
+
     CompletableFuture<List<Cid>> refs(boolean useBlockstore);
+
+    CompletableFuture<Boolean> applyToAll(Consumer<Cid> action, boolean useBlockstore);
 
     CompletableFuture<Boolean> bloomAdd(Cid cid);
 

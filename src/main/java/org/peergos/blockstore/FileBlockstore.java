@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -149,6 +150,36 @@ public class FileBlockstore implements Blockstore {
             return keyToHash(filename.substring(0, filename.length() - BLOCK_FILE_SUFFIX.length()));
         }).collect(Collectors.toList());
         return CompletableFuture.completedFuture(cidList);
+    }
+
+    @Override
+    public CompletableFuture<Long> count(boolean useBlockstore) {
+        try {
+            return Futures.of(Files.walk(blocksRoot)
+                    .filter(f -> Files.isRegularFile(f) &&
+                            f.toFile().length() > 0 &&
+                            f.getFileName().toString().endsWith(BLOCK_FILE_SUFFIX))
+                    .count());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public CompletableFuture<Boolean> applyToAll(Consumer<Cid> action, boolean useBlockstore) {
+        try {
+            Files.walk(blocksRoot)
+                    .filter(f -> Files.isRegularFile(f) &&
+                            f.toFile().length() > 0 &&
+                            f.getFileName().toString().endsWith(BLOCK_FILE_SUFFIX))
+                    .map(p -> {
+                        String filename = p.getFileName().toString();
+                        return keyToHash(filename.substring(0, filename.length() - BLOCK_FILE_SUFFIX.length()));
+                    }).forEach(action);
+            return Futures.of(true);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -129,6 +130,21 @@ public class JdbcBlockMetadataStore implements BlockMetadataStore {
             ResultSet rs = stmt.executeQuery();
             rs.next();
             return rs.getInt(1);
+        } catch (SQLException sqe) {
+            LOG.log(Level.WARNING, sqe.getMessage(), sqe);
+            throw new RuntimeException(sqe);
+        }
+    }
+
+    @Override
+    public boolean applyToAll(Consumer<Cid> action) {
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(LIST)) {
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                action.accept(Cid.cast(rs.getBytes("cid")));
+            }
+            return true;
         } catch (SQLException sqe) {
             LOG.log(Level.WARNING, sqe.getMessage(), sqe);
             throw new RuntimeException(sqe);

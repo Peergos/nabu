@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.stream.*;
 
 public class FilteredBlockstore implements Blockstore {
@@ -84,6 +85,16 @@ public class FilteredBlockstore implements Blockstore {
     @Override
     public CompletableFuture<List<Cid>> refs(boolean useBlockstore) {
         return blocks.refs(useBlockstore);
+    }
+
+    @Override
+    public CompletableFuture<Long> count(boolean useBlockstore) {
+        return blocks.count(useBlockstore);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> applyToAll(Consumer<Cid> action, boolean useBlockstore) {
+        return blocks.applyToAll(action, useBlockstore);
     }
 
     public static FilteredBlockstore bloomBased(Blockstore source, double falsePositiveRate) {

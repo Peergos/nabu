@@ -7,6 +7,7 @@ import org.peergos.blockstore.metadatadb.BlockMetadataStore;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class RamBlockMetadataStore implements BlockMetadataStore {
@@ -30,6 +31,12 @@ public class RamBlockMetadataStore implements BlockMetadataStore {
     @Override
     public void remove(Cid block) {
         store.remove(block);
+    }
+
+    @Override
+    public boolean applyToAll(Consumer<Cid> action) {
+        store.keySet().stream().forEach(action);
+        return true;
     }
 
     @Override

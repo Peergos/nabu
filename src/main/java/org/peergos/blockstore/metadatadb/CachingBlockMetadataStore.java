@@ -9,6 +9,7 @@ import org.peergos.util.Futures;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.stream.*;
 
 public class CachingBlockMetadataStore implements Blockstore {
@@ -87,6 +88,21 @@ public class CachingBlockMetadataStore implements Blockstore {
         if (useBlockstore)
             return target.refs(true);
         return CompletableFuture.completedFuture(metadata.list().collect(Collectors.toList()));
+    }
+
+    @Override
+    public CompletableFuture<Long> count(boolean useBlockstore) {
+        if (useBlockstore)
+            return target.count(useBlockstore);
+
+        return CompletableFuture.completedFuture(metadata.size());
+    }
+
+    @Override
+    public CompletableFuture<Boolean> applyToAll(Consumer<Cid> action, boolean useBlockstore) {
+        if (useBlockstore)
+            return target.applyToAll(action, true);
+        return CompletableFuture.completedFuture(metadata.applyToAll(action));
     }
 
     @Override
