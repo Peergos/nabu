@@ -105,7 +105,7 @@
         <dependency>
             <groupId>com.github.peergos</groupId>
             <artifactId>jvm-libp2p</artifactId>
-            <version>0.18.0-ipv6-mdns-wildcard</version>
+            <version>0.19.0-quic</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
