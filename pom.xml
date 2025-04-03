@@ -6,7 +6,7 @@
 
     <groupId>com.github.peergos</groupId>
     <artifactId>nabu</artifactId>
-    <version>v0.8.1</version>
+    <version>v0.9.1</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -105,7 +105,7 @@
         <dependency>
             <groupId>com.github.peergos</groupId>
             <artifactId>jvm-libp2p</artifactId>
-            <version>0.19.0-quic</version>
+            <version>0.19.1-quic</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
