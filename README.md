@@ -11,6 +11,7 @@ This is a WIP. You can follow our progress updates [here](https://peergos.net/pu
 
 Currently implemented properties:
 * TCP transport
+* QUIC transport (and encryption and multiplexing)
 * Noise encryption and authentication
 * TLS security provider (with early muxer negotiation using ALPN)
 * RSA and Ed25519 peer IDs
@@ -39,7 +40,6 @@ In the future we will add:
 * dcutr (direct connection upgrade through relay)
 * AutoRelay
 * example iOS chat app
-* QUIC transport (and encryption and multiplexing)
 
 ## Usage
 You can use this as a standalone application for storing and retrieving blocks. Or you can embed it in your application. 
