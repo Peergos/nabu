@@ -281,7 +281,7 @@ public class EmbeddedIpfs {
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         Bitswap bitswap = new Bitswap(bitswapProtocolId.orElse(Bitswap.PROTOCOL_ID),
-                new BitswapEngine(blockstore, authoriser, maxBitswapMsgSize.orElse(Bitswap.MAX_MESSAGE_SIZE), true));
+                new BitswapEngine(blockstore, authoriser, maxBitswapMsgSize.orElse(Bitswap.MAX_MESSAGE_SIZE), false));
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
         List<ProtocolBinding> protocols = new ArrayList<>();

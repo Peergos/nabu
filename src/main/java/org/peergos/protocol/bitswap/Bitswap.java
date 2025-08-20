@@ -140,7 +140,9 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
                         dialPeer(us, peer, c -> {
                             c.send(msg);
                         });
-                    } catch (Exception e) {}
+                    } catch (Exception e) {
+                        LOG.info(e.getMessage());
+                    }
                 }));
     }
 

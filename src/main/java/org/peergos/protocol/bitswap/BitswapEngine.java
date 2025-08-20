@@ -13,7 +13,6 @@ import org.peergos.protocol.bitswap.pb.*;
 import org.peergos.util.*;
 
 import java.io.*;
-import java.nio.charset.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
@@ -29,7 +28,6 @@ public class BitswapEngine {
     private final ConcurrentHashMap<Want, Boolean> persistBlocks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Want, PeerId> blockHaves = new ConcurrentHashMap<>();
     private final Map<Want, Boolean> deniedWants = Collections.synchronizedMap(new LRUCache<>(10_000));
-    private final Map<PeerId, Map<Want, Boolean>> recentBlocksSent = Collections.synchronizedMap(new LRUCache<>(100));
     private final Map<PeerId, Map<Want, Long>> recentWantsSent = Collections.synchronizedMap(new org.peergos.util.LRUCache<>(100));
     private final Map<PeerId, Boolean> blockedPeers = Collections.synchronizedMap(new LRUCache<>(1_000));
     private final boolean blockAggressivePeers;
@@ -54,7 +52,12 @@ public class BitswapEngine {
     }
 
     public boolean allowConnection(PeerId peer) {
-        return ! blockAggressivePeers || ! blockedPeers.containsKey(peer);
+        if (! blockAggressivePeers)
+            return true;
+        boolean blocked = blockedPeers.containsKey(peer);
+        if (blocked)
+            LOG.info("Blocked connection from " + peer);
+        return !blocked;
     }
 
     public void setAddressBook(AddressBook addrs) {
@@ -149,11 +152,6 @@ public class BitswapEngine {
         int messageSize = 0;
         Multihash peerM = Multihash.deserialize(source.remotePeerId().getBytes());
         Cid sourcePeerId = new Cid(1, Cid.Codec.Libp2pKey, peerM.getType(), peerM.getHash());
-        Map<Want, Boolean> recent = recentBlocksSent.get(source.remotePeerId());
-        if (recent == null) {
-            recent = Collections.synchronizedMap(new LRUCache<>(1_000));
-            recentBlocksSent.put(source.remotePeerId(), recent);
-        }
         int absentBlocks = 0;
         int presentBlocks = 0;
         if (msg.hasWantlist()) {
@@ -180,8 +178,6 @@ public class BitswapEngine {
                         messageSize += presence.getSerializedSize();
                         continue;
                     }
-                    if (recent.containsKey(w))
-                        continue; // don't re-send this block as we recently sent it to this peer
                     boolean blockPresent = store.has(c).join();
                     if (! blockPresent)
                         absentBlocks++;
@@ -202,7 +198,6 @@ public class BitswapEngine {
                         }
                         messageSize += blockSize;
                         blocks.add(blockP);
-                        recent.put(w, true);
                     } else if (sendDontHave) {
                         if (blockPresent) {
                             deniedWants.put(w, true);
@@ -291,7 +286,7 @@ public class BitswapEngine {
                 blockHaves.put(w, source.remotePeerId());
             }
         }
-        if (absentBlocks > 10 && presentBlocks == 0 && ! receivedRequestedHave && ! receivedWantedBlock) {
+        if (blockAggressivePeers && absentBlocks > 10 && presentBlocks == 0 && ! receivedRequestedHave && ! receivedWantedBlock) {
             // This peer is sending us lots of irrelevant requests, block them
             blockedPeers.put(source.remotePeerId(), true);
             source.close();
