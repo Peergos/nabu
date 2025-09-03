@@ -82,6 +82,9 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 try {
                     bootstrap(us);
                     Thread.sleep(BOOTSTRAP_PERIOD_MILLIS);
+                } catch (Libp2pException e) {
+                    if (! e.getMessage().contains("Transport is closed"))
+                        e.printStackTrace();
                 } catch (Throwable t) {
                     t.printStackTrace();
                 }
