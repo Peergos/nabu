@@ -36,12 +36,12 @@ public class EmbeddedIpfsTest {
     @Test
     public void largeBlock() throws Exception {
         EmbeddedIpfs node1 = build(Collections.emptyList(), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
-        node1.start();
+        node1.start(false);
         EmbeddedIpfs node2 = build(node1.node.listenAddresses()
                 .stream()
                 .map(a -> new MultiAddress(a.toString()))
                 .collect(Collectors.toList()), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
-        node2.start();
+        node2.start(false);
 
         Cid block = node2.blockstore.put(new byte[1024 * 1024], Cid.Codec.Raw).join();
         PeerId peerId2 = node2.node.getPeerId();
@@ -73,14 +73,14 @@ public class EmbeddedIpfsTest {
 
         HttpProtocol.HttpRequestProcessor http1 = (s, req, h) -> HttpProtocol.proxyRequest(req, proxyTarget, h);
         EmbeddedIpfs node1 = build(Collections.emptyList(), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())), Optional.of(http1));
-        node1.start();
+        node1.start(false);
 
         HttpProtocol.HttpRequestProcessor http2 = (s, req, h) -> HttpProtocol.proxyRequest(req, new InetSocketAddress("localhost", 7778), h);
         EmbeddedIpfs node2 = build(node1.node.listenAddresses()
                 .stream()
                 .map(a -> new MultiAddress(a.toString()))
                 .collect(Collectors.toList()), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())), Optional.of(http2));
-        node2.start();
+        node2.start(false);
 
         for (int i = 0; i < 1000; i++) {
             ByteBuf largeBody = Unpooled.buffer(2 * 1024 * 1024);
@@ -104,9 +104,9 @@ public class EmbeddedIpfsTest {
     @Test
     public void mdnsDiscovery() throws Exception {
         EmbeddedIpfs node1 = build(Collections.emptyList(), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
-        node1.start();
+        node1.start(false);
         EmbeddedIpfs node2 = build(Collections.emptyList(), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
-        node2.start();
+        node2.start(false);
 
         Thread.sleep(5_000);
         Cid block = node2.blockstore.put(new byte[1024], Cid.Codec.Raw).join();
@@ -123,7 +123,7 @@ public class EmbeddedIpfsTest {
     @Test
     public void publishValue() throws Exception {
         EmbeddedIpfs node1 = build(BootstrapTest.BOOTSTRAP_NODES, List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
-        node1.start();
+        node1.start(false);
 
         PrivKey publisher = Ed25519Kt.generateEd25519KeyPair().getFirst();
         byte[] value = "This is a test".getBytes();
@@ -137,7 +137,7 @@ public class EmbeddedIpfsTest {
     @Test
     public void publishPresignedValue() throws Exception {
         EmbeddedIpfs node1 = build(BootstrapTest.BOOTSTRAP_NODES, List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
-        node1.start();
+        node1.start(false);
 
         PrivKey publisher = Ed25519Kt.generateEd25519KeyPair().getFirst();
         byte[] value = "This is a test".getBytes();
@@ -180,13 +180,13 @@ public class EmbeddedIpfsTest {
     public void wildcardListenerAddressesGetExpanded() {
         int node1Port = TestPorts.getPort();
         EmbeddedIpfs node1 = build(Collections.emptyList(), List.of(new MultiAddress("/ip6/::/tcp/" + node1Port)));
-        node1.start();
+        node1.start(false);
 
         EmbeddedIpfs node2 = build(node1.node.listenAddresses()
                 .stream()
                 .map(a -> new MultiAddress(a.toString()))
                 .collect(Collectors.toList()), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
-        node2.start();
+        node2.start(false);
         Multiaddr node1Addr = new Multiaddr("/ip4/127.0.0.1/tcp/" + node1Port + "/p2p/" + node1.node.getPeerId());
         IdentifyOuterClass.Identify id = new Identify().dial(node2.node, node1Addr).getController().join().id().join();
         List<MultiAddress> listening = id.getListenAddrsList().stream().map(b -> new MultiAddress(b.toByteArray())).collect(Collectors.toList());

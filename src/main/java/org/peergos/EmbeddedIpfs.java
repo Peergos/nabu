@@ -137,7 +137,7 @@ public class EmbeddedIpfs {
         return candidates.stream().sorted().collect(Collectors.toList());
     }
 
-    public void start() {
+    public void start(boolean asyncBootstrap) {
         LOG.info("Starting IPFS...");
         Thread shutdownHook = new Thread(() -> {
             LOG.info("Stopping Ipfs server...");
@@ -159,7 +159,8 @@ public class EmbeddedIpfs {
             LOG.warning("Starting with empty bootstrap list - you will not join the global dht");
         int connections = dht.bootstrapRoutingTable(node, bootstrap, addr -> !addr.contains("/wss/"));
         LOG.info("Bootstrapping IPFS kademlia");
-        dht.bootstrap(node);
+        if (! asyncBootstrap)
+            dht.bootstrap(node);
         dht.startBootstrapThread(node);
 
         LOG.info("MDNS discovery enabled");
