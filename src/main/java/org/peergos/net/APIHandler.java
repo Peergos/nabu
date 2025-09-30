@@ -113,16 +113,21 @@ public class APIHandler extends Handler {
                             .orElse(Collections.emptySet());
                     List<HashedBlock> blocks = ipfs.getBlocks(wants, peers, true);
                     if (wants.size() == blocks.size()) {
-                        List<List<String>> links = blocks.stream()
-                                .map(b -> b.hash.codec.equals(Cid.Codec.Raw) ?
-                                        Collections.<String>emptyList() :
-                                        CborObject.getLinks(b.hash, b.block)
-                                                .stream()
-                                                .filter(c -> c.getType() != Multihash.Type.id)
-                                                .map(Cid::toString)
-                                                .collect(Collectors.toList()))
+                        List<Map<String, Object>> linksAndSize = blocks.stream()
+                                .map(b -> {
+                                    Map<String, Object> res = new TreeMap<>();
+                                    res.put("size", b.block.length);
+                                    res.put("links", b.hash.codec.equals(Cid.Codec.Raw) ?
+                                            Collections.<String>emptyList() :
+                                            CborObject.getLinks(b.hash, b.block)
+                                                    .stream()
+                                                    .filter(c -> c.getType() != Multihash.Type.id)
+                                                    .map(Cid::toString)
+                                                    .collect(Collectors.toList()));
+                                    return res;
+                                })
                                 .collect(Collectors.toList());
-                        replyJson(httpExchange, JSONParser.toString(links));
+                        replyJson(httpExchange, JSONParser.toString(linksAndSize));
                     } else {
                         try {
                             httpExchange.sendResponseHeaders(400, 0);
