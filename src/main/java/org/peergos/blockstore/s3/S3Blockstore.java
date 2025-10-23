@@ -87,6 +87,9 @@ public class S3Blockstore implements Blockstore {
     private final String host;
     private final boolean useHttps;
     private final String folder;
+    private final Optional<String> storageClass;
+    private final boolean noReads;
+
 
 
     private final Hasher hasher;
@@ -100,6 +103,10 @@ public class S3Blockstore implements Blockstore {
         regionEndpoint = getParam(params, "regionEndpoint", "");
         String paramAccessKey = getParam(params, "accessKey", "");
         String paramSecretKey = getParam(params, "secretKey", "");
+        boolean useGlacier = Boolean.parseBoolean(getParam(params, "use-glacier", "false"));
+        this.storageClass = useGlacier ? Optional.of("GLACIER") : Optional.empty();
+        this.noReads = storageClass.isPresent() && storageClass.get().equals("GLACIER");
+
         if (paramAccessKey.equals("") && paramSecretKey.equals("")) {
             String envAccessKey = System.getenv("AWS_ACCESS_KEY_ID");
             String envSecretKey = System.getenv("AWS_SECRET_ACCESS_KEY");
@@ -290,7 +297,7 @@ public class S3Blockstore implements Blockstore {
             return Futures.of(Optional.of(0));
         try {
             PresignedUrl headUrl = S3Request.preSignHead(folder + hashToKey(cid), Optional.of(60),
-                    S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, region, accessKeyId, secretKey, useHttps, hasher).join();
+                    S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, region, storageClass, accessKeyId, secretKey, useHttps, hasher).join();
             Map<String, List<String>> headRes = HttpUtil.head(headUrl.base, headUrl.fields);
             blockHeads.inc();
             long size = Long.parseLong(headRes.get("Content-Length").get(0));
@@ -318,6 +325,8 @@ public class S3Blockstore implements Blockstore {
     public CompletableFuture<Optional<byte[]>> get(Cid cid) {
         if (blockMetadata.get(cid).isEmpty())
             return CompletableFuture.completedFuture(Optional.empty());
+        if (noReads)
+            throw new IllegalStateException("Reads from Glacier are disabled!");
         return getWithBackoff(() -> getWithoutRetry(cid));
     }
 
@@ -325,7 +334,7 @@ public class S3Blockstore implements Blockstore {
         String path = folder + hashToKey(cid);
         Optional<Pair<Integer, Integer>> range = Optional.empty();
         PresignedUrl getUrl = S3Request.preSignGet(path, Optional.of(600), range,
-                S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, region, accessKeyId, secretKey, useHttps, hasher).join();
+                S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, region, storageClass, accessKeyId, secretKey, useHttps, hasher).join();
         Histogram.Timer readTimer = readTimerLog.labels("read").startTimer();
         try {
             byte[] block = HttpUtil.get(getUrl.base, getUrl.fields);
@@ -369,7 +378,7 @@ public class S3Blockstore implements Blockstore {
             Map<String, String> extraHeaders = new TreeMap<>();
             extraHeaders.put("Content-Type", "application/octet-stream");
             String contentHash =  ArrayOps.bytesToHex(hash);
-            PresignedUrl putUrl = S3Request.preSignPut(s3Key, block.length, contentHash, false,
+            PresignedUrl putUrl = S3Request.preSignPut(s3Key, block.length, contentHash, storageClass, false,
                     S3AdminRequests.asAwsDate(ZonedDateTime.now()), host, extraHeaders, region, accessKeyId, secretKey, useHttps, hasher).join();
             HttpUtil.put(putUrl.base, putUrl.fields, block);
             blockMetadata.put(cid, block);
@@ -394,7 +403,7 @@ public class S3Blockstore implements Blockstore {
     public CompletableFuture<Boolean> rm(Cid cid) {
         try {
             PresignedUrl delUrl = S3Request.preSignDelete(folder + hashToKey(cid), S3AdminRequests.asAwsDate(ZonedDateTime.now()), host,
-                    region, accessKeyId, secretKey, useHttps, hasher).join();
+                    region, storageClass, accessKeyId, secretKey, useHttps, hasher).join();
             HttpUtil.delete(delUrl.base, delUrl.fields);
             blockMetadata.remove(cid);
             return CompletableFuture.completedFuture(true);
@@ -446,7 +455,7 @@ public class S3Blockstore implements Blockstore {
             long processedObjects = 0;
             do {
                 result = S3AdminRequests.listObjects(folder, 1_000, continuationToken,
-                        ZonedDateTime.now(), host, region, accessKeyId, secretKey, url -> {
+                        ZonedDateTime.now(), host, region, storageClass, accessKeyId, secretKey, url -> {
                             try {
                                 return HttpUtil.get(url.base, url.fields);
                             } catch (IOException e) {

@@ -79,6 +79,7 @@ public class S3AdminRequests {
                                                               ZonedDateTime now,
                                                               String host,
                                                               String region,
+                                                              Optional<String> storageClass,
                                                               String accessKeyId,
                                                               String s3SecretKey,
                                                               boolean useHttps,
@@ -91,8 +92,8 @@ public class S3AdminRequests {
         continuationToken.ifPresent(t -> extraQueryParameters.put("continuation-token", t));
 
         Instant normalised = normaliseDate(now);
-        S3Request policy = new S3Request("GET", host, "", S3Request.UNSIGNED, Optional.empty(), false, true,
-                extraQueryParameters, Collections.emptyMap(), accessKeyId, region, asAwsDate(normalised));
+        S3Request policy = new S3Request("GET", host, "", S3Request.UNSIGNED, storageClass, Optional.empty(), false, true,
+                extraQueryParameters, new HashMap<>(), accessKeyId, region, asAwsDate(normalised));
         return S3Request.preSignRequest(policy, "", host, s3SecretKey, useHttps, h);
     }
 
@@ -102,19 +103,16 @@ public class S3AdminRequests {
                                                ZonedDateTime now,
                                                String host,
                                                String region,
+                                               Optional<String> storageClass,
                                                String accessKeyId,
                                                String s3SecretKey,
                                                Function<PresignedUrl, byte[]> getter,
                                                Supplier<DocumentBuilder> builder,
                                                boolean useHttps,
                                                Hasher h) {
-        PresignedUrl listReq = preSignList(prefix, maxKeys, continuationToken, now, host, region, accessKeyId, s3SecretKey, useHttps, h).join();
+        PresignedUrl listReq = preSignList(prefix, maxKeys, continuationToken, now, host, region, storageClass, accessKeyId, s3SecretKey, useHttps, h).join();
         try {
             ByteArrayInputStream bais = new ByteArrayInputStream(getter.apply(listReq));
-            if (false) { //debugging code
-                String docString = new String(bais.readAllBytes());
-                System.currentTimeMillis();
-            }
             Document xml = builder.get().parse(bais);
             List<ObjectMetadata> res = new ArrayList<>();
             Node root = xml.getFirstChild();
