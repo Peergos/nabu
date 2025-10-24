@@ -90,8 +90,6 @@ public class S3Blockstore implements Blockstore {
     private final Optional<String> storageClass;
     private final boolean noReads;
 
-
-
     private final Hasher hasher;
 
     private final BlockMetadataStore blockMetadata;
@@ -105,6 +103,7 @@ public class S3Blockstore implements Blockstore {
         String paramSecretKey = getParam(params, "secretKey", "");
         boolean useGlacier = Boolean.parseBoolean(getParam(params, "use-glacier", "false"));
         this.storageClass = useGlacier ? Optional.of("GLACIER") : Optional.empty();
+        LOG.info("Using storage class " + storageClass.orElse("STANDARD"));
         this.noReads = storageClass.isPresent() && storageClass.get().equals("GLACIER");
 
         if (paramAccessKey.equals("") && paramSecretKey.equals("")) {
