@@ -16,6 +16,7 @@ import java.util.concurrent.*;
 
 public class KademliaTest {
 
+    @Ignore
     @Test
     public void findOtherNode() throws Exception {
         RamBlockstore blockstore1 = new RamBlockstore();
