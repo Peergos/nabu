@@ -36,20 +36,32 @@ public class KademliaTest {
             Kademlia dht2 = builder2.getWanDht().get();
             dht2.bootstrapRoutingTable(node2, BootstrapTest.BOOTSTRAP_NODES, addr -> !addr.contains("/wss/"));
             dht2.bootstrap(node2);
+            new Thread(() -> {
+                for (int i=0; i < 20; i++)
+                    try {
+                        dht2.bootstrap(node2);
+                    } catch (Exception e) {}
+            }).start();
 
             // bootstrap node 1
             Kademlia dht1 = builder1.getWanDht().get();
             dht1.bootstrapRoutingTable(node1, BootstrapTest.BOOTSTRAP_NODES, addr -> !addr.contains("/wss/"));
             dht1.bootstrap(node1);
+            new Thread(() -> {
+                for (int i=0; i < 20; i++)
+                    try {
+                        dht1.bootstrap(node1);
+                    } catch (Exception e) {}
+            }).start();
 
-            // Check node1 can find node2 from kubo
+            // Check node1 can find node2
             Multihash peerId2 = Multihash.deserialize(node2.getPeerId().getBytes());
             List<PeerAddresses> closestPeers = dht1.findClosestPeers(peerId2, 2, node1);
             Optional<PeerAddresses> matching = closestPeers.stream()
                     .filter(p -> p.peerId.equals(peerId2))
                     .findFirst();
             if (matching.isEmpty())
-                throw new IllegalStateException("Couldn't find node2 from kubo!");
+                throw new IllegalStateException("Couldn't find node2!");
         } finally {
             node1.stop();
             node2.stop();
