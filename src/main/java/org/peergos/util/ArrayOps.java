@@ -28,4 +28,15 @@ public class ArrayOps {
             res[i] = (byte) Integer.parseInt(hex.substring(2*i, 2*i+2), 16);
         return res;
     }
+
+    public static boolean equalArrays(byte[] a, int aStart, int aEnd, byte[] b, int bStart, int bEnd) {
+        int len = aEnd - aStart;
+        if (len != bEnd - bStart)
+            return false;
+        for (int i=0; i < len; i++) {
+            if (a[aStart + i] != b[bStart + i])
+                return false;
+        }
+        return true;
+    }
 }

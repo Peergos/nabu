@@ -5,6 +5,8 @@ import io.ipfs.multihash.*;
 import io.libp2p.core.PeerId;
 import io.libp2p.crypto.keys.*;
 import org.peergos.*;
+import org.peergos.blockstore.auth.Bat;
+import org.peergos.blockstore.auth.BatId;
 import org.peergos.cbor.*;
 import org.peergos.protocol.ipns.*;
 import org.peergos.protocol.ipns.pb.*;
@@ -124,6 +126,9 @@ public class APIHandler extends Handler {
                                                     .filter(c -> c.getType() != Multihash.Type.id)
                                                     .map(Cid::toString)
                                                     .collect(Collectors.toList()));
+                                    res.put("bats", Bat.getBlockBats(b.hash, b.block).stream()
+                                            .map(BatId::toString)
+                                            .collect(Collectors.toList()));
                                     return res;
                                 })
                                 .collect(Collectors.toList());
