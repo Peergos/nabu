@@ -6,6 +6,7 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.peergos.blockstore.*;
+import org.peergos.protocol.bitswap.Bitswap;
 
 import java.io.File;
 import java.io.IOException;
@@ -45,7 +46,7 @@ public class APIServiceTest {
     @Test
     public void bulkGetTest() {
         EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(new RamBlockstore()), null,
-                null, null, Optional.empty(), Collections.emptyList(), Optional.empty(), Collections.emptyList());
+                null, Bitswap.MAX_MESSAGE_SIZE, Optional.empty(), Optional.empty(), Collections.emptyList(), Optional.empty(), Collections.emptyList());
         Cid cid1 = ipfs.blockstore.put("Hello".getBytes(), Cid.Codec.Raw).join();
         Cid cid2= ipfs.blockstore.put("world!".getBytes(), Cid.Codec.Raw).join();
         List<Want> wants = new ArrayList<>();
@@ -57,7 +58,7 @@ public class APIServiceTest {
 
     public static void runAPIServiceTest(Blockstore blocks) {
         EmbeddedIpfs ipfs = new EmbeddedIpfs(null, new ProvidingBlockstore(blocks), null,
-                null, null, Optional.empty(), Collections.emptyList(), Optional.empty(), Collections.emptyList());
+                null, Bitswap.MAX_MESSAGE_SIZE, Optional.empty(), Optional.empty(), Collections.emptyList(), Optional.empty(), Collections.emptyList());
         Cid cid = Cid.decode("zdpuAwfJrGYtiGFDcSV3rDpaUrqCtQZRxMjdC6Eq9PNqLqTGg");
         Assert.assertFalse("cid found", ipfs.blockstore.has(cid).join());
         String text = "Hello world!";

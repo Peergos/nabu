@@ -43,22 +43,23 @@ public class EmbeddedIpfs {
 
     public final Host node;
     public final Blockstore blockstore;
-    public final BlockService blocks;
+    public final Optional<BlockService> blockRetriever;
     public final RecordStore records;
 
     public final Kademlia dht;
-    public final Bitswap bitswap;
     public final Optional<HttpProtocol.Binding> p2pHttp;
     private final List<MultiAddress> bootstrap;
     private final Optional<PeriodicBlockProvider> blockProvider;
     private final List<MultiAddress> announce;
     private final List<MDnsDiscovery> mdns = new ArrayList<>();
+    private final int maxBlockSize;
 
     public EmbeddedIpfs(Host node,
                         Blockstore blockstore,
                         RecordStore records,
                         Kademlia dht,
-                        Bitswap bitswap,
+                        int maxBlockSize,
+                        Optional<BlockService> blockRetriever,
                         Optional<HttpProtocol.Binding> p2pHttp,
                         List<MultiAddress> bootstrap,
                         Optional<BlockingDeque<Cid>> newBlockProvider,
@@ -67,17 +68,17 @@ public class EmbeddedIpfs {
         this.blockstore = blockstore;
         this.records = records;
         this.dht = dht;
-        this.bitswap = bitswap;
+        this.maxBlockSize = maxBlockSize;
         this.p2pHttp = p2pHttp;
         this.bootstrap = bootstrap;
-        this.blocks = new BitswapBlockService(node, bitswap, dht);
+        this.blockRetriever = blockRetriever;
         this.blockProvider = newBlockProvider.map(q -> new PeriodicBlockProvider(22 * 3600_000L,
                 () -> blockstore.refs(false).join().stream(), node, dht, q));
         this.announce = announce;
     }
 
     public int maxBlockSize() {
-        return bitswap.maxBlockSize();
+        return maxBlockSize;
     }
 
     public List<HashedBlock> getBlocks(List<Want> wants, Set<PeerId> peers, boolean addToLocal) {
@@ -105,9 +106,11 @@ public class EmbeddedIpfs {
                 });
         if (remote.isEmpty())
             return blocksFound;
+        if (blockRetriever.isEmpty())
+            throw new IllegalStateException("Blocks not found locally!");
         return java.util.stream.Stream.concat(
                         blocksFound.stream(),
-                        blocks.get(remote, peers, addToLocal).stream())
+                        blockRetriever.get().get(remote, peers, addToLocal).stream())
                 .collect(Collectors.toList());
     }
 
@@ -252,13 +255,14 @@ public class EmbeddedIpfs {
                                      IdentitySection identity,
                                      BlockRequestAuthoriser authoriser,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler) {
-        return build(records, blocks, provideBlocks, swarmAddresses, bootstrap, identity, Collections.emptyList(),
+        return build(records, blocks, provideBlocks, true, swarmAddresses, bootstrap, identity, Collections.emptyList(),
                 authoriser, handler, Optional.empty(), Optional.empty());
     }
 
     public static EmbeddedIpfs build(RecordStore records,
                                      Blockstore blocks,
                                      boolean provideBlocks,
+                                     boolean runBitswap,
                                      List<MultiAddress> swarmAddresses,
                                      List<MultiAddress> bootstrap,
                                      IdentitySection identity,
@@ -281,15 +285,17 @@ public class EmbeddedIpfs {
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blockstore), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
-        Bitswap bitswap = new Bitswap(bitswapProtocolId.orElse(Bitswap.PROTOCOL_ID),
-                new BitswapEngine(blockstore, authoriser, maxBitswapMsgSize.orElse(Bitswap.MAX_MESSAGE_SIZE), false));
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
         List<ProtocolBinding> protocols = new ArrayList<>();
         protocols.add(new Ping());
         protocols.add(new AutonatProtocol.Binding());
         protocols.add(new CircuitHopProtocol.Binding(relayManager, stop));
-        protocols.add(bitswap);
+        Optional<Bitswap> bitswap = runBitswap ?
+                Optional.of(new Bitswap(bitswapProtocolId.orElse(Bitswap.PROTOCOL_ID),
+                        new BitswapEngine(blockstore, authoriser, maxBitswapMsgSize.orElse(Bitswap.MAX_MESSAGE_SIZE), false))) :
+                Optional.empty();
+        bitswap.ifPresent(protocols::add);
         protocols.add(dht);
         httpHandler.ifPresent(protocols::add);
 
@@ -298,7 +304,12 @@ public class EmbeddedIpfs {
         Optional<BlockingDeque<Cid>> newBlockProvider = provideBlocks ?
                 Optional.of(((ProvidingBlockstore)blockstore).toPublish) :
                 Optional.empty();
-        return new EmbeddedIpfs(node, blockstore, records, dht, bitswap, httpHandler, bootstrap, newBlockProvider, announce);
+        int maxBlockSize = bitswap.map(Bitswap::maxBlockSize)
+                .orElse(Bitswap.MAX_MESSAGE_SIZE);
+        Optional<BlockService> blockService = runBitswap ?
+                Optional.of(new BitswapBlockService(node, bitswap.get(), dht)) :
+                Optional.empty();
+        return new EmbeddedIpfs(node, blockstore, records, dht, maxBlockSize, blockService, httpHandler, bootstrap, newBlockProvider, announce);
     }
 
     public static Multiaddr[] getAddresses(Host node, Kademlia dht, Multihash targetNodeId) throws ConnectionException {
