@@ -73,7 +73,7 @@ public class HttpProxyHandler extends Handler {
             httpExchange.close();
             long t2 = System.currentTimeMillis();
             if (LOGGING)
-                LOG.info("P2P HTTP proxy handled " + path + " query in: " + (t2 - t1) + " mS" + (response != null ? (", response code http " + response.statusCode) : ""));
+                LOG.info("P2P HTTP proxy handled " + httpExchange.getRequestURI() + " query in: " + (t2 - t1) + " mS" + (response != null ? (", response code http " + response.statusCode) : ""));
         }
     }
 }
