@@ -107,7 +107,9 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             }
             return true;
         } catch (Exception e) {
-            if (e.getCause() instanceof NothingToCompleteException || e.getCause() instanceof NonCompleteException)
+            if (e instanceof Libp2pException && e.getMessage().contains("Transport is closed"))
+                return false;
+            else if (e.getCause() instanceof NothingToCompleteException || e.getCause() instanceof NonCompleteException)
                 LOG.fine("Couldn't connect to " + peer.peerId);
             else
                 e.printStackTrace();
