@@ -316,9 +316,11 @@ public class EmbeddedIpfs {
         AddressBook addressBook = node.getAddressBook();
         Multihash targetPeerId = targetNodeId.bareMultihash();
         PeerId peerId = PeerId.fromBase58(targetPeerId.toBase58());
-        Optional<Multiaddr> targetAddressesOpt = addressBook.get(peerId).join().stream().findFirst();
+        Collection<Multiaddr> all = addressBook.get(peerId).join();
+        if (! all.isEmpty())
+            return all.toArray(Multiaddr[]::new);
         Multiaddr[] allAddresses = null;
-        if (targetAddressesOpt.isEmpty()) {
+        if (all.isEmpty()) {
             List<PeerAddresses> closestPeers = dht.findClosestPeers(targetPeerId, 1, node);
             Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetPeerId)).findFirst();
             if (matching.isEmpty()) {
@@ -327,8 +329,6 @@ public class EmbeddedIpfs {
             PeerAddresses peer = matching.get();
             allAddresses = peer.addresses.stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
         }
-        return targetAddressesOpt.isPresent() ?
-                Arrays.asList(targetAddressesOpt.get()).toArray(Multiaddr[]::new)
-                : allAddresses;
+        return allAddresses;
     }
 }

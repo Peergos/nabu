@@ -60,7 +60,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         List<? extends Future<? extends KademliaController>> futures = resolved.stream()
                 .map(addr -> {
                     Multiaddr addrWithPeer = Multiaddr.fromString(addr);
-                    addressBook.setAddrs(addrWithPeer.getPeerId(), 0, addrWithPeer);
+                    addressBook.setAddrs(addrWithPeer.getPeerId(), 0, addrWithPeer).join();
                     return ioExec.submit(() -> dial(host, addrWithPeer).getController().join());
                 })
                 .collect(Collectors.toList());
