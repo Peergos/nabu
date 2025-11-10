@@ -309,6 +309,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             KademliaController contr = conn.getController().orTimeout(2, TimeUnit.SECONDS).join();
             return closeAfter(conn.getStream(), () -> contr.closerPeers(key));
         } catch (Exception e) {
+            if (e instanceof Libp2pException && e.getMessage().contains("Transport is closed"))
+                return CompletableFuture.completedFuture(Collections.emptyList());
             // we can't dial quic only nodes until it's implemented
             if (target.addresses.stream().allMatch(a -> a.toString().contains("quic")))
                 return CompletableFuture.completedFuture(Collections.emptyList());
