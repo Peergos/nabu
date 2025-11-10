@@ -107,7 +107,7 @@ public class EmbeddedIpfs {
         if (remote.isEmpty())
             return blocksFound;
         if (blockRetriever.isEmpty())
-            throw new IllegalStateException("Blocks not found locally!");
+            throw new IllegalStateException("Blocks not found locally! " + wants.stream().map(w -> w.cid).collect(Collectors.toList()));
         return java.util.stream.Stream.concat(
                         blocksFound.stream(),
                         blockRetriever.get().get(remote, peers, addToLocal).stream())
