@@ -328,6 +328,7 @@ public class EmbeddedIpfs {
             }
             PeerAddresses peer = matching.get();
             allAddresses = peer.addresses.stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
+            addressBook.setAddrs(peerId, 0, allAddresses);
         }
         return allAddresses;
     }
