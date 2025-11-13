@@ -82,8 +82,12 @@ public class EmbeddedIpfsTest {
                 .collect(Collectors.toList()), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())), Optional.of(http2));
         node2.start(false);
 
-        for (int i = 0; i < 1000; i++) {
+        byte[] data = new byte[1024*1024];
+        new Random(42).nextBytes(data);
+        for (int i = 0; i < 10000; i++) {
             ByteBuf largeBody = Unpooled.buffer(2 * 1024 * 1024);
+            largeBody.writeBytes(data);
+            largeBody.writeBytes(data);
             DefaultFullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/hey", largeBody);
             HttpProtocol.HttpController http = node2.p2pHttp.get().dial(node2.node, node1.node.getPeerId(), node1.node.listenAddresses().toArray(Multiaddr[]::new))
                     .getController().join();
@@ -92,8 +96,7 @@ public class EmbeddedIpfsTest {
             int contentLength = resp.headers().getInt("content-length");
             resp.content().readBytes(bout, contentLength);
             byte[] body = bout.toByteArray();
-            Assert.assertTrue("Correct response", Arrays.equals(body, replyBytes));
-            resp.release();
+            Assert.assertArrayEquals("Correct response", body, replyBytes);
             resp.release();
         }
 

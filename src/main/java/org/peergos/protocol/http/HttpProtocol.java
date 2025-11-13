@@ -4,11 +4,13 @@ import io.libp2p.core.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
 import io.netty.bootstrap.*;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.*;
 import io.netty.channel.socket.nio.*;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.logging.*;
+import io.netty.util.ReferenceCountUtil;
 import org.jetbrains.annotations.*;
 
 import java.net.*;
@@ -44,9 +46,17 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         public void onMessage(@NotNull Stream stream, FullHttpResponse msg) {
             CompletableFuture<FullHttpResponse> req = queue.poll();
             if (req != null) {
-                req.complete(msg.retain());
+                FullHttpResponse copy = new DefaultFullHttpResponse(
+                        msg.protocolVersion(),
+                        msg.status(),
+                        Unpooled.copiedBuffer(msg.content())
+                );
+                copy.headers().setAll(msg.headers());
+
+                req.complete(copy);
+                ReferenceCountUtil.release(msg);
             } else {
-                msg.release();
+                ReferenceCountUtil.release(msg);
             }
             stream.close();
         }
@@ -55,12 +65,19 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             CompletableFuture<FullHttpResponse> res = new CompletableFuture<>();
             queue.add(res);
             FullHttpRequest withTargetHost = setHost(req, stream.remotePeerId());
-            stream.writeAndFlush(withTargetHost);
+            FullHttpRequest copy = new DefaultFullHttpRequest(
+                    withTargetHost.protocolVersion(),
+                    withTargetHost.method(),
+                    withTargetHost.uri(),
+                    Unpooled.copiedBuffer(withTargetHost.content()));
+            copy.headers().setAll(withTargetHost.headers());
+
+            stream.writeAndFlush(copy);
             return res;
         }
     }
 
-    public static class ResponseWriter extends SimpleChannelInboundHandler<HttpContent> {
+    public static class ResponseWriter extends SimpleChannelInboundHandler<FullHttpResponse> {
         private final Consumer<HttpContent> replyProcessor;
 
         public ResponseWriter(Consumer<HttpContent> replyProcessor) {
@@ -68,8 +85,23 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpContent reply) {
-            replyProcessor.accept(reply);
+        protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse reply) {
+            FullHttpResponse copy = new DefaultFullHttpResponse(
+                    reply.protocolVersion(),
+                    reply.status(),
+                    Unpooled.copiedBuffer(reply.content())
+            );
+            copy.headers().setAll(reply.headers());
+
+            replyProcessor.accept(copy);
+            if (reply instanceof LastHttpContent) {
+                ctx.channel().close();
+            }
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            ctx.close();
         }
     }
 
@@ -85,12 +117,16 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         }
 
         private void sendReply(HttpContent reply, Stream p2pstream) {
-            p2pstream.writeAndFlush(reply.retain());
+            p2pstream.writeAndFlush(reply);
         }
 
         @Override
         public void onMessage(@NotNull Stream stream, FullHttpRequest msg) {
-            requestHandler.handle(stream, msg, reply -> sendReply(reply, stream));
+            try {
+                requestHandler.handle(stream, msg, reply -> sendReply(reply, stream));
+            } finally {
+                ReferenceCountUtil.release(msg);
+            }
         }
 
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
@@ -118,14 +154,22 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         ChannelFuture fut = b.connect(proxyTarget);
         Channel ch = fut.channel();
 
-        FullHttpRequest retained = msg.retain();
+        FullHttpRequest copy = new DefaultFullHttpRequest(
+                msg.protocolVersion(),
+                msg.method(),
+                msg.uri(),
+                Unpooled.copiedBuffer(msg.content()));
+        copy.headers().setAll(msg.headers());
+
         fut.addListener(x -> {
             if (x.isSuccess())
-                ch.writeAndFlush(retained).addListener(f -> {
-                    retained.release();
+                ch.writeAndFlush(copy).addListener(f -> {
+                    if (! f.isSuccess()) {
+                        ReferenceCountUtil.release(copy);
+                    }
                 });
             else
-                retained.release();
+                ReferenceCountUtil.release(copy);
         });
     }
 
