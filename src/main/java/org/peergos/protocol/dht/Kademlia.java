@@ -314,6 +314,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             // we can't dial quic only nodes until it's implemented
             if (target.addresses.stream().allMatch(a -> a.toString().contains("quic")))
                 return CompletableFuture.completedFuture(Collections.emptyList());
+            if (e instanceof NoSuchRemoteProtocolException || e.getCause() instanceof NoSuchRemoteProtocolException)
+                return CompletableFuture.completedFuture(Collections.emptyList());
             if (e.getCause() instanceof NothingToCompleteException || e.getCause() instanceof NonCompleteException) {
                 LOG.fine("Couldn't dial " + target.peerId + " addrs: " + target.addresses);
             }  else if (e.getCause() instanceof TimeoutException)
