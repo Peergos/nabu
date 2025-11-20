@@ -50,9 +50,9 @@ public class KademliaEngine {
     private AddressBook addressBook;
     private final Multihash ourPeerId;
     private final byte[] ourPeerIdBytes;
-    private final Blockstore blocks;
+    private final Optional<Blockstore> blocks;
 
-    public KademliaEngine(Multihash ourPeerId, ProviderStore providersStore, RecordStore ipnsStore, Blockstore blocks) {
+    public KademliaEngine(Multihash ourPeerId, ProviderStore providersStore, RecordStore ipnsStore, Optional<Blockstore> blocks) {
         this.providersStore = providersStore;
         this.ipnsStore = ipnsStore;
         this.ourPeerId = ourPeerId;
@@ -154,7 +154,7 @@ public class KademliaEngine {
             case GET_PROVIDERS: {
                 Multihash hash = Multihash.deserialize(msg.getKey().toByteArray());
                 Set<Dht.Message.Peer> providers = providersStore.getProviders(hash);
-                if (blocks.hasAny(hash).join()) {
+                if (blocks.isPresent() && blocks.get().hasAny(hash).join()) {
                     providers = new HashSet<>(providers);
                     providers.add(new PeerAddresses(ourPeerId,
                             addressBook.getAddrs(PeerId.fromBase58(ourPeerId.toBase58())).join()

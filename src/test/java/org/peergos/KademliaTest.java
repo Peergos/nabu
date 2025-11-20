@@ -146,7 +146,7 @@ public class KademliaTest {
     public void kademliaFindNodeLimitTest() {
         PeerId us = new HostBuilder().generateIdentity().getPeerId();
         KademliaEngine kad = new KademliaEngine(Multihash.fromBase58(us.toBase58()),
-                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore());
+                new RamProviderStore(1000), new RamRecordStore(), Optional.of(new RamBlockstore()));
         RamAddressBook addrs = new RamAddressBook();
         kad.setAddressBook(addrs);
         for (int i=0; i < 1000; i++) {

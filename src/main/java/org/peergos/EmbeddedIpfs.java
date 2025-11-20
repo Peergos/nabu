@@ -282,7 +282,7 @@ public class EmbeddedIpfs {
         }
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
 
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, blockstore), false);
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blockstore)), false);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
@@ -310,26 +310,5 @@ public class EmbeddedIpfs {
                 Optional.of(new BitswapBlockService(node, bitswap.get(), dht)) :
                 Optional.empty();
         return new EmbeddedIpfs(node, blockstore, records, dht, maxBlockSize, blockService, httpHandler, bootstrap, newBlockProvider, announce);
-    }
-
-    public static Multiaddr[] getAddresses(Host node, Kademlia dht, Multihash targetNodeId) throws ConnectionException {
-        AddressBook addressBook = node.getAddressBook();
-        Multihash targetPeerId = targetNodeId.bareMultihash();
-        PeerId peerId = PeerId.fromBase58(targetPeerId.toBase58());
-        Collection<Multiaddr> all = addressBook.get(peerId).join();
-        if (! all.isEmpty())
-            return all.toArray(Multiaddr[]::new);
-        Multiaddr[] allAddresses = null;
-        if (all.isEmpty()) {
-            List<PeerAddresses> closestPeers = dht.findClosestPeers(targetPeerId, 1, node);
-            Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetPeerId)).findFirst();
-            if (matching.isEmpty()) {
-                throw new ConnectionException("Target not found: " + targetPeerId);
-            }
-            PeerAddresses peer = matching.get();
-            allAddresses = peer.addresses.stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
-            addressBook.setAddrs(peerId, 0, allAddresses);
-        }
-        return allAddresses;
     }
 }
