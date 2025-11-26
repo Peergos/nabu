@@ -9,6 +9,7 @@ import io.libp2p.core.PeerId;
 import io.libp2p.core.crypto.PrivKey;
 import io.libp2p.core.crypto.PubKey;
 import io.libp2p.core.multiformats.Multiaddr;
+import io.libp2p.core.multiformats.Protocol;
 import io.libp2p.core.multistream.ProtocolBinding;
 import io.libp2p.discovery.MDnsDiscovery;
 import io.libp2p.protocol.Ping;
@@ -161,7 +162,11 @@ public class EmbeddedPeer {
         }
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
 
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.empty()), false);
+        boolean quicEnabled = swarmAddresses.stream()
+                .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.QUICV1));
+        boolean tcpEnabled = swarmAddresses.stream()
+                .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.empty()), false, quicEnabled, tcpEnabled);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);

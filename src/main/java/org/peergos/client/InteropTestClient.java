@@ -92,7 +92,7 @@ public class InteropTestClient {
             b.getIdentity().setFactory(() -> privKey);
 
             if (transport.equals(QUIC_V1)) {
-                b.getSecureTransports().add(QuicTransport::Ecdsa);
+                b.getSecureTransports().add(QuicTransport::ECDSA);
             } else {
                 b.getTransports().add(TcpTransport::new);
             }

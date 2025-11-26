@@ -56,7 +56,8 @@ public class KademliaTest {
             }).start();
 
             // Check node1 can find node2
-            Multihash peerId2 = Multihash.deserialize(node2.getPeerId().getBytes());
+            PeerId target = PeerId.fromBase58("12D3KooWFn7nQXUP2bB5dHDUFBkpMsCCjaFDXQKsnYuWaJa8kGEN");
+            Multihash peerId2 = Multihash.deserialize(target.getBytes());
             List<PeerAddresses> closestPeers = dht1.findClosestPeers(peerId2, 2, node1);
             Optional<PeerAddresses> matching = closestPeers.stream()
                     .filter(p -> p.peerId.equals(peerId2))

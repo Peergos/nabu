@@ -121,11 +121,19 @@ public class HostBuilder {
                                      Blockstore blocks,
                                      BlockRequestAuthoriser authoriser,
                                      boolean blockAggressivePeers) {
+        List<MultiAddress> swarmAddresses = List.of(
+                new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort),
+                new MultiAddress("/ip4/0.0.0.0/udp/" + listenPort + "/quic-v1")
+        );
         HostBuilder builder = new HostBuilder()
                 .generateIdentity()
-                .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)));
+                .listen(swarmAddresses);
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blocks)), false);
+        boolean quicEnabled = swarmAddresses.stream()
+                .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.QUICV1));
+        boolean tcpEnabled = swarmAddresses.stream()
+                .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blocks)), false, quicEnabled, tcpEnabled);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
         return builder.addProtocols(List.of(
@@ -159,7 +167,7 @@ public class HostBuilder {
             b.getIdentity().setFactory(() -> privKey);
             List<Multiaddr> toListen = listenAddrs.stream().map(Multiaddr::new).collect(Collectors.toList());
             if (toListen.stream().anyMatch(a -> a.has(Protocol.QUICV1)))
-                b.getSecureTransports().add(QuicTransport::Ecdsa);
+                b.getSecureTransports().add(QuicTransport::ECDSA);
             b.getTransports().add(TcpTransport::new);
             b.getSecureChannels().add(NoiseXXSecureChannel::new);
 //            b.getSecureChannels().add(TlsSecureChannel::new);

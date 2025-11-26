@@ -32,12 +32,15 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     public static final String LAN_DHT_ID = "/ipfs/lan/kad/1.0.0";
     private final KademliaEngine engine;
     private final boolean localDht;
+    private final boolean quicEnabled, tcpEnabled;
     private AddressBook addressBook;
 
-    public Kademlia(KademliaEngine dht, boolean localOnly) {
+    public Kademlia(KademliaEngine dht, boolean localOnly, boolean quicEnabled, boolean tcpEnabled) {
         super(localOnly ? LAN_DHT_ID : WAN_DHT_ID, new KademliaProtocol(dht));
         this.engine = dht;
         this.localDht = localOnly;
+        this.quicEnabled = quicEnabled;
+        this.tcpEnabled = tcpEnabled;
     }
 
     public void setAddressBook(AddressBook addrs) {
@@ -209,7 +212,9 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     .map(r -> {
                         toQuery.remove(r);
                         queried.add(r.addresses.peerId);
-                        return ioExec.submit(() -> getCloserPeers(key, r.addresses, us).join());
+                        return ioExec.submit(() -> getCloserPeers(key, r.addresses, us)
+                                .orTimeout(2, TimeUnit.SECONDS)
+                                .join());
                     })
                     .collect(Collectors.toList());
             boolean foundCloser = false;
@@ -312,7 +317,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             if (e instanceof Libp2pException && e.getMessage().contains("Transport is closed"))
                 return CompletableFuture.completedFuture(Collections.emptyList());
             // we can't dial quic only nodes until it's implemented
-            if (target.addresses.stream().allMatch(a -> a.toString().contains("quic")))
+            if (! quicEnabled && target.addresses.stream().allMatch(a -> a.toString().contains("quic")))
                 return CompletableFuture.completedFuture(Collections.emptyList());
             if (e instanceof NoSuchRemoteProtocolException || e.getCause() instanceof NoSuchRemoteProtocolException)
                 return CompletableFuture.completedFuture(Collections.emptyList());
@@ -391,7 +396,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     }
 
     private boolean hasTransportOverlap(PeerAddresses p) {
-        return p.addresses.stream().anyMatch(a -> a.has(Protocol.TCP) && ! a.has(Protocol.P2PCIRCUIT));
+        return p.addresses.stream()
+                .anyMatch(a -> (
+                        (tcpEnabled && a.has(Protocol.TCP)) ||
+                        (quicEnabled && a.has(Protocol.QUICV1)) && ! a.has(Protocol.WEBTRANSPORT)) &&
+                        ! a.has(Protocol.P2PCIRCUIT));
     }
 
     public CompletableFuture<Integer> publishValue(Multihash publisher,

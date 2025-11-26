@@ -6,6 +6,7 @@ import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
 import io.libp2p.core.multiformats.*;
+import io.libp2p.core.multiformats.Protocol;
 import io.libp2p.core.multistream.*;
 import io.libp2p.discovery.*;
 import io.libp2p.protocol.*;
@@ -282,7 +283,11 @@ public class EmbeddedIpfs {
         }
         Multihash ourPeerId = Multihash.deserialize(builder.getPeerId().getBytes());
 
-        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blockstore)), false);
+        boolean quicEnabled = swarmAddresses.stream()
+                .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.QUICV1));
+        boolean tcpEnabled = swarmAddresses.stream()
+                .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
+        Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blockstore)), false, quicEnabled, tcpEnabled);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
         CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
