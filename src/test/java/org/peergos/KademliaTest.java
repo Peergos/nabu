@@ -10,6 +10,7 @@ import org.junit.*;
 import org.peergos.blockstore.*;
 import org.peergos.protocol.*;
 import org.peergos.protocol.dht.*;
+import org.peergos.util.ArrayOps;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -21,13 +22,16 @@ public class KademliaTest {
     public void findOtherNode() throws Exception {
         RamBlockstore blockstore1 = new RamBlockstore();
         HostBuilder builder1 = HostBuilder.create(TestPorts.getPort(),
-                new RamProviderStore(1000), new RamRecordStore(), blockstore1, (c, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(1000), new RamRecordStore(), blockstore1,
+                (c, p, a) -> CompletableFuture.completedFuture(true));
         Host node1 = builder1.build();
         node1.start().join();
         IdentifyBuilder.addIdentifyProtocol(node1, Collections.emptyList());
 
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
-                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true));
+                new RamProviderStore(1000), new RamRecordStore(), new RamBlockstore(),
+                (c, p, a) -> CompletableFuture.completedFuture(true), false,
+                Optional.of(ArrayOps.hexToBytes("080112206c30e46eb8f33ecac93547da7ff2780ad5e8462f9c43ab47ee5d679964d8f105")));
         Host node2 = builder2.build();
         node2.start().join();
         IdentifyBuilder.addIdentifyProtocol(node2, Collections.emptyList());
@@ -56,8 +60,7 @@ public class KademliaTest {
             }).start();
 
             // Check node1 can find node2
-            PeerId target = PeerId.fromBase58("12D3KooWFn7nQXUP2bB5dHDUFBkpMsCCjaFDXQKsnYuWaJa8kGEN");
-            Multihash peerId2 = Multihash.deserialize(target.getBytes());
+            Multihash peerId2 = Multihash.deserialize(node2.getPeerId().getBytes());
             List<PeerAddresses> closestPeers = dht1.findClosestPeers(peerId2, 2, node1);
             Optional<PeerAddresses> matching = closestPeers.stream()
                     .filter(p -> p.peerId.equals(peerId2))

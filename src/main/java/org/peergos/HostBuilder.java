@@ -112,7 +112,7 @@ public class HostBuilder {
                                      RecordStore records,
                                      Blockstore blocks,
                                      BlockRequestAuthoriser authoriser) {
-        return create(listenPort, providers, records, blocks, authoriser, false);
+        return create(listenPort, providers, records, blocks, authoriser, false, Optional.empty());
     }
 
     public static HostBuilder create(int listenPort,
@@ -120,14 +120,17 @@ public class HostBuilder {
                                      RecordStore records,
                                      Blockstore blocks,
                                      BlockRequestAuthoriser authoriser,
-                                     boolean blockAggressivePeers) {
+                                     boolean blockAggressivePeers,
+                                     Optional<byte[]> privKey) {
         List<MultiAddress> swarmAddresses = List.of(
                 new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort),
                 new MultiAddress("/ip4/0.0.0.0/udp/" + listenPort + "/quic-v1")
         );
         HostBuilder builder = new HostBuilder()
-                .generateIdentity()
                 .listen(swarmAddresses);
+        builder = privKey.isPresent() ?
+                builder.setIdentity(privKey.get()) :
+                builder.generateIdentity();
         Multihash ourPeerId = Multihash.deserialize(builder.peerId.getBytes());
         boolean quicEnabled = swarmAddresses.stream()
                 .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.QUICV1));
