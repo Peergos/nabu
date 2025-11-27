@@ -15,6 +15,7 @@ import org.peergos.protocol.dnsaddr.*;
 import org.peergos.protocol.ipns.*;
 import org.peergos.util.Logging;
 
+import java.nio.channels.ClosedChannelException;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -326,6 +327,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             }  else if (e.getCause() instanceof TimeoutException)
                 LOG.fine("Timeout dialing " + target.peerId + " addrs: " + target.addresses);
             else if (e.getCause() instanceof ConnectionClosedException) {}
+            else if (e.getCause() instanceof ClosedChannelException) {}
             else
                 e.printStackTrace();
         }
