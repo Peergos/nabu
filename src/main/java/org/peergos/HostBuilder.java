@@ -1,6 +1,5 @@
 package org.peergos;
 
-import identify.pb.*;
 import io.ipfs.multiaddr.*;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
@@ -11,10 +10,8 @@ import io.libp2p.core.multiformats.Protocol;
 import io.libp2p.core.multistream.*;
 import io.libp2p.core.mux.*;
 import io.libp2p.crypto.keys.*;
-import io.libp2p.etc.types.*;
 import io.libp2p.protocol.*;
 import io.libp2p.security.noise.*;
-import io.libp2p.security.tls.*;
 import io.libp2p.transport.quic.QuicTransport;
 import io.libp2p.transport.tcp.*;
 import io.libp2p.core.crypto.KeyKt;
@@ -24,8 +21,6 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.*;
 import java.util.stream.*;
 
 public class HostBuilder {
