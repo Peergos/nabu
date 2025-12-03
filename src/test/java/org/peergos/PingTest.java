@@ -43,7 +43,7 @@ public class PingTest {
     public static Host build(PrivKey keys,
                              int listenPort,
                              List<ProtocolBinding> protocols) {
-        return new HostBuilder()
+        return new HostBuilder(new RamAddressBook())
                 .setIdentity(keys.bytes())
                 .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)))
                 .addProtocols(protocols)

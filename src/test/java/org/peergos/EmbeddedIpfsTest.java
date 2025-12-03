@@ -204,7 +204,7 @@ public class EmbeddedIpfsTest {
 
     public static EmbeddedIpfs build(List<MultiAddress> bootstrap, List<MultiAddress> swarmAddresses, Optional<HttpProtocol.HttpRequestProcessor> http) {
         BlockRequestAuthoriser blockRequestAuthoriser = (c, p, a) -> CompletableFuture.completedFuture(true);
-        HostBuilder builder = new HostBuilder().generateIdentity();
+        HostBuilder builder = new HostBuilder(new RamAddressBook()).generateIdentity();
         PrivKey privKey = builder.getPrivateKey();
         PeerId peerId = builder.getPeerId();
         IdentitySection id = new IdentitySection(privKey.bytes(), peerId);

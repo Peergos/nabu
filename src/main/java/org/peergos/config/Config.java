@@ -4,6 +4,7 @@ import io.ipfs.multiaddr.MultiAddress;
 import io.libp2p.core.PeerId;
 import io.libp2p.core.crypto.PrivKey;
 import org.peergos.HostBuilder;
+import org.peergos.RamAddressBook;
 import org.peergos.util.JSONParser;
 import org.peergos.util.JsonHelper;
 
@@ -77,7 +78,7 @@ public class Config {
     }
 
     public Config defaultConfig(Optional<Supplier<Mount>> dataStoreSupplier) {
-        HostBuilder builder = new HostBuilder().generateIdentity();
+        HostBuilder builder = new HostBuilder(new RamAddressBook()).generateIdentity();
         PrivKey privKey = builder.getPrivateKey();
         PeerId peerId = builder.getPeerId();
 

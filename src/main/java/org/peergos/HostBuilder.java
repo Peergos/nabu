@@ -34,8 +34,10 @@ public class HostBuilder {
     private List<String> listenAddrs = new ArrayList<>();
     private List<ProtocolBinding> protocols = new ArrayList<>();
     private List<StreamMuxerProtocol> muxers = new ArrayList<>();
+    private final AddressBook addrs;
 
-    public HostBuilder() {
+    public HostBuilder(AddressBook addrs) {
+        this.addrs = addrs;
     }
 
     public PrivKey getPrivateKey() {
@@ -126,7 +128,7 @@ public class HostBuilder {
                 new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort),
                 new MultiAddress("/ip4/0.0.0.0/udp/" + listenPort + "/quic-v1")
         );
-        HostBuilder builder = new HostBuilder()
+        HostBuilder builder = new HostBuilder(new RamAddressBook())
                 .listen(swarmAddresses);
         builder = privKey.isPresent() ?
                 builder.setIdentity(privKey.get()) :
@@ -149,7 +151,7 @@ public class HostBuilder {
 
     public static Host build(int listenPort,
                              List<ProtocolBinding> protocols) {
-        return new HostBuilder()
+        return new HostBuilder(new RamAddressBook())
                 .generateIdentity()
                 .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + listenPort)))
                 .addProtocols(protocols)
@@ -159,13 +161,14 @@ public class HostBuilder {
     public Host build() {
         if (muxers.isEmpty())
             muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
-        return build(privKey, listenAddrs, protocols, muxers);
+        return build(privKey, listenAddrs, protocols, muxers, addrs);
     }
 
     public static Host build(PrivKey privKey,
                              List<String> listenAddrs,
                              List<ProtocolBinding> protocols,
-                             List<StreamMuxerProtocol> muxers) {
+                             List<StreamMuxerProtocol> muxers,
+                             AddressBook addrs) {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             List<Multiaddr> toListen = listenAddrs.stream().map(Multiaddr::new).collect(Collectors.toList());
@@ -176,7 +179,6 @@ public class HostBuilder {
 //            b.getSecureChannels().add(TlsSecureChannel::new);
 
             b.getMuxers().addAll(muxers);
-            RamAddressBook addrs = new RamAddressBook();
             b.getAddressBook().setImpl(addrs);
             // Uncomment to add mux debug logging
 //            b.getDebug().getMuxFramesHandler().addLogger(LogLevel.INFO, "MUX");

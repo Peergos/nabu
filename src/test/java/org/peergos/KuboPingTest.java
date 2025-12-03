@@ -19,7 +19,7 @@ public class KuboPingTest {
 
     @Test
     public void runPingOverYamux() throws IOException {
-        Host node1 = new HostBuilder()
+        Host node1 = new HostBuilder(new RamAddressBook())
                 .generateIdentity()
                 .listen(List.of(new MultiAddress("/ip4/0.0.0.0/tcp/" + TestPorts.getPort())))
                 .addProtocols(List.of(new Ping(), new Bitswap(new BitswapEngine(new RamBlockstore(), (c, p, a) -> CompletableFuture.completedFuture(true), Bitswap.MAX_MESSAGE_SIZE))))

@@ -148,13 +148,13 @@ public class KademliaTest {
 
     @Test
     public void kademliaFindNodeLimitTest() {
-        PeerId us = new HostBuilder().generateIdentity().getPeerId();
+        PeerId us = new HostBuilder(new RamAddressBook()).generateIdentity().getPeerId();
         KademliaEngine kad = new KademliaEngine(Multihash.fromBase58(us.toBase58()),
                 new RamProviderStore(1000), new RamRecordStore(), Optional.of(new RamBlockstore()));
         RamAddressBook addrs = new RamAddressBook();
         kad.setAddressBook(addrs);
         for (int i=0; i < 1000; i++) {
-            PeerId peer = new HostBuilder().generateIdentity().getPeerId();
+            PeerId peer = new HostBuilder(new RamAddressBook()).generateIdentity().getPeerId();
             for (int j=0; j < 100; j++) {
                 kad.addIncomingConnection(peer);
                 addrs.addAddrs(peer, 0, new Multiaddr[]{new Multiaddr("/ip4/127.0.0.1/tcp/4001/p2p/" + peer.toBase58())});

@@ -166,7 +166,7 @@ public class IpnsPublisher {
     }
 
     public static EmbeddedIpfs startIpfs() {
-        HostBuilder builder = new HostBuilder().generateIdentity();
+        HostBuilder builder = new HostBuilder(new RamAddressBook()).generateIdentity();
         PrivKey privKey = builder.getPrivateKey();
         PeerId peerId = builder.getPeerId();
         IdentitySection id = new IdentitySection(privKey.bytes(), peerId);

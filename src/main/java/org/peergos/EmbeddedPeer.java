@@ -153,10 +153,13 @@ public class EmbeddedPeer {
                                      List<MultiAddress> bootstrap,
                                      IdentitySection identity,
                                      List<MultiAddress> announce,
+                                     AddressBook addrs,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler) {
         ProviderStore providers = new RamProviderStore(10_000);
 
-        HostBuilder builder = new HostBuilder().setIdentity(identity.privKeyProtobuf).listen(swarmAddresses);
+        HostBuilder builder = new HostBuilder(addrs)
+                .setIdentity(identity.privKeyProtobuf)
+                .listen(swarmAddresses);
         if (! builder.getPeerId().equals(identity.peerId)) {
             throw new IllegalStateException("PeerId invalid");
         }
