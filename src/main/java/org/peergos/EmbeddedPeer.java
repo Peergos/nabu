@@ -186,25 +186,4 @@ public class EmbeddedPeer {
 
         return new EmbeddedPeer(node, records, dht, httpHandler, bootstrap, announce);
     }
-
-    public static Multiaddr[] getAddresses(Host node, Kademlia dht, Multihash targetNodeId) throws ConnectionException {
-        AddressBook addressBook = node.getAddressBook();
-        Multihash targetPeerId = targetNodeId.bareMultihash();
-        PeerId peerId = PeerId.fromBase58(targetPeerId.toBase58());
-        Collection<Multiaddr> all = addressBook.get(peerId).join();
-        if (! all.isEmpty())
-            return all.toArray(Multiaddr[]::new);
-        Multiaddr[] allAddresses = null;
-        if (all.isEmpty()) {
-            List<PeerAddresses> closestPeers = dht.findClosestPeers(targetPeerId, 1, node);
-            Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetPeerId)).findFirst();
-            if (matching.isEmpty()) {
-                throw new ConnectionException("Target not found: " + targetPeerId);
-            }
-            PeerAddresses peer = matching.get();
-            allAddresses = peer.addresses.stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
-            addressBook.setAddrs(peerId, 0, allAddresses);
-        }
-        return allAddresses;
-    }
 }

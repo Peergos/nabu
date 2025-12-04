@@ -1,6 +1,5 @@
 package org.peergos.protocol.dht;
 
-import io.ipfs.cid.*;
 import io.ipfs.multihash.*;
 import org.peergos.protocol.ipns.*;
 
