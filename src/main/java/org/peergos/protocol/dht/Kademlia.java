@@ -470,7 +470,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 break;
             if (toQuery.size() == remaining) {
                 // publish to closest remaining nodes
-                System.out.println("Publishing to further nodes, so far only " + publishes.size());
+                if (publishes.size() > 0)
+                    System.out.println("Publishing to further nodes, so far only " + publishes.size());
                 while (publishes.size() < minPublishes && !toQuery.isEmpty()) {
                     List<RoutingEntry> closest = toQuery.stream()
                     .limit(minPublishes - publishes.size() + 5)
