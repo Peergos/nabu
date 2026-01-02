@@ -13,6 +13,7 @@ import io.libp2p.protocol.*;
 import org.peergos.*;
 import org.peergos.protocol.dnsaddr.*;
 import org.peergos.protocol.ipns.*;
+import org.peergos.util.Futures;
 import org.peergos.util.Logging;
 
 import java.nio.channels.ClosedChannelException;
@@ -431,6 +432,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 .collect(Collectors.toList()));
         Set<Multihash> queried = Collections.synchronizedSet(new HashSet<>());
         while (! toQuery.isEmpty()) {
+            if (! running.get())
+                return Futures.of(0);
             int remaining = toQuery.size() - 3;
             List<RoutingEntry> thisRound = toQuery.stream()
                     .filter(r -> hasTransportOverlap(r.addresses)) // don't waste time trying to dial nodes we can't
@@ -473,6 +476,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 if (publishes.size() > 0)
                     System.out.println("Publishing to further nodes, so far only " + publishes.size());
                 while (publishes.size() < minPublishes && !toQuery.isEmpty()) {
+                    if (! running.get())
+                        return Futures.of(0);
                     List<RoutingEntry> closest = toQuery.stream()
                     .limit(minPublishes - publishes.size() + 5)
                     .collect(Collectors.toList());
