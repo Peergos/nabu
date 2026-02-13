@@ -7,7 +7,7 @@ A minimal Java implementation of [IPFS](https://ipfs.io)
 [Nabu](https://en.wikipedia.org/wiki/Nabu) is the ancient Mesopotamian patron god of literacy, the rational arts, scribes, and wisdom.
 
 ## Status
-This is a WIP. You can follow our progress updates [here](https://peergos.net/public/ianopolous/work/java-ipfs-updates.md?open=true).
+This is used in production in [Peergos](https://peergos.org) for several years now. It's development was logged [here](https://peergos.net/public/ianopolous/work/java-ipfs-updates.md?open=true).
 
 Currently implemented properties:
 * TCP transport
@@ -39,7 +39,6 @@ In the future we will add:
 * circuit-relay
 * dcutr (direct connection upgrade through relay)
 * AutoRelay
-* example iOS chat app
 
 ## Usage
 You can use this as a standalone application for storing and retrieving blocks. Or you can embed it in your application. 
