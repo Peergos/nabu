@@ -85,6 +85,7 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
 
         @Override
         public void onException(@Nullable Throwable cause) {
+            engine.erroredConnection(stream.remotePeerId());
             resp.completeExceptionally(cause);
         }
     }

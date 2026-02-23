@@ -69,6 +69,10 @@ public class KademliaEngine {
         addToRoutingTable(peer);
     }
 
+    public synchronized void erroredConnection(PeerId peer) {
+        router.stale(new Node(Id.create(Hash.sha256(peer.getBytes()), 256), peer.toString()));
+    }
+
     public synchronized void addIncomingConnection(PeerId peer) {
         // don't auto add incoming kademlia connections to routing table
     }
