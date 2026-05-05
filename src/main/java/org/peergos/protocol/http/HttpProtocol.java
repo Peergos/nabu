@@ -61,6 +61,28 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             stream.close();
         }
 
+        @Override
+        public void onClosed(@NotNull Stream stream) {
+            failQueued(new RuntimeException("Stream closed before response received"));
+        }
+
+        @Override
+        public void onReadClosed(@NotNull Stream stream) {
+            failQueued(new RuntimeException("Stream read-closed before response received"));
+        }
+
+        @Override
+        public void onException(Throwable cause) {
+            failQueued(cause != null ? cause : new RuntimeException("Stream exception"));
+        }
+
+        private void failQueued(Throwable cause) {
+            CompletableFuture<FullHttpResponse> req;
+            while ((req = queue.poll()) != null) {
+                req.completeExceptionally(cause);
+            }
+        }
+
         public CompletableFuture<FullHttpResponse> send(FullHttpRequest req) {
             CompletableFuture<FullHttpResponse> res = new CompletableFuture<>();
             queue.add(res);
@@ -79,6 +101,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
 
     public static class ResponseWriter extends SimpleChannelInboundHandler<FullHttpResponse> {
         private final Consumer<HttpContent> replyProcessor;
+        private volatile boolean replied = false;
 
         public ResponseWriter(Consumer<HttpContent> replyProcessor) {
             this.replyProcessor = replyProcessor;
@@ -93,6 +116,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             );
             copy.headers().setAll(reply.headers());
 
+            replied = true;
             replyProcessor.accept(copy);
             if (reply instanceof LastHttpContent) {
                 ctx.channel().close();
@@ -102,6 +126,13 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             ctx.close();
+            if (!replied) {
+                replied = true;
+                FullHttpResponse error = new DefaultFullHttpResponse(
+                        HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY, Unpooled.EMPTY_BUFFER);
+                error.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+                replyProcessor.accept(error);
+            }
         }
     }
 
@@ -166,11 +197,21 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                 ch.writeAndFlush(copy).addListener(f -> {
                     if (! f.isSuccess()) {
                         ReferenceCountUtil.release(copy);
+                        sendErrorReply(replyHandler);
                     }
                 });
-            else
+            else {
                 ReferenceCountUtil.release(copy);
+                sendErrorReply(replyHandler);
+            }
         });
+    }
+
+    private static void sendErrorReply(Consumer<HttpContent> replyHandler) {
+        FullHttpResponse error = new DefaultFullHttpResponse(
+                HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY, Unpooled.EMPTY_BUFFER);
+        error.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+        replyHandler.accept(error);
     }
 
     private static final long TRAFFIC_LIMIT = Long.MAX_VALUE; // This is the total inbound or outbound traffic allowed, not a rate

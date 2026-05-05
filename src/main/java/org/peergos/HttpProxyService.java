@@ -72,19 +72,22 @@ public class HttpProxyService {
         }
         reqHeaders.set(HttpHeaderNames.CONTENT_LENGTH, request.body != null ? request.body.length : 0);
         FullHttpResponse resp = proxier.send(httpRequest.retain()).join();
-        ByteArrayOutputStream bout = new ByteArrayOutputStream();
-        int contentLength = resp.headers().getInt("content-length");
-        resp.content().readBytes(bout, contentLength);
-        Map<String, String> headers = new HashMap<>();
-        for (Map.Entry<String, String> entry: resp.headers().entries()) {
-            String key = entry.getKey();
-            if (key != null) {
-                headers.put(key, entry.getValue());
+        try {
+            ByteArrayOutputStream bout = new ByteArrayOutputStream();
+            int contentLength = resp.headers().getInt(HttpHeaderNames.CONTENT_LENGTH, 0);
+            resp.content().readBytes(bout, contentLength);
+            Map<String, String> headers = new HashMap<>();
+            for (Map.Entry<String, String> entry: resp.headers().entries()) {
+                String key = entry.getKey();
+                if (key != null) {
+                    headers.put(key, entry.getValue());
+                }
             }
+            int code = resp.status().code();
+            return new ProxyResponse(bout.toByteArray(), headers, code);
+        } finally {
+            resp.release();
         }
-        int code = resp.status().code();
-        resp.release();
-        return new ProxyResponse(bout.toByteArray(), headers, code);
     }
     private String constructQueryParamString(Map<String, List<String>> queryParams) {
         StringBuilder sb = new StringBuilder();
