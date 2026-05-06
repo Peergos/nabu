@@ -7,6 +7,7 @@ import org.jetbrains.annotations.*;
 import org.peergos.protocol.dht.pb.Dht;
 
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
 
 public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController> {
 
@@ -20,6 +21,13 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
             .register();
 
     public static final int MAX_MESSAGE_SIZE = 1024*1024;
+
+    private static final AtomicInteger threadCount = new AtomicInteger();
+    private static final Executor requestHandlers = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "kademlia-handler-" + threadCount.incrementAndGet());
+        t.setDaemon(true);
+        return t;
+    });
 
     private final KademliaEngine engine;
 
@@ -99,7 +107,7 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
 
         @Override
         public void onMessage(@NotNull Stream stream, Dht.Message msg) {
-            engine.receiveRequest(msg, stream.remotePeerId(), stream);
+            requestHandlers.execute(() -> engine.receiveRequest(msg, stream.remotePeerId(), stream));
         }
 
         @Override

@@ -2,6 +2,7 @@ package org.peergos;
 
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.AddressBook;
+import io.libp2p.core.ConnectionClosedException;
 import io.libp2p.core.Host;
 import io.libp2p.core.PeerId;
 import io.libp2p.core.multiformats.Multiaddr;
@@ -59,7 +60,17 @@ public class HttpProxyService {
     public ProxyResponse proxyRequest(Multihash targetNodeId, ProxyRequest request) throws IOException, ConnectionException {
         Multiaddr[] addressesToDial = getAddresses(node, dht, targetNodeId);
         PeerId peerId = PeerId.fromBase58(targetNodeId.bareMultihash().toBase58());
-        HttpProtocol.HttpController proxier = p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
+        HttpProtocol.HttpController proxier;
+        try {
+            proxier = p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
+        } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof ConnectionClosedException) {
+                proxier = p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
+            } else {
+                throw e;
+            }
+        }
         String urlParams = constructQueryParamString(request.queryParams);
         FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1,
                 HttpMethod.valueOf(request.method.name()),
