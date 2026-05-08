@@ -515,17 +515,15 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     private CompletableFuture<Optional<GetResult>> getValueFromPeer(PeerAddresses peer, Multihash publisher, Host us) {
         try {
             StreamPromise<? extends KademliaController> conn = dialPeer(peer, us);
-            return conn
-                    .getController()
+            return conn.getController()
                     .orTimeout(1, TimeUnit.SECONDS)
-                    .join()
-                    .getValue(publisher)
-                    .orTimeout(1, TimeUnit.SECONDS)
-                    .thenApply(x -> {
-                        conn.getStream().thenApply(s -> s.close());
-                        return x;
-                    })
-                    .thenApply(Optional::of);
+                    .thenCompose(controller -> controller.getValue(publisher)
+                            .orTimeout(1, TimeUnit.SECONDS)
+                            .thenApply(result -> {
+                                conn.getStream().thenApply(s -> s.close());
+                                return Optional.<GetResult>of(result);
+                            }))
+                    .exceptionally(e -> Optional.empty());
         } catch (Exception e) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
@@ -551,11 +549,11 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             List<RoutingEntry> thisRound = toQuery.stream()
                     .limit(queryParallelism)
                     .collect(Collectors.toList());
-            List<CompletableFuture<CompletableFuture<Void>>> futures = thisRound.stream()
+            List<CompletableFuture<Void>> futures = thisRound.stream()
                     .map(r -> {
                         toQuery.remove(r);
                         queried.add(r.addresses.peerId);
-                        return CompletableFuture.supplyAsync(() -> getValueFromPeer(r.addresses, publisher, us).thenAccept(get ->
+                        return getValueFromPeer(r.addresses, publisher, us).thenAccept(get ->
                                 get.ifPresent(g -> {
                                     if (g.record.isPresent() && g.record.get().publisher.equals(publisher))
                                         candidates.add(g.record.get().value);
@@ -566,15 +564,14 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                                             toQuery.add(e);
                                         }
                                     }
-                                })), ioExec);
+                                }));
                     })
                     .collect(Collectors.toList());
             futures.forEach(f -> {
                 try {
                     if (candidates.size() >= minResults)
                         return;
-                    f.orTimeout(5, TimeUnit.SECONDS).join()
-                            .orTimeout(5, TimeUnit.SECONDS).join();
+                    f.orTimeout(5, TimeUnit.SECONDS).join();
                 } catch (Exception e) {}
             });
             // exit early if we have enough results
