@@ -204,6 +204,7 @@ public class EmbeddedPeer {
         // Circuit relay v2 (upstream), only relaying for others when we are publicly reachable
         Host node = builder.addProtocols(protocols)
                 .enableRelay(Relay.dhtRelaySource(dht))
+                .enableDcutr()
                 .build();
 
         EmbeddedPeer peer = new EmbeddedPeer(node, records, dht, httpHandler, bootstrap, announce);

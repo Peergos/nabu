@@ -327,6 +327,7 @@ public class EmbeddedIpfs {
         // Circuit relay v2 (upstream), only relaying for others when we are publicly reachable
         Host node = builder.addProtocols(protocols)
                 .enableRelay(Relay.dhtRelaySource(dht))
+                .enableDcutr()
                 .build();
 
         Optional<BlockingDeque<Cid>> newBlockProvider = provideBlocks ?

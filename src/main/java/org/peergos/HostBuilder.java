@@ -14,6 +14,7 @@ import io.libp2p.protocol.*;
 import io.libp2p.protocol.circuit.CircuitHopProtocol;
 import io.libp2p.protocol.circuit.CircuitStopProtocol;
 import io.libp2p.protocol.circuit.RelayTransport;
+import org.peergos.protocol.dcutr.*;
 import io.libp2p.security.noise.*;
 import io.libp2p.transport.quic.QuicTransport;
 import io.libp2p.transport.tcp.*;
@@ -39,6 +40,7 @@ public class HostBuilder {
     private CircuitHopProtocol.Binding relayHop;
     private CircuitStopProtocol.Binding relayStop;
     private Function<Host, List<RelayTransport.CandidateRelay>> relayCandidates;
+    private DcutrProtocol.Binding dcutr;
 
     public HostBuilder(AddressBook addrs) {
         this.addrs = addrs;
@@ -61,6 +63,23 @@ public class HostBuilder {
         this.relayStop = new CircuitStopProtocol.Binding(new CircuitStopProtocol());
         this.relayHop = new CircuitHopProtocol.Binding(manager, relayStop);
         this.relayCandidates = candidateRelays;
+        return this;
+    }
+
+    public HostBuilder enableDcutr() {
+        return enableDcutr(conn -> {});
+    }
+
+    /**
+     * Enable DCUtR (direct connection upgrade through relay): once a relayed connection is established,
+     * coordinate a hole punch over it to upgrade to a direct connection.
+     *
+     * @param onUpgraded invoked with the direct connection once a hole punch succeeds
+     */
+    public HostBuilder enableDcutr(Consumer<Connection> onUpgraded) {
+        this.dcutr = new DcutrProtocol.Binding(
+                () -> reachability.getConfirmedPublicAddresses(),
+                onUpgraded);
         return this;
     }
 
@@ -165,7 +184,8 @@ public class HostBuilder {
                         new AutonatProtocol.Binding(),
                         new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
                         dht))
-                .enableRelay(Relay.dhtRelaySource(dht));
+                .enableRelay(Relay.dhtRelaySource(dht))
+                .enableDcutr();
     }
 
     public static Host build(int listenPort,
@@ -180,7 +200,7 @@ public class HostBuilder {
     public Host build() {
         if (muxers.isEmpty())
             muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
-        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, relayHop, relayStop, relayCandidates);
+        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, relayHop, relayStop, relayCandidates, dcutr);
     }
 
     public static Host build(PrivKey privKey,
@@ -188,7 +208,7 @@ public class HostBuilder {
                              List<ProtocolBinding> protocols,
                              List<StreamMuxerProtocol> muxers,
                              AddressBook addrs) {
-        return build(privKey, listenAddrs, protocols, muxers, addrs, new ReachabilityManager(), null, null, null);
+        return build(privKey, listenAddrs, protocols, muxers, addrs, new ReachabilityManager(), null, null, null, null);
     }
 
     public static Host build(PrivKey privKey,
@@ -197,7 +217,7 @@ public class HostBuilder {
                              List<StreamMuxerProtocol> muxers,
                              AddressBook addrs,
                              ReachabilityManager reachability) {
-        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, null, null, null);
+        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, null, null, null, null);
     }
 
     public static Host build(PrivKey privKey,
@@ -208,7 +228,8 @@ public class HostBuilder {
                              ReachabilityManager reachability,
                              CircuitHopProtocol.Binding relayHop,
                              CircuitStopProtocol.Binding relayStop,
-                             Function<Host, List<RelayTransport.CandidateRelay>> relayCandidates) {
+                             Function<Host, List<RelayTransport.CandidateRelay>> relayCandidates,
+                             DcutrProtocol.Binding dcutr) {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             List<Multiaddr> toListen = listenAddrs.stream().map(Multiaddr::new).collect(Collectors.toList());
@@ -234,6 +255,22 @@ public class HostBuilder {
                     return t;
                 });
                 b.getTransports().add(u -> new RelayTransport(relayHop, relayStop, u, relayCandidates, relayRunner));
+            }
+
+            if (dcutr != null) {
+                b.getProtocols().add(dcutr);
+                // The inbound peer of a relayed connection initiates the DCUtR hole punch over it
+                b.getConnectionHandlers().add(connection -> {
+                    if (connection.isInitiator())
+                        return;
+                    Multiaddr remote = connection.remoteAddress();
+                    if (remote == null || ! remote.toString().contains("p2p-circuit"))
+                        return;
+                    try {
+                        // opening the stream drives the initiator flow (see DcutrProtocol.onStartInitiator)
+                        connection.muxerSession().createStream(dcutr);
+                    } catch (Exception e) {}
+                });
             }
 
             for (ProtocolBinding<?> protocol : protocols) {
@@ -300,6 +337,8 @@ public class HostBuilder {
             if (protocol instanceof HostConsumer)
                 ((HostConsumer)protocol).setHost(host);
         }
+        if (dcutr != null)
+            dcutr.setHost(host);
         if (relayHop != null) {
             // The relay transport (and, through it, the hop protocol) needs a reference to the host
             host.getNetwork().getTransports().stream()
