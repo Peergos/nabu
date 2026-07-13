@@ -307,6 +307,19 @@ public class HostBuilder {
                     .map(t -> (RelayTransport) t)
                     .findFirst()
                     .ifPresent(rt -> rt.setHost(host));
+            // Reserve on relays whenever we discover we are not publicly reachable
+            if (relayCandidates != null) {
+                final Host relayHost = host;
+                ScheduledExecutorService autoRelayRunner = Executors.newScheduledThreadPool(1, r -> {
+                    Thread t = new Thread(r, "auto-relay");
+                    t.setDaemon(true);
+                    return t;
+                });
+                new AutoRelay(reachability,
+                        () -> relayCandidates.apply(relayHost),
+                        candidate -> AutoRelay.reserveOnRelay(relayHost, candidate),
+                        autoRelayRunner).start();
+            }
         }
         // If we speak AutoNAT, run the client that discovers our own reachability
         protocols.stream()

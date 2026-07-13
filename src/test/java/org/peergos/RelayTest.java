@@ -4,11 +4,13 @@ import io.ipfs.multiaddr.*;
 import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.protocol.*;
+import io.libp2p.protocol.circuit.RelayTransport.CandidateRelay;
 import org.junit.*;
 import org.peergos.protocol.autonat.ReachabilityManager.Reachability;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.*;
 
 /**
  * End-to-end circuit-relay-v2 data path through nabu's HostBuilder, using the upstream jvm-libp2p
@@ -18,10 +20,14 @@ import java.util.concurrent.*;
 public class RelayTest {
 
     private static HostBuilder relayEnabled(int port) {
+        return relayEnabled(port, h -> List.of());
+    }
+
+    private static HostBuilder relayEnabled(int port, Function<Host, List<CandidateRelay>> candidateSource) {
         HostBuilder builder = new HostBuilder(new RamAddressBook()).generateIdentity();
         if (port > 0)
             builder.listen(List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + port)));
-        return builder.addProtocols(List.of(new Ping())).enableRelay(h -> List.of());
+        return builder.addProtocols(List.of(new Ping())).enableRelay(candidateSource);
     }
 
     @Test
@@ -57,6 +63,45 @@ public class RelayTest {
             PingController pinger = ping.getController().get(15, TimeUnit.SECONDS);
             long latency = pinger.ping().get(15, TimeUnit.SECONDS);
             System.out.println("Ping over relay latency: " + latency + "ms");
+        } finally {
+            relay.stop();
+            server.stop();
+            client.stop();
+        }
+    }
+
+    @Test
+    public void autoTriggerReservesRelayWhenPrivate() throws Exception {
+        HostBuilder relayBuilder = relayEnabled(TestPorts.getPort());
+        Host relay = relayBuilder.build();
+        relay.start().join();
+        relayBuilder.getReachability().setReachability(Reachability.PUBLIC, List.of());
+
+        int relayPort = portOf(relay);
+        List<Multiaddr> relayAddrs = List.of(new Multiaddr("/ip4/127.0.0.1/tcp/" + relayPort));
+        // the server only knows about this relay as a candidate; AutoRelay must reserve on it
+        Function<Host, List<CandidateRelay>> serverRelays =
+                h -> List.of(new CandidateRelay(relay.getPeerId(), relayAddrs));
+
+        HostBuilder serverBuilder = relayEnabled(TestPorts.getPort(), serverRelays);
+        HostBuilder clientBuilder = relayEnabled(TestPorts.getPort());
+        Host server = serverBuilder.build();
+        Host client = clientBuilder.build();
+        server.start().join();
+        client.start().join();
+        try {
+            // Going PRIVATE should make AutoRelay reserve a slot on the candidate relay
+            serverBuilder.getReachability().setReachability(Reachability.PRIVATE, List.of());
+
+            Multiaddr relayAddr = new Multiaddr("/ip4/127.0.0.1/tcp/" + relayPort).withP2P(relay.getPeerId());
+            Multiaddr toDial = relayAddr.concatenated(
+                    new Multiaddr("/p2p-circuit/p2p/" + server.getPeerId().toBase58()));
+            Connection conn = client.getNetwork().connect(server.getPeerId(), toDial).get(15, TimeUnit.SECONDS);
+
+            PingController pinger = conn.muxerSession().createStream(new Ping())
+                    .getController().get(15, TimeUnit.SECONDS);
+            long latency = pinger.ping().get(15, TimeUnit.SECONDS);
+            System.out.println("Ping over auto-reserved relay latency: " + latency + "ms");
         } finally {
             relay.stop();
             server.stop();
