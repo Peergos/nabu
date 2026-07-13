@@ -5,6 +5,7 @@ import com.offbynull.portmapper.gateway.*;
 import com.offbynull.portmapper.gateways.network.*;
 import com.offbynull.portmapper.gateways.process.*;
 import com.offbynull.portmapper.mapper.*;
+import io.ipfs.multiaddr.MultiAddress;
 import io.libp2p.core.multiformats.*;
 import org.peergos.util.Logging;
 
@@ -30,6 +31,31 @@ public class PortForwarder {
     public PortForwarder(int port, Consumer<Multiaddr> onMapped) {
         this.port = port;
         this.onMapped = onMapped;
+    }
+
+    /**
+     * Start a forwarder for each distinct TCP/UDP port in the given swarm addresses, reporting mapped
+     * external addresses to {@code onMapped}. Returns the started forwarders so they can be stopped.
+     */
+    public static List<PortForwarder> forSwarm(List<MultiAddress> swarmAddresses, Consumer<Multiaddr> onMapped) {
+        Set<Integer> ports = new LinkedHashSet<>();
+        for (MultiAddress a : swarmAddresses) {
+            Multiaddr m = Multiaddr.fromString(a.toString());
+            if (m.has(Protocol.TCP))
+                ports.add(Integer.parseInt(m.getFirstComponent(Protocol.TCP).getStringValue()));
+            if (m.has(Protocol.UDP))
+                ports.add(Integer.parseInt(m.getFirstComponent(Protocol.UDP).getStringValue()));
+        }
+        ports.remove(0);
+        List<PortForwarder> forwarders = new ArrayList<>();
+        for (int port : ports) {
+            PortForwarder forwarder = new PortForwarder(port, onMapped);
+            forwarders.add(forwarder);
+            forwarder.start();
+        }
+        if (! ports.isEmpty())
+            LOG.info("UPnP/NAT-PMP port forwarding enabled for ports " + ports);
+        return forwarders;
     }
 
     public synchronized void start() {

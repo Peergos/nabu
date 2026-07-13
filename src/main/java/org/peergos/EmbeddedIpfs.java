@@ -201,26 +201,11 @@ public class EmbeddedIpfs {
     private void startPortForwarders() {
         if (! portForwardingEnabled || swarmAddresses == null || reachability == null)
             return;
-        Set<Integer> ports = new LinkedHashSet<>();
-        for (MultiAddress a : swarmAddresses) {
-            Multiaddr m = Multiaddr.fromString(a.toString());
-            if (m.has(Protocol.TCP))
-                ports.add(Integer.parseInt(m.getFirstComponent(Protocol.TCP).getStringValue()));
-            if (m.has(Protocol.UDP))
-                ports.add(Integer.parseInt(m.getFirstComponent(Protocol.UDP).getStringValue()));
-        }
-        ports.remove(0);
-        for (int port : ports) {
-            PortForwarder forwarder = new PortForwarder(port, addr -> {
-                LOG.info("UPnP/NAT-PMP mapped external address: " + addr);
-                reachability.addLocalCandidate(addr);
-                node.getAddressBook().addAddrs(node.getPeerId(), 0, addr);
-            });
-            portForwarders.add(forwarder);
-            forwarder.start();
-        }
-        if (! ports.isEmpty())
-            LOG.info("UPnP/NAT-PMP port forwarding enabled for ports " + ports);
+        portForwarders.addAll(PortForwarder.forSwarm(swarmAddresses, addr -> {
+            LOG.info("UPnP/NAT-PMP mapped external address: " + addr);
+            reachability.addLocalCandidate(addr);
+            node.getAddressBook().addAddrs(node.getPeerId(), 0, addr);
+        }));
     }
 
     public CompletableFuture<Void> stop() throws Exception {

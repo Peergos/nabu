@@ -30,6 +30,7 @@ import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
 import org.peergos.protocol.ipns.*;
+import org.peergos.protocol.ports.*;
 import org.peergos.util.Logging;
 
 import java.nio.file.*;
@@ -53,6 +54,11 @@ public class EmbeddedPeer {
     private final List<MultiAddress> bootstrap;
     private final List<MultiAddress> announce;
     private final List<MDnsDiscovery> mdns = new ArrayList<>();
+    // Set by build(); used for optional UPnP/NAT-PMP port forwarding
+    private ReachabilityManager reachability;
+    private List<MultiAddress> swarmAddresses;
+    private boolean portForwardingEnabled;
+    private final List<PortForwarder> portForwarders = new ArrayList<>();
 
     public EmbeddedPeer(Host node,
                         RecordStore records,
@@ -135,12 +141,29 @@ public class EmbeddedPeer {
             return null;
         });
         mdns.start();
+        startPortForwarders();
+    }
+
+    /** Enable UPnP/NAT-PMP forwarding of the swarm ports. Must be called before {@link #start}. */
+    public void enablePortForwarding() {
+        this.portForwardingEnabled = true;
+    }
+
+    private void startPortForwarders() {
+        if (! portForwardingEnabled || swarmAddresses == null || reachability == null)
+            return;
+        portForwarders.addAll(PortForwarder.forSwarm(swarmAddresses, addr -> {
+            LOG.info("UPnP/NAT-PMP mapped external address: " + addr);
+            reachability.addLocalCandidate(addr);
+            node.getAddressBook().addAddrs(node.getPeerId(), 0, addr);
+        }));
     }
 
     public CompletableFuture<Void> stop() throws Exception {
         if (records != null) {
             records.close();
         }
+        portForwarders.forEach(PortForwarder::stop);
         dht.stopBootstrapThread();
         for (MDnsDiscovery m : mdns) {
             m.stop();
@@ -183,6 +206,9 @@ public class EmbeddedPeer {
                 .enableRelay(Relay.dhtRelaySource(dht))
                 .build();
 
-        return new EmbeddedPeer(node, records, dht, httpHandler, bootstrap, announce);
+        EmbeddedPeer peer = new EmbeddedPeer(node, records, dht, httpHandler, bootstrap, announce);
+        peer.reachability = builder.getReachability();
+        peer.swarmAddresses = swarmAddresses;
+        return peer;
     }
 }
