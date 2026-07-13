@@ -141,7 +141,10 @@ public class HostBuilder {
                 .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blocks)), false, quicEnabled, tcpEnabled);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
-        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
+        // Only act as a relay for others when we are ourselves publicly reachable
+        ReachabilityManager reachability = builder.getReachability();
+        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5,
+                () -> reachability.getReachability() == ReachabilityManager.Reachability.PUBLIC);
         return builder.addProtocols(List.of(
                 new Ping(),
                 new AutonatProtocol.Binding(),

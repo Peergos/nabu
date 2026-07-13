@@ -171,7 +171,9 @@ public class EmbeddedPeer {
                 .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.empty()), false, quicEnabled, tcpEnabled);
         CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
-        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
+        // Only act as a relay for others when we are ourselves publicly reachable
+        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5,
+                () -> builder.getReachability().getReachability() == ReachabilityManager.Reachability.PUBLIC);
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
         List<ProtocolBinding> protocols = new ArrayList<>();

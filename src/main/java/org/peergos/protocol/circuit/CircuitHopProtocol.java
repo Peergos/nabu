@@ -103,6 +103,14 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
         Optional<Reservation> allowConnection(Multihash target, Multihash initiator);
 
         static RelayManager limitTo(PrivKey priv, Multihash relayPeerId, int concurrent) {
+            return limitTo(priv, relayPeerId, concurrent, () -> true);
+        }
+
+        /**
+         * @param shouldRelay whether we should currently act as a relay - typically only when we are
+         *                    ourselves publicly reachable, so a NATed node never offers to relay.
+         */
+        static RelayManager limitTo(PrivKey priv, Multihash relayPeerId, int concurrent, Supplier<Boolean> shouldRelay) {
             return new RelayManager() {
                 Map<Multihash, Reservation> reservations = new HashMap<>();
 
@@ -113,6 +121,8 @@ public class CircuitHopProtocol extends ProtobufProtocolHandler<CircuitHopProtoc
 
                 @Override
                 public synchronized Optional<Reservation> createReservation(Multihash requestor) {
+                    if (! shouldRelay.get())
+                        return Optional.empty();
                     if (reservations.size() >= concurrent)
                         return Optional.empty();
                     LocalDateTime now = LocalDateTime.now();
