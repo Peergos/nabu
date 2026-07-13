@@ -285,16 +285,16 @@ public class HostBuilder {
                     .filter(p -> p instanceof Kademlia && p.getProtocolDescriptor().getAnnounceProtocols().contains("/ipfs/kad/1.0.0"))
                     .map(p -> (Kademlia) p)
                     .findFirst();
-            // Send an identify req on all new incoming connections
+            // Identify the peer on every new connection. This is done in both directions (not just
+            // incoming) because a NATed node only makes outbound connections, and the peer's identify
+            // reply carries our observed (NAT-mapped) address, which is what reachability detection and
+            // AutoNAT need.
             b.getConnectionHandlers().add(connection -> {
                 PeerId remotePeer = connection.secureSession().getRemoteId();
                 Multiaddr remote = connection.remoteAddress().withP2P(remotePeer);
                 addrs.addAddrs(remotePeer, 0, remote);
-                if (connection.isInitiator())
-                    return;
                 addrs.getAddrs(remotePeer).thenAccept(existing -> {
-                    if (! existing.isEmpty())
-                        return;
+                    boolean newPeer = existing.isEmpty();
                     StreamPromise<IdentifyController> stream = connection.muxerSession()
                             .createStream(new IdentifyBinding(new IdentifyProtocol()));
                     stream.getController()
@@ -315,10 +315,10 @@ public class HostBuilder {
                                 }
                                 List<String> protocolIds = remoteId.getProtocolsList().stream().collect(Collectors.toList());
                                 if (protocolIds.contains(Kademlia.WAN_DHT_ID) && wan.isPresent()) {
-                                    // add to kademlia routing table iffi
+                                    // add to kademlia routing table iff
                                     // 1) we haven't already dialled them
                                     // 2) they accept a new kademlia stream
-                                    if (existing.isEmpty())
+                                    if (newPeer)
                                         connection.muxerSession().createStream(wan.get());
                                 }
                             });

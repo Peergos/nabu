@@ -74,6 +74,11 @@ public class EmbeddedPeer {
         this.announce = announce;
     }
 
+    /** Our reachability state (set when built via {@link #build}); may be null for hand-constructed instances. */
+    public ReachabilityManager getReachability() {
+        return reachability;
+    }
+
     public CompletableFuture<Integer> publishValue(PrivKey priv, byte[] value, Optional<String> extraDataKeySuffix, Optional<Cborable> extraData, long sequence, int hoursTtl) {
         Multihash pub = Multihash.deserialize(PeerId.fromPubKey(priv.publicKey()).getBytes());
         LocalDateTime expiry = LocalDateTime.now().plusHours(hoursTtl);
