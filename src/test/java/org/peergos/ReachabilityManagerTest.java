@@ -41,6 +41,17 @@ public class ReachabilityManagerTest {
     }
 
     @Test
+    public void localCandidatesAreOfferedToAutonatButFilteredForPrivacy() {
+        ReachabilityManager r = new ReachabilityManager();
+        Multiaddr upnpMapped = new Multiaddr("/ip4/1.2.3.4/tcp/4001");
+        r.addLocalCandidate(upnpMapped);
+        r.addLocalCandidate(new Multiaddr("/ip4/10.0.0.5/tcp/4001")); // private, ignored
+
+        Assert.assertEquals("local UPnP candidate is offered for AutoNAT verification",
+                List.of(upnpMapped), r.getAllObservedAddresses());
+    }
+
+    @Test
     public void listenerFiresOnlyOnTransition() {
         ReachabilityManager r = new ReachabilityManager();
         AtomicInteger fired = new AtomicInteger();

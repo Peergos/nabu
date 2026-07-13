@@ -27,6 +27,7 @@ import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
 import org.peergos.protocol.ipns.*;
+import org.peergos.protocol.ports.*;
 import org.peergos.util.Logging;
 
 import java.nio.file.*;
@@ -54,6 +55,11 @@ public class EmbeddedIpfs {
     private final List<MultiAddress> announce;
     private final List<MDnsDiscovery> mdns = new ArrayList<>();
     private final int maxBlockSize;
+    // Set by build(); used for optional UPnP/NAT-PMP port forwarding
+    private ReachabilityManager reachability;
+    private List<MultiAddress> swarmAddresses;
+    private boolean portForwardingEnabled;
+    private final List<PortForwarder> portForwarders = new ArrayList<>();
 
     public EmbeddedIpfs(Host node,
                         Blockstore blockstore,
@@ -184,12 +190,44 @@ public class EmbeddedIpfs {
         mdns.start();
 
         blockProvider.ifPresent(PeriodicBlockProvider::start);
+        startPortForwarders();
+    }
+
+    /** Enable UPnP/NAT-PMP forwarding of the swarm ports. Must be called before {@link #start}. */
+    public void enablePortForwarding() {
+        this.portForwardingEnabled = true;
+    }
+
+    private void startPortForwarders() {
+        if (! portForwardingEnabled || swarmAddresses == null || reachability == null)
+            return;
+        Set<Integer> ports = new LinkedHashSet<>();
+        for (MultiAddress a : swarmAddresses) {
+            Multiaddr m = Multiaddr.fromString(a.toString());
+            if (m.has(Protocol.TCP))
+                ports.add(Integer.parseInt(m.getFirstComponent(Protocol.TCP).getStringValue()));
+            if (m.has(Protocol.UDP))
+                ports.add(Integer.parseInt(m.getFirstComponent(Protocol.UDP).getStringValue()));
+        }
+        ports.remove(0);
+        for (int port : ports) {
+            PortForwarder forwarder = new PortForwarder(port, addr -> {
+                LOG.info("UPnP/NAT-PMP mapped external address: " + addr);
+                reachability.addLocalCandidate(addr);
+                node.getAddressBook().addAddrs(node.getPeerId(), 0, addr);
+            });
+            portForwarders.add(forwarder);
+            forwarder.start();
+        }
+        if (! ports.isEmpty())
+            LOG.info("UPnP/NAT-PMP port forwarding enabled for ports " + ports);
     }
 
     public CompletableFuture<Void> stop() throws Exception {
         if (records != null) {
             records.close();
         }
+        portForwarders.forEach(PortForwarder::stop);
         blockProvider.ifPresent(PeriodicBlockProvider::stop);
         dht.stopBootstrapThread();
         for (MDnsDiscovery m : mdns) {
@@ -314,6 +352,9 @@ public class EmbeddedIpfs {
         Optional<BlockService> blockService = runBitswap ?
                 Optional.of(new BitswapBlockService(node, bitswap.get(), dht)) :
                 Optional.empty();
-        return new EmbeddedIpfs(node, blockstore, records, dht, maxBlockSize, blockService, httpHandler, bootstrap, newBlockProvider, announce);
+        EmbeddedIpfs ipfs = new EmbeddedIpfs(node, blockstore, records, dht, maxBlockSize, blockService, httpHandler, bootstrap, newBlockProvider, announce);
+        ipfs.reachability = builder.getReachability();
+        ipfs.swarmAddresses = swarmAddresses;
+        return ipfs;
     }
 }

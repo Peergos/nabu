@@ -13,14 +13,21 @@ public class AddressesSection implements Jsonable {
     public final MultiAddress gatewayAddress;
     public final Optional<MultiAddress> proxyTargetAddress;
     public final Optional<String> allowTarget;
+    public final boolean enableUPnP;
 
     public AddressesSection(List<MultiAddress> swarmAddresses, MultiAddress apiAddress, MultiAddress gatewayAddress,
                             Optional<MultiAddress> proxyTargetAddress, Optional<String> allowTarget) {
+        this(swarmAddresses, apiAddress, gatewayAddress, proxyTargetAddress, allowTarget, false);
+    }
+
+    public AddressesSection(List<MultiAddress> swarmAddresses, MultiAddress apiAddress, MultiAddress gatewayAddress,
+                            Optional<MultiAddress> proxyTargetAddress, Optional<String> allowTarget, boolean enableUPnP) {
         this.swarmAddresses = swarmAddresses;
         this.apiAddress = apiAddress;
         this.gatewayAddress = gatewayAddress;
         this.proxyTargetAddress = proxyTargetAddress;
         this.allowTarget = allowTarget;
+        this.enableUPnP = enableUPnP;
     }
 
     public List<MultiAddress> getSwarmAddresses() {
@@ -37,6 +44,9 @@ public class AddressesSection implements Jsonable {
         if (allowTarget.isPresent()) {
             addressesMap.put("AllowTarget", allowTarget.get());
         }
+        if (enableUPnP) {
+            addressesMap.put("UPnP", enableUPnP);
+        }
         List<String> swarm = swarmAddresses.stream().map(b -> b.toString()).collect(Collectors.toList());
         addressesMap.put("Swarm", swarm);
         Map<String, Object> configMap = new LinkedHashMap<>();
@@ -52,10 +62,12 @@ public class AddressesSection implements Jsonable {
         MultiAddress gateway = new MultiAddress(JsonHelper.getStringProperty(json, "Addresses", "Gateway"));
         Optional<Object> proxyTarget = JsonHelper.getOptionalProperty(json, "Addresses", "ProxyTarget");
         Optional<Object> allowTarget = JsonHelper.getOptionalProperty(json, "Addresses", "AllowTarget");
+        Optional<Object> upnp = JsonHelper.getOptionalProperty(json, "Addresses", "UPnP");
 
         return new AddressesSection(swarmAddresses, api, gateway,
                 proxyTarget.isPresent() ? Optional.of(new MultiAddress((String) proxyTarget.get())) : Optional.empty(),
-                allowTarget.isPresent() ? Optional.of((String) allowTarget.get()) : Optional.empty()
+                allowTarget.isPresent() ? Optional.of((String) allowTarget.get()) : Optional.empty(),
+                upnp.isPresent() && Boolean.parseBoolean(upnp.get().toString())
         );
     }
 }

@@ -61,6 +61,8 @@ public class Nabu {
                 authoriser,
                 config.addresses.proxyTargetAddress.map(Nabu::proxyHandler)
         );
+        if (config.addresses.enableUPnP)
+            ipfs.enablePortForwarding();
         ipfs.start(false);
         String apiAddressArg = "Addresses.API";
         MultiAddress apiAddress = args.hasArg(apiAddressArg) ? new MultiAddress(args.getArg(apiAddressArg)) :  config.addresses.apiAddress;

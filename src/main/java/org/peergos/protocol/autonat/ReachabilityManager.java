@@ -27,6 +27,8 @@ public class ReachabilityManager {
     private final Map<Multiaddr, Set<Multihash>> observations = new HashMap<>();
     // Addresses AutoNAT has confirmed are dialable from the public internet.
     private final Set<Multiaddr> confirmedPublic = new LinkedHashSet<>();
+    // Self-discovered candidate addresses (e.g. from UPnP/NAT-PMP port mapping) to be verified by AutoNAT.
+    private final Set<Multiaddr> localCandidates = new LinkedHashSet<>();
     private final List<Consumer<Reachability>> listeners = new CopyOnWriteArrayList<>();
     private volatile Reachability reachability = Reachability.UNKNOWN;
 
@@ -55,9 +57,20 @@ public class ReachabilityManager {
                 .collect(Collectors.toList());
     }
 
-    /** All public addresses observed so far, regardless of how many peers reported them. */
+    /** All candidate public addresses to test: peer-observed plus self-discovered (e.g. UPnP). */
     public synchronized List<Multiaddr> getAllObservedAddresses() {
-        return new ArrayList<>(observations.keySet());
+        Set<Multiaddr> all = new LinkedHashSet<>(observations.keySet());
+        all.addAll(localCandidates);
+        return new ArrayList<>(all);
+    }
+
+    /**
+     * Register a self-discovered candidate public address (e.g. a UPnP/NAT-PMP mapped address) so the
+     * AutoNAT client will ask peers to verify it. Only public addresses are kept.
+     */
+    public synchronized void addLocalCandidate(Multiaddr addr) {
+        if (addr != null && PeerAddresses.isPublic(addr, false))
+            localCandidates.add(addr);
     }
 
     public Reachability getReachability() {
