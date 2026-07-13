@@ -21,6 +21,7 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import java.util.*;
+import java.util.function.*;
 import java.util.stream.*;
 
 public class HostBuilder {
@@ -256,6 +257,24 @@ public class HostBuilder {
             if (protocol instanceof HostConsumer)
                 ((HostConsumer)protocol).setHost(host);
         }
+        // If we speak AutoNAT, run the client that discovers our own reachability
+        protocols.stream()
+                .filter(p -> p instanceof AutonatProtocol.Binding)
+                .map(p -> (AutonatProtocol.Binding) p)
+                .findFirst()
+                .ifPresent(autonat -> {
+                    Multihash ourId = Multihash.deserialize(host.getPeerId().getBytes());
+                    Supplier<List<Multiaddr>> candidates = () -> {
+                        List<Multiaddr> candidateAddrs = new ArrayList<>(reachability.getAllObservedAddresses());
+                        for (Multiaddr a : host.listenAddresses())
+                            if (PeerAddresses.isPublic(a, false))
+                                candidateAddrs.add(a);
+                        return candidateAddrs.stream().distinct().collect(Collectors.toList());
+                    };
+                    AutoNatClient client = new AutoNatClient(host, ourId, reachability, autonat, candidates);
+                    host.addConnectionHandler(client::onConnection);
+                    client.start();
+                });
         return host;
     }
 }
