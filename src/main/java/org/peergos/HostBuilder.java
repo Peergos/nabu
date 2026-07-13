@@ -306,20 +306,27 @@ public class HostBuilder {
                     .filter(t -> t instanceof RelayTransport)
                     .map(t -> (RelayTransport) t)
                     .findFirst()
-                    .ifPresent(rt -> rt.setHost(host));
-            // Reserve on relays whenever we discover we are not publicly reachable
-            if (relayCandidates != null) {
-                final Host relayHost = host;
-                ScheduledExecutorService autoRelayRunner = Executors.newScheduledThreadPool(1, r -> {
-                    Thread t = new Thread(r, "auto-relay");
-                    t.setDaemon(true);
-                    return t;
-                });
-                new AutoRelay(reachability,
-                        () -> relayCandidates.apply(relayHost),
-                        candidate -> AutoRelay.reserveOnRelay(relayHost, candidate),
-                        autoRelayRunner).start();
-            }
+                    .ifPresent(rt -> {
+                        rt.setHost(host);
+                        // AutoRelay: reserve on relays (discovered via the candidate source) whenever
+                        // we are not publicly reachable. The transport handles reservation, renewal and
+                        // reporting our relayed addresses in listenAddresses() for DHT announcement.
+                        if (relayCandidates != null) {
+                            ExecutorService autoRelayRunner = Executors.newSingleThreadExecutor(r -> {
+                                Thread t = new Thread(r, "auto-relay");
+                                t.setDaemon(true);
+                                return t;
+                            });
+                            reachability.addListener(state -> {
+                                if (state == ReachabilityManager.Reachability.PRIVATE) {
+                                    rt.setRelayCount(2);
+                                    autoRelayRunner.submit(rt::ensureEnoughCurrentRelays);
+                                } else if (state == ReachabilityManager.Reachability.PUBLIC) {
+                                    rt.setRelayCount(0);
+                                }
+                            });
+                        }
+                    });
         }
         // If we speak AutoNAT, run the client that discovers our own reachability
         protocols.stream()
