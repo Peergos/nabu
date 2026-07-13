@@ -30,9 +30,14 @@ public class HostBuilder {
     private List<ProtocolBinding> protocols = new ArrayList<>();
     private List<StreamMuxerProtocol> muxers = new ArrayList<>();
     private final AddressBook addrs;
+    private final ReachabilityManager reachability = new ReachabilityManager();
 
     public HostBuilder(AddressBook addrs) {
         this.addrs = addrs;
+    }
+
+    public ReachabilityManager getReachability() {
+        return reachability;
     }
 
     public PrivKey getPrivateKey() {
@@ -156,7 +161,7 @@ public class HostBuilder {
     public Host build() {
         if (muxers.isEmpty())
             muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
-        return build(privKey, listenAddrs, protocols, muxers, addrs);
+        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability);
     }
 
     public static Host build(PrivKey privKey,
@@ -164,6 +169,15 @@ public class HostBuilder {
                              List<ProtocolBinding> protocols,
                              List<StreamMuxerProtocol> muxers,
                              AddressBook addrs) {
+        return build(privKey, listenAddrs, protocols, muxers, addrs, new ReachabilityManager());
+    }
+
+    public static Host build(PrivKey privKey,
+                             List<String> listenAddrs,
+                             List<ProtocolBinding> protocols,
+                             List<StreamMuxerProtocol> muxers,
+                             AddressBook addrs,
+                             ReachabilityManager reachability) {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             List<Multiaddr> toListen = listenAddrs.stream().map(Multiaddr::new).collect(Collectors.toList());
@@ -211,6 +225,13 @@ public class HostBuilder {
                                         .toArray(Multiaddr[]::new);
 
                                 addrs.addAddrs(remotePeer, 0, remoteAddrs);
+                                // Record the external address the remote observed us connecting from
+                                if (remoteId.hasObservedAddr()) {
+                                    try {
+                                        Multiaddr observed = Multiaddr.deserialize(remoteId.getObservedAddr().toByteArray());
+                                        reachability.observeAddress(observed, Multihash.deserialize(remotePeer.getBytes()));
+                                    } catch (Exception e) {}
+                                }
                                 List<String> protocolIds = remoteId.getProtocolsList().stream().collect(Collectors.toList());
                                 if (protocolIds.contains(Kademlia.WAN_DHT_ID) && wan.isPresent()) {
                                     // add to kademlia routing table iffi
