@@ -170,21 +170,18 @@ public class EmbeddedPeer {
         boolean tcpEnabled = swarmAddresses.stream()
                 .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.empty()), false, quicEnabled, tcpEnabled);
-        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
-        // Only act as a relay for others when we are ourselves publicly reachable
-        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5,
-                () -> builder.getReachability().getReachability() == ReachabilityManager.Reachability.PUBLIC);
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
         List<ProtocolBinding> protocols = new ArrayList<>();
         protocols.add(new Ping());
         protocols.add(new AutonatProtocol.Binding());
-        protocols.add(new CircuitHopProtocol.Binding(relayManager, stop));
-
         protocols.add(dht);
         httpHandler.ifPresent(protocols::add);
 
-        Host node = builder.addProtocols(protocols).build();
+        // Circuit relay v2 (upstream), only relaying for others when we are publicly reachable
+        Host node = builder.addProtocols(protocols)
+                .enableRelay(Relay.dhtRelaySource(dht))
+                .build();
 
         return new EmbeddedPeer(node, records, dht, httpHandler, bootstrap, announce);
     }

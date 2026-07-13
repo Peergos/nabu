@@ -288,14 +288,11 @@ public class EmbeddedIpfs {
         boolean tcpEnabled = swarmAddresses.stream()
                 .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blockstore)), false, quicEnabled, tcpEnabled);
-        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
-        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
         List<ProtocolBinding> protocols = new ArrayList<>();
         protocols.add(new Ping());
         protocols.add(new AutonatProtocol.Binding());
-        protocols.add(new CircuitHopProtocol.Binding(relayManager, stop));
         Optional<Bitswap> bitswap = runBitswap ?
                 Optional.of(new Bitswap(bitswapProtocolId.orElse(Bitswap.PROTOCOL_ID),
                         new BitswapEngine(blockstore, authoriser, maxBitswapMsgSize.orElse(Bitswap.MAX_MESSAGE_SIZE), false))) :
@@ -304,7 +301,10 @@ public class EmbeddedIpfs {
         protocols.add(dht);
         httpHandler.ifPresent(protocols::add);
 
-        Host node = builder.addProtocols(protocols).build();
+        // Circuit relay v2 (upstream), only relaying for others when we are publicly reachable
+        Host node = builder.addProtocols(protocols)
+                .enableRelay(Relay.dhtRelaySource(dht))
+                .build();
 
         Optional<BlockingDeque<Cid>> newBlockProvider = provideBlocks ?
                 Optional.of(((ProvidingBlockstore)blockstore).toPublish) :

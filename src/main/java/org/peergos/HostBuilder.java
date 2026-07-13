@@ -11,6 +11,9 @@ import io.libp2p.core.multistream.*;
 import io.libp2p.core.mux.*;
 import io.libp2p.crypto.keys.*;
 import io.libp2p.protocol.*;
+import io.libp2p.protocol.circuit.CircuitHopProtocol;
+import io.libp2p.protocol.circuit.CircuitStopProtocol;
+import io.libp2p.protocol.circuit.RelayTransport;
 import io.libp2p.security.noise.*;
 import io.libp2p.transport.quic.QuicTransport;
 import io.libp2p.transport.tcp.*;
@@ -21,6 +24,7 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.function.*;
 import java.util.stream.*;
 
@@ -32,6 +36,9 @@ public class HostBuilder {
     private List<StreamMuxerProtocol> muxers = new ArrayList<>();
     private final AddressBook addrs;
     private final ReachabilityManager reachability = new ReachabilityManager();
+    private CircuitHopProtocol.Binding relayHop;
+    private CircuitStopProtocol.Binding relayStop;
+    private Function<Host, List<RelayTransport.CandidateRelay>> relayCandidates;
 
     public HostBuilder(AddressBook addrs) {
         this.addrs = addrs;
@@ -39,6 +46,22 @@ public class HostBuilder {
 
     public ReachabilityManager getReachability() {
         return reachability;
+    }
+
+    /**
+     * Enable circuit-relay-v2 using the upstream jvm-libp2p implementation: register the relay hop and
+     * stop protocols (relay-server role, gated so we only relay when publicly reachable) and add the
+     * relay transport so we can dial and listen on {@code /p2p-circuit} addresses.
+     *
+     * @param candidateRelays source of relays to auto-reserve on (e.g. discovered via the DHT)
+     */
+    public HostBuilder enableRelay(Function<Host, List<RelayTransport.CandidateRelay>> candidateRelays) {
+        CircuitHopProtocol.RelayManager manager =
+                GatingRelayManager.reachabilityGated(privKey, peerId, 5, reachability);
+        this.relayStop = new CircuitStopProtocol.Binding(new CircuitStopProtocol());
+        this.relayHop = new CircuitHopProtocol.Binding(manager, relayStop);
+        this.relayCandidates = candidateRelays;
+        return this;
     }
 
     public PrivKey getPrivateKey() {
@@ -68,10 +91,7 @@ public class HostBuilder {
     }
 
     public Optional<CircuitHopProtocol.Binding> getRelayHop() {
-        return protocols.stream()
-                .filter(p -> p instanceof CircuitHopProtocol.Binding)
-                .map(p -> (CircuitHopProtocol.Binding)p)
-                .findFirst();
+        return Optional.ofNullable(relayHop);
     }
 
     public HostBuilder addMuxers(List<StreamMuxerProtocol> muxers) {
@@ -140,17 +160,12 @@ public class HostBuilder {
         boolean tcpEnabled = swarmAddresses.stream()
                 .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blocks)), false, quicEnabled, tcpEnabled);
-        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
-        // Only act as a relay for others when we are ourselves publicly reachable
-        ReachabilityManager reachability = builder.getReachability();
-        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5,
-                () -> reachability.getReachability() == ReachabilityManager.Reachability.PUBLIC);
         return builder.addProtocols(List.of(
-                new Ping(),
-                new AutonatProtocol.Binding(),
-                new CircuitHopProtocol.Binding(relayManager, stop),
-                new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
-                dht));
+                        new Ping(),
+                        new AutonatProtocol.Binding(),
+                        new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
+                        dht))
+                .enableRelay(Relay.dhtRelaySource(dht));
     }
 
     public static Host build(int listenPort,
@@ -165,7 +180,7 @@ public class HostBuilder {
     public Host build() {
         if (muxers.isEmpty())
             muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
-        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability);
+        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, relayHop, relayStop, relayCandidates);
     }
 
     public static Host build(PrivKey privKey,
@@ -173,7 +188,7 @@ public class HostBuilder {
                              List<ProtocolBinding> protocols,
                              List<StreamMuxerProtocol> muxers,
                              AddressBook addrs) {
-        return build(privKey, listenAddrs, protocols, muxers, addrs, new ReachabilityManager());
+        return build(privKey, listenAddrs, protocols, muxers, addrs, new ReachabilityManager(), null, null, null);
     }
 
     public static Host build(PrivKey privKey,
@@ -182,6 +197,18 @@ public class HostBuilder {
                              List<StreamMuxerProtocol> muxers,
                              AddressBook addrs,
                              ReachabilityManager reachability) {
+        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, null, null, null);
+    }
+
+    public static Host build(PrivKey privKey,
+                             List<String> listenAddrs,
+                             List<ProtocolBinding> protocols,
+                             List<StreamMuxerProtocol> muxers,
+                             AddressBook addrs,
+                             ReachabilityManager reachability,
+                             CircuitHopProtocol.Binding relayHop,
+                             CircuitStopProtocol.Binding relayStop,
+                             Function<Host, List<RelayTransport.CandidateRelay>> relayCandidates) {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             List<Multiaddr> toListen = listenAddrs.stream().map(Multiaddr::new).collect(Collectors.toList());
@@ -195,6 +222,19 @@ public class HostBuilder {
             b.getAddressBook().setImpl(addrs);
             // Uncomment to add mux debug logging
 //            b.getDebug().getMuxFramesHandler().addLogger(LogLevel.INFO, "MUX");
+
+            if (relayHop != null) {
+                // Circuit relay v2 (upstream jvm-libp2p): relay-server hop+stop protocols and the
+                // relay transport that dials/listens on /p2p-circuit addresses.
+                b.getProtocols().add(relayHop);
+                b.getProtocols().add(relayStop);
+                ScheduledExecutorService relayRunner = Executors.newScheduledThreadPool(1, r -> {
+                    Thread t = new Thread(r, "relay-transport");
+                    t.setDaemon(true);
+                    return t;
+                });
+                b.getTransports().add(u -> new RelayTransport(relayHop, relayStop, u, relayCandidates, relayRunner));
+            }
 
             for (ProtocolBinding<?> protocol : protocols) {
                 b.getProtocols().add(protocol);
@@ -259,6 +299,14 @@ public class HostBuilder {
         for (ProtocolBinding protocol : protocols) {
             if (protocol instanceof HostConsumer)
                 ((HostConsumer)protocol).setHost(host);
+        }
+        if (relayHop != null) {
+            // The relay transport (and, through it, the hop protocol) needs a reference to the host
+            host.getNetwork().getTransports().stream()
+                    .filter(t -> t instanceof RelayTransport)
+                    .map(t -> (RelayTransport) t)
+                    .findFirst()
+                    .ifPresent(rt -> rt.setHost(host));
         }
         // If we speak AutoNAT, run the client that discovers our own reachability
         protocols.stream()
