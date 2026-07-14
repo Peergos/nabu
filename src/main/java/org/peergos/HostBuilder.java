@@ -184,7 +184,7 @@ public class HostBuilder {
                         new AutonatProtocol.Binding(),
                         new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
                         dht))
-                .enableRelay(Relay.dhtRelaySource(dht))
+                .enableRelay(Relay.candidateRelaySource(dht))
                 .enableDcutr();
     }
 

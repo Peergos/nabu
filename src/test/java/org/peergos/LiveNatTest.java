@@ -37,23 +37,27 @@ public class LiveNatTest {
         System.out.println("=== LiveNatTest peerId=" + node.node.getPeerId() + " port=" + port);
         node.start(true);
 
-        long total = 110_000;
+        long total = 130_000;
         long deadline = System.currentTimeMillis() + total;
         ReachabilityManager reach = node.getReachability();
+        boolean forcedPrivate = false;
         while (System.currentTimeMillis() < deadline) {
             Thread.sleep(10_000);
+            long elapsed = (total - (deadline - System.currentTimeMillis())) / 1000;
+            // Once we have peers, force PRIVATE to exercise AutoRelay against real public relays
+            // (a symmetric-NAT sandbox won't reach an AutoNAT quorum on its own).
+            if (! forcedPrivate && elapsed >= 30 && ! node.node.getNetwork().getConnections().isEmpty()) {
+                System.out.println("=== forcing reachability PRIVATE to exercise AutoRelay");
+                reach.setReachability(ReachabilityManager.Reachability.PRIVATE, List.of());
+                forcedPrivate = true;
+            }
             int connections = node.node.getNetwork().getConnections().size();
-            List<Multiaddr> listen = node.node.listenAddresses();
-            List<Multiaddr> relayed = listen.stream()
+            List<Multiaddr> relayed = node.node.listenAddresses().stream()
                     .filter(a -> a.toString().contains("p2p-circuit")).collect(Collectors.toList());
             System.out.println(String.format(
-                    "[t+%3ds] conns=%d reachability=%s observed=%s confirmedPublic=%s relayedAddrs=%s",
-                    (total - (deadline - System.currentTimeMillis())) / 1000,
-                    connections,
-                    reach.getReachability(),
-                    reach.getAllObservedAddresses(),
-                    reach.getConfirmedPublicAddresses(),
-                    relayed));
+                    "[t+%3ds] conns=%d reachability=%s observedCount=%d relayReservations=%s",
+                    elapsed, connections, reach.getReachability(),
+                    reach.getAllObservedAddresses().size(), relayed));
         }
         System.out.println("=== Final listen addresses: " + node.node.listenAddresses());
         node.stop().join();
