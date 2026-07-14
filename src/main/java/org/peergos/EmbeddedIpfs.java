@@ -27,6 +27,7 @@ import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import org.peergos.protocol.http.*;
 import org.peergos.protocol.ipns.*;
+import org.peergos.protocol.ports.*;
 import org.peergos.util.Logging;
 
 import java.nio.file.*;
@@ -54,6 +55,11 @@ public class EmbeddedIpfs {
     private final List<MultiAddress> announce;
     private final List<MDnsDiscovery> mdns = new ArrayList<>();
     private final int maxBlockSize;
+    // Set by build(); used for optional UPnP/NAT-PMP port forwarding
+    private ReachabilityManager reachability;
+    private List<MultiAddress> swarmAddresses;
+    private boolean portForwardingEnabled;
+    private final List<PortForwarder> portForwarders = new ArrayList<>();
 
     public EmbeddedIpfs(Host node,
                         Blockstore blockstore,
@@ -184,12 +190,29 @@ public class EmbeddedIpfs {
         mdns.start();
 
         blockProvider.ifPresent(PeriodicBlockProvider::start);
+        startPortForwarders();
+    }
+
+    /** Enable UPnP/NAT-PMP forwarding of the swarm ports. Must be called before {@link #start}. */
+    public void enablePortForwarding() {
+        this.portForwardingEnabled = true;
+    }
+
+    private void startPortForwarders() {
+        if (! portForwardingEnabled || swarmAddresses == null || reachability == null)
+            return;
+        portForwarders.addAll(PortForwarder.forSwarm(swarmAddresses, addr -> {
+            LOG.info("UPnP/NAT-PMP mapped external address: " + addr);
+            reachability.addLocalCandidate(addr);
+            node.getAddressBook().addAddrs(node.getPeerId(), 0, addr);
+        }));
     }
 
     public CompletableFuture<Void> stop() throws Exception {
         if (records != null) {
             records.close();
         }
+        portForwarders.forEach(PortForwarder::stop);
         blockProvider.ifPresent(PeriodicBlockProvider::stop);
         dht.stopBootstrapThread();
         for (MDnsDiscovery m : mdns) {
@@ -288,14 +311,11 @@ public class EmbeddedIpfs {
         boolean tcpEnabled = swarmAddresses.stream()
                 .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blockstore)), false, quicEnabled, tcpEnabled);
-        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
-        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.getPrivateKey(), ourPeerId, 5);
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
         List<ProtocolBinding> protocols = new ArrayList<>();
         protocols.add(new Ping());
         protocols.add(new AutonatProtocol.Binding());
-        protocols.add(new CircuitHopProtocol.Binding(relayManager, stop));
         Optional<Bitswap> bitswap = runBitswap ?
                 Optional.of(new Bitswap(bitswapProtocolId.orElse(Bitswap.PROTOCOL_ID),
                         new BitswapEngine(blockstore, authoriser, maxBitswapMsgSize.orElse(Bitswap.MAX_MESSAGE_SIZE), false))) :
@@ -304,7 +324,11 @@ public class EmbeddedIpfs {
         protocols.add(dht);
         httpHandler.ifPresent(protocols::add);
 
-        Host node = builder.addProtocols(protocols).build();
+        // Circuit relay v2 (upstream), only relaying for others when we are publicly reachable
+        Host node = builder.addProtocols(protocols)
+                .enableRelay(Relay.candidateRelaySource(dht))
+                .enableDcutr()
+                .build();
 
         Optional<BlockingDeque<Cid>> newBlockProvider = provideBlocks ?
                 Optional.of(((ProvidingBlockstore)blockstore).toPublish) :
@@ -314,6 +338,9 @@ public class EmbeddedIpfs {
         Optional<BlockService> blockService = runBitswap ?
                 Optional.of(new BitswapBlockService(node, bitswap.get(), dht)) :
                 Optional.empty();
-        return new EmbeddedIpfs(node, blockstore, records, dht, maxBlockSize, blockService, httpHandler, bootstrap, newBlockProvider, announce);
+        EmbeddedIpfs ipfs = new EmbeddedIpfs(node, blockstore, records, dht, maxBlockSize, blockService, httpHandler, bootstrap, newBlockProvider, announce);
+        ipfs.reachability = builder.getReachability();
+        ipfs.swarmAddresses = swarmAddresses;
+        return ipfs;
     }
 }

@@ -11,6 +11,10 @@ import io.libp2p.core.multistream.*;
 import io.libp2p.core.mux.*;
 import io.libp2p.crypto.keys.*;
 import io.libp2p.protocol.*;
+import io.libp2p.protocol.circuit.CircuitHopProtocol;
+import io.libp2p.protocol.circuit.CircuitStopProtocol;
+import io.libp2p.protocol.circuit.RelayTransport;
+import org.peergos.protocol.dcutr.*;
 import io.libp2p.security.noise.*;
 import io.libp2p.transport.quic.QuicTransport;
 import io.libp2p.transport.tcp.*;
@@ -21,6 +25,8 @@ import org.peergos.protocol.bitswap.*;
 import org.peergos.protocol.circuit.*;
 import org.peergos.protocol.dht.*;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.function.*;
 import java.util.stream.*;
 
 public class HostBuilder {
@@ -30,9 +36,51 @@ public class HostBuilder {
     private List<ProtocolBinding> protocols = new ArrayList<>();
     private List<StreamMuxerProtocol> muxers = new ArrayList<>();
     private final AddressBook addrs;
+    private final ReachabilityManager reachability = new ReachabilityManager();
+    private CircuitHopProtocol.Binding relayHop;
+    private CircuitStopProtocol.Binding relayStop;
+    private Function<Host, List<RelayTransport.CandidateRelay>> relayCandidates;
+    private DcutrProtocol.Binding dcutr;
 
     public HostBuilder(AddressBook addrs) {
         this.addrs = addrs;
+    }
+
+    public ReachabilityManager getReachability() {
+        return reachability;
+    }
+
+    /**
+     * Enable circuit-relay-v2 using the upstream jvm-libp2p implementation: register the relay hop and
+     * stop protocols (relay-server role, gated so we only relay when publicly reachable) and add the
+     * relay transport so we can dial and listen on {@code /p2p-circuit} addresses.
+     *
+     * @param candidateRelays source of relays to auto-reserve on (e.g. discovered via the DHT)
+     */
+    public HostBuilder enableRelay(Function<Host, List<RelayTransport.CandidateRelay>> candidateRelays) {
+        CircuitHopProtocol.RelayManager manager =
+                GatingRelayManager.reachabilityGated(privKey, peerId, 5, reachability);
+        this.relayStop = new CircuitStopProtocol.Binding(new CircuitStopProtocol());
+        this.relayHop = new CircuitHopProtocol.Binding(manager, relayStop);
+        this.relayCandidates = candidateRelays;
+        return this;
+    }
+
+    public HostBuilder enableDcutr() {
+        return enableDcutr(conn -> {});
+    }
+
+    /**
+     * Enable DCUtR (direct connection upgrade through relay): once a relayed connection is established,
+     * coordinate a hole punch over it to upgrade to a direct connection.
+     *
+     * @param onUpgraded invoked with the direct connection once a hole punch succeeds
+     */
+    public HostBuilder enableDcutr(Consumer<Connection> onUpgraded) {
+        this.dcutr = new DcutrProtocol.Binding(
+                () -> reachability.getConfirmedPublicAddresses(),
+                onUpgraded);
+        return this;
     }
 
     public PrivKey getPrivateKey() {
@@ -62,10 +110,7 @@ public class HostBuilder {
     }
 
     public Optional<CircuitHopProtocol.Binding> getRelayHop() {
-        return protocols.stream()
-                .filter(p -> p instanceof CircuitHopProtocol.Binding)
-                .map(p -> (CircuitHopProtocol.Binding)p)
-                .findFirst();
+        return Optional.ofNullable(relayHop);
     }
 
     public HostBuilder addMuxers(List<StreamMuxerProtocol> muxers) {
@@ -134,14 +179,13 @@ public class HostBuilder {
         boolean tcpEnabled = swarmAddresses.stream()
                 .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blocks)), false, quicEnabled, tcpEnabled);
-        CircuitStopProtocol.Binding stop = new CircuitStopProtocol.Binding();
-        CircuitHopProtocol.RelayManager relayManager = CircuitHopProtocol.RelayManager.limitTo(builder.privKey, ourPeerId, 5);
         return builder.addProtocols(List.of(
-                new Ping(),
-                new AutonatProtocol.Binding(),
-                new CircuitHopProtocol.Binding(relayManager, stop),
-                new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
-                dht));
+                        new Ping(),
+                        new AutonatProtocol.Binding(),
+                        new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
+                        dht))
+                .enableRelay(Relay.candidateRelaySource(dht))
+                .enableDcutr();
     }
 
     public static Host build(int listenPort,
@@ -156,7 +200,7 @@ public class HostBuilder {
     public Host build() {
         if (muxers.isEmpty())
             muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
-        return build(privKey, listenAddrs, protocols, muxers, addrs);
+        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, relayHop, relayStop, relayCandidates, dcutr);
     }
 
     public static Host build(PrivKey privKey,
@@ -164,6 +208,28 @@ public class HostBuilder {
                              List<ProtocolBinding> protocols,
                              List<StreamMuxerProtocol> muxers,
                              AddressBook addrs) {
+        return build(privKey, listenAddrs, protocols, muxers, addrs, new ReachabilityManager(), null, null, null, null);
+    }
+
+    public static Host build(PrivKey privKey,
+                             List<String> listenAddrs,
+                             List<ProtocolBinding> protocols,
+                             List<StreamMuxerProtocol> muxers,
+                             AddressBook addrs,
+                             ReachabilityManager reachability) {
+        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, null, null, null, null);
+    }
+
+    public static Host build(PrivKey privKey,
+                             List<String> listenAddrs,
+                             List<ProtocolBinding> protocols,
+                             List<StreamMuxerProtocol> muxers,
+                             AddressBook addrs,
+                             ReachabilityManager reachability,
+                             CircuitHopProtocol.Binding relayHop,
+                             CircuitStopProtocol.Binding relayStop,
+                             Function<Host, List<RelayTransport.CandidateRelay>> relayCandidates,
+                             DcutrProtocol.Binding dcutr) {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
             List<Multiaddr> toListen = listenAddrs.stream().map(Multiaddr::new).collect(Collectors.toList());
@@ -178,6 +244,35 @@ public class HostBuilder {
             // Uncomment to add mux debug logging
 //            b.getDebug().getMuxFramesHandler().addLogger(LogLevel.INFO, "MUX");
 
+            if (relayHop != null) {
+                // Circuit relay v2 (upstream jvm-libp2p): relay-server hop+stop protocols and the
+                // relay transport that dials/listens on /p2p-circuit addresses.
+                b.getProtocols().add(relayHop);
+                b.getProtocols().add(relayStop);
+                ScheduledExecutorService relayRunner = Executors.newScheduledThreadPool(1, r -> {
+                    Thread t = new Thread(r, "relay-transport");
+                    t.setDaemon(true);
+                    return t;
+                });
+                b.getTransports().add(u -> new RelayTransport(relayHop, relayStop, u, relayCandidates, relayRunner));
+            }
+
+            if (dcutr != null) {
+                b.getProtocols().add(dcutr);
+                // The inbound peer of a relayed connection initiates the DCUtR hole punch over it
+                b.getConnectionHandlers().add(connection -> {
+                    if (connection.isInitiator())
+                        return;
+                    Multiaddr remote = connection.remoteAddress();
+                    if (remote == null || ! remote.toString().contains("p2p-circuit"))
+                        return;
+                    try {
+                        // opening the stream drives the initiator flow (see DcutrProtocol.onStartInitiator)
+                        connection.muxerSession().createStream(dcutr);
+                    } catch (Exception e) {}
+                });
+            }
+
             for (ProtocolBinding<?> protocol : protocols) {
                 b.getProtocols().add(protocol);
                 if (protocol instanceof AddressBookConsumer)
@@ -190,16 +285,16 @@ public class HostBuilder {
                     .filter(p -> p instanceof Kademlia && p.getProtocolDescriptor().getAnnounceProtocols().contains("/ipfs/kad/1.0.0"))
                     .map(p -> (Kademlia) p)
                     .findFirst();
-            // Send an identify req on all new incoming connections
+            // Identify the peer on every new connection. This is done in both directions (not just
+            // incoming) because a NATed node only makes outbound connections, and the peer's identify
+            // reply carries our observed (NAT-mapped) address, which is what reachability detection and
+            // AutoNAT need.
             b.getConnectionHandlers().add(connection -> {
                 PeerId remotePeer = connection.secureSession().getRemoteId();
                 Multiaddr remote = connection.remoteAddress().withP2P(remotePeer);
                 addrs.addAddrs(remotePeer, 0, remote);
-                if (connection.isInitiator())
-                    return;
                 addrs.getAddrs(remotePeer).thenAccept(existing -> {
-                    if (! existing.isEmpty())
-                        return;
+                    boolean newPeer = existing.isEmpty();
                     StreamPromise<IdentifyController> stream = connection.muxerSession()
                             .createStream(new IdentifyBinding(new IdentifyProtocol()));
                     stream.getController()
@@ -211,12 +306,19 @@ public class HostBuilder {
                                         .toArray(Multiaddr[]::new);
 
                                 addrs.addAddrs(remotePeer, 0, remoteAddrs);
+                                // Record the external address the remote observed us connecting from
+                                if (remoteId.hasObservedAddr()) {
+                                    try {
+                                        Multiaddr observed = Multiaddr.deserialize(remoteId.getObservedAddr().toByteArray());
+                                        reachability.observeAddress(observed, Multihash.deserialize(remotePeer.getBytes()));
+                                    } catch (Exception e) {}
+                                }
                                 List<String> protocolIds = remoteId.getProtocolsList().stream().collect(Collectors.toList());
                                 if (protocolIds.contains(Kademlia.WAN_DHT_ID) && wan.isPresent()) {
-                                    // add to kademlia routing table iffi
+                                    // add to kademlia routing table iff
                                     // 1) we haven't already dialled them
                                     // 2) they accept a new kademlia stream
-                                    if (existing.isEmpty())
+                                    if (newPeer)
                                         connection.muxerSession().createStream(wan.get());
                                 }
                             });
@@ -235,6 +337,54 @@ public class HostBuilder {
             if (protocol instanceof HostConsumer)
                 ((HostConsumer)protocol).setHost(host);
         }
+        if (dcutr != null)
+            dcutr.setHost(host);
+        if (relayHop != null) {
+            // The relay transport (and, through it, the hop protocol) needs a reference to the host
+            host.getNetwork().getTransports().stream()
+                    .filter(t -> t instanceof RelayTransport)
+                    .map(t -> (RelayTransport) t)
+                    .findFirst()
+                    .ifPresent(rt -> {
+                        rt.setHost(host);
+                        // AutoRelay: reserve on relays (discovered via the candidate source) whenever
+                        // we are not publicly reachable. The transport handles reservation, renewal and
+                        // reporting our relayed addresses in listenAddresses() for DHT announcement.
+                        if (relayCandidates != null) {
+                            ExecutorService autoRelayRunner = Executors.newSingleThreadExecutor(r -> {
+                                Thread t = new Thread(r, "auto-relay");
+                                t.setDaemon(true);
+                                return t;
+                            });
+                            reachability.addListener(state -> {
+                                if (state == ReachabilityManager.Reachability.PRIVATE) {
+                                    rt.setRelayCount(2);
+                                    autoRelayRunner.submit(rt::ensureEnoughCurrentRelays);
+                                } else if (state == ReachabilityManager.Reachability.PUBLIC) {
+                                    rt.setRelayCount(0);
+                                }
+                            });
+                        }
+                    });
+        }
+        // If we speak AutoNAT, run the client that discovers our own reachability
+        protocols.stream()
+                .filter(p -> p instanceof AutonatProtocol.Binding)
+                .map(p -> (AutonatProtocol.Binding) p)
+                .findFirst()
+                .ifPresent(autonat -> {
+                    Multihash ourId = Multihash.deserialize(host.getPeerId().getBytes());
+                    Supplier<List<Multiaddr>> candidates = () -> {
+                        List<Multiaddr> candidateAddrs = new ArrayList<>(reachability.getAllObservedAddresses());
+                        for (Multiaddr a : host.listenAddresses())
+                            if (PeerAddresses.isPublic(a, false))
+                                candidateAddrs.add(a);
+                        return candidateAddrs.stream().distinct().collect(Collectors.toList());
+                    };
+                    AutoNatClient client = new AutoNatClient(host, ourId, reachability, autonat, candidates);
+                    host.addConnectionHandler(client::onConnection);
+                    client.start();
+                });
         return host;
     }
 }
