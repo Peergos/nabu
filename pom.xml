@@ -154,35 +154,35 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-native-quic</artifactId>
-            <version>4.2.5.Final</version>
+            <version>4.2.10.Final</version>
             <classifier>linux-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-native-quic</artifactId>
-            <version>4.2.5.Final</version>
+            <version>4.2.10.Final</version>
             <classifier>linux-aarch_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-native-quic</artifactId>
-            <version>4.2.5.Final</version>
+            <version>4.2.10.Final</version>
             <classifier>osx-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-native-quic</artifactId>
-            <version>4.2.5.Final</version>
+            <version>4.2.10.Final</version>
             <classifier>osx-aarch_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-native-quic</artifactId>
-            <version>4.2.5.Final</version>
+            <version>4.2.10.Final</version>
             <classifier>windows-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
