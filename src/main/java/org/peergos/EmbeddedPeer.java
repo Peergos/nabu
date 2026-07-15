@@ -203,6 +203,7 @@ public class EmbeddedPeer {
         List<ProtocolBinding> protocols = new ArrayList<>();
         protocols.add(new Ping());
         protocols.add(new AutonatProtocol.Binding());
+        protocols.addAll(AutonatV2.protocols());
         protocols.add(dht);
         httpHandler.ifPresent(protocols::add);
 

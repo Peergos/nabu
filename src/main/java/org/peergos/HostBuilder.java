@@ -185,6 +185,7 @@ public class HostBuilder {
                         new AutonatProtocol.Binding(),
                         new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
                         dht))
+                .addProtocols(AutonatV2.protocols())
                 .enableRelay(Relay.candidateRelaySource(dht))
                 .enableDcutr();
     }
@@ -370,17 +371,16 @@ public class HostBuilder {
                         }
                     });
         }
-        // If we speak AutoNAT, run the client that discovers our own reachability
+        // If we speak AutoNAT v2, run the client that discovers our own reachability
         protocols.stream()
-                .filter(p -> p instanceof AutonatProtocol.Binding)
-                .map(p -> (AutonatProtocol.Binding) p)
+                .filter(p -> p instanceof AutonatV2.Binding)
+                .map(p -> (AutonatV2.Binding) p)
                 .findFirst()
                 .ifPresent(autonat -> {
-                    Multihash ourId = Multihash.deserialize(host.getPeerId().getBytes());
                     final Host natHost = host;
                     Supplier<List<Multiaddr>> candidates = () ->
                             predictedExternalAddresses(natHost, reachability, listenAddrs);
-                    AutoNatClient client = new AutoNatClient(host, ourId, reachability, autonat, candidates);
+                    AutoNatV2Client client = new AutoNatV2Client(host, reachability, autonat, autonat.getNonces(), candidates);
                     host.addConnectionHandler(client::onConnection);
                     client.start();
                 });

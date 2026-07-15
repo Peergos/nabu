@@ -44,9 +44,9 @@ public class LiveNatTest {
         while (System.currentTimeMillis() < deadline) {
             Thread.sleep(10_000);
             long elapsed = (total - (deadline - System.currentTimeMillis())) / 1000;
-            // Once we have peers, force PRIVATE to exercise AutoRelay against real public relays
-            // (a symmetric-NAT sandbox won't reach an AutoNAT quorum on its own).
-            if (! forcedPrivate && elapsed >= 30 && ! node.node.getNetwork().getConnections().isEmpty()) {
+            // If AutoNAT v2 hasn't produced a verdict by now, force PRIVATE to exercise AutoRelay.
+            if (! forcedPrivate && elapsed >= 60 && reach.getReachability() == ReachabilityManager.Reachability.UNKNOWN
+                    && ! node.node.getNetwork().getConnections().isEmpty()) {
                 System.out.println("=== forcing reachability PRIVATE to exercise AutoRelay");
                 reach.setReachability(ReachabilityManager.Reachability.PRIVATE, List.of());
                 forcedPrivate = true;

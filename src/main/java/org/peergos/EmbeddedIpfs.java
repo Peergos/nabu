@@ -316,6 +316,7 @@ public class EmbeddedIpfs {
         List<ProtocolBinding> protocols = new ArrayList<>();
         protocols.add(new Ping());
         protocols.add(new AutonatProtocol.Binding());
+        protocols.addAll(AutonatV2.protocols());
         Optional<Bitswap> bitswap = runBitswap ?
                 Optional.of(new Bitswap(bitswapProtocolId.orElse(Bitswap.PROTOCOL_ID),
                         new BitswapEngine(blockstore, authoriser, maxBitswapMsgSize.orElse(Bitswap.MAX_MESSAGE_SIZE), false))) :
