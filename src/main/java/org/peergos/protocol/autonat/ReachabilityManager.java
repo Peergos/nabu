@@ -3,10 +3,12 @@ package org.peergos.protocol.autonat;
 import io.ipfs.multihash.Multihash;
 import io.libp2p.core.multiformats.Multiaddr;
 import org.peergos.PeerAddresses;
+import org.peergos.util.Logging;
 
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
+import java.util.logging.*;
 import java.util.stream.*;
 
 /**
@@ -19,7 +21,27 @@ import java.util.stream.*;
  */
 public class ReachabilityManager {
 
+    private static final Logger LOG = Logging.LOG();
+
     public enum Reachability { UNKNOWN, PUBLIC, PRIVATE }
+
+    /**
+     * The NAT's port-mapping behaviour, inferred from DCUtR hole-punch outcomes. A successful hole punch
+     * means our socket is mapped consistently enough to be reachable directly ({@link #ENDPOINT_INDEPENDENT});
+     * hole punches that keep failing to distinct peers indicate a {@link #SYMMETRIC} NAT (a different
+     * external port per destination), which defeats hole punching and forces us to stay behind relays.
+     *
+     * (This can't be probed directly with a STUN-style test on jvm-libp2p: its QUIC {@code dial} binds a
+     * fresh ephemeral port each time so the observed address is a throwaway mapping, and {@code
+     * dialAsListener} only completes during a mutual hole punch - so hole-punch success/failure is the
+     * signal we actually have.)
+     */
+    public enum NatType { UNKNOWN, ENDPOINT_INDEPENDENT, SYMMETRIC }
+
+    // Distinct peers we failed to hole punch to; enough of them implies a symmetric NAT.
+    private static final int HOLE_PUNCH_FAILURES_FOR_SYMMETRIC = 2;
+    private final Set<Multihash> holePunchFailures = new HashSet<>();
+    private volatile NatType natType = NatType.UNKNOWN;
 
     // Distinct remote peers that must observe an address before we treat it as a real candidate.
     private final int confirmationsRequired;
@@ -65,6 +87,37 @@ public class ReachabilityManager {
     }
 
     /**
+     * External IPs that at least {@code minReporters} distinct peers observed us at. Since jvm-libp2p
+     * dials from ephemeral ports, the observed *port* is unreliable, but the *IP* is stable, so callers
+     * pair these with our listen port to predict our real external address for AutoNAT to verify.
+     */
+    public synchronized Set<String> getObservedHosts(int minReporters) {
+        Map<String, Set<Multihash>> reportersByHost = new HashMap<>();
+        for (Map.Entry<Multiaddr, Set<Multihash>> e : observations.entrySet()) {
+            String host = hostOf(e.getKey());
+            if (host != null)
+                reportersByHost.computeIfAbsent(host, k -> new HashSet<>()).addAll(e.getValue());
+        }
+        return reportersByHost.entrySet().stream()
+                .filter(e -> e.getValue().size() >= minReporters)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    /** Self-discovered candidates (e.g. UPnP-mapped addresses), which have real ports unlike observations. */
+    public synchronized List<Multiaddr> getLocalCandidates() {
+        return new ArrayList<>(localCandidates);
+    }
+
+    private static String hostOf(Multiaddr addr) {
+        try {
+            return new io.ipfs.multiaddr.MultiAddress(addr.toString()).getHost();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * Register a self-discovered candidate public address (e.g. a UPnP/NAT-PMP mapped address) so the
      * AutoNAT client will ask peers to verify it. Only public addresses are kept.
      */
@@ -102,5 +155,40 @@ public class ReachabilityManager {
     /** Register a callback fired whenever the reachability verdict transitions. */
     public void addListener(Consumer<Reachability> listener) {
         listeners.add(listener);
+    }
+
+    public NatType getNatType() {
+        return natType;
+    }
+
+    private void setNatType(NatType updated) {
+        NatType previous = this.natType;
+        this.natType = updated;
+        if (previous != updated && updated != NatType.UNKNOWN) {
+            if (updated == NatType.SYMMETRIC)
+                LOG.info("NAT type inferred: SYMMETRIC - DCUtR hole punching keeps failing to distinct "
+                        + "peers, so direct connections aren't possible; this node must stay reachable via "
+                        + "circuit relays");
+            else
+                LOG.info("NAT type inferred: ENDPOINT_INDEPENDENT - a DCUtR hole punch succeeded, so direct "
+                        + "connections are possible");
+        }
+    }
+
+    /**
+     * Feed the outcome of a DCUtR hole-punch attempt. A success means our external mapping is consistent
+     * enough for a direct connection (endpoint-independent); repeated failures to distinct peers indicate
+     * a symmetric NAT. This is the reachability-type signal we actually have, since jvm-libp2p cannot make
+     * an ordinary dial from the listen socket to run a STUN-style probe.
+     */
+    public synchronized void recordHolePunchOutcome(Multihash peer, boolean directConnectionEstablished) {
+        if (directConnectionEstablished) {
+            holePunchFailures.clear();
+            setNatType(NatType.ENDPOINT_INDEPENDENT);
+        } else {
+            holePunchFailures.add(peer);
+            if (holePunchFailures.size() >= HOLE_PUNCH_FAILURES_FOR_SYMMETRIC)
+                setNatType(NatType.SYMMETRIC);
+        }
     }
 }

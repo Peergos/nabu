@@ -55,9 +55,9 @@ public class LiveNatTest {
             List<Multiaddr> relayed = node.node.listenAddresses().stream()
                     .filter(a -> a.toString().contains("p2p-circuit")).collect(Collectors.toList());
             System.out.println(String.format(
-                    "[t+%3ds] conns=%d reachability=%s observedCount=%d relayReservations=%s",
-                    elapsed, connections, reach.getReachability(),
-                    reach.getAllObservedAddresses().size(), relayed));
+                    "[t+%3ds] conns=%d reachability=%s natType=%s observedCount=%d relayReservations=%d",
+                    elapsed, connections, reach.getReachability(), reach.getNatType(),
+                    reach.getAllObservedAddresses().size(), relayed.size()));
         }
         System.out.println("=== Final listen addresses: " + node.node.listenAddresses());
         node.stop().join();

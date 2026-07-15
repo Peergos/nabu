@@ -52,6 +52,31 @@ public class ReachabilityManagerTest {
     }
 
     @Test
+    public void observedHostsAggregatePortsButNeedAQuorum() {
+        ReachabilityManager r = new ReachabilityManager();
+        // same IP observed by 3 peers, each at a different (ephemeral) port -> IP still qualifies
+        r.observeAddress(new Multiaddr("/ip4/1.2.3.4/tcp/30001"), peer(1));
+        r.observeAddress(new Multiaddr("/ip4/1.2.3.4/udp/41999/quic-v1"), peer(2));
+        r.observeAddress(new Multiaddr("/ip4/1.2.3.4/tcp/55123"), peer(3));
+        r.observeAddress(new Multiaddr("/ip4/9.9.9.9/tcp/4001"), peer(4)); // only one reporter
+        Assert.assertEquals(Set.of("1.2.3.4"), r.getObservedHosts(3));
+    }
+
+    @Test
+    public void natTypeInferredFromHolePunchOutcomes() {
+        ReachabilityManager r = new ReachabilityManager();
+        Assert.assertEquals(ReachabilityManager.NatType.UNKNOWN, r.getNatType());
+        // failures to distinct peers -> symmetric
+        r.recordHolePunchOutcome(peer(1), false);
+        Assert.assertEquals(ReachabilityManager.NatType.UNKNOWN, r.getNatType());
+        r.recordHolePunchOutcome(peer(2), false);
+        Assert.assertEquals(ReachabilityManager.NatType.SYMMETRIC, r.getNatType());
+        // a success flips it to endpoint-independent
+        r.recordHolePunchOutcome(peer(3), true);
+        Assert.assertEquals(ReachabilityManager.NatType.ENDPOINT_INDEPENDENT, r.getNatType());
+    }
+
+    @Test
     public void listenerFiresOnlyOnTransition() {
         ReachabilityManager r = new ReachabilityManager();
         AtomicInteger fired = new AtomicInteger();

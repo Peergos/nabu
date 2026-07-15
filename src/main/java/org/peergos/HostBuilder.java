@@ -79,7 +79,8 @@ public class HostBuilder {
     public HostBuilder enableDcutr(Consumer<Connection> onUpgraded) {
         this.dcutr = new DcutrProtocol.Binding(
                 () -> reachability.getConfirmedPublicAddresses(),
-                onUpgraded);
+                onUpgraded,
+                reachability::recordHolePunchOutcome);
         return this;
     }
 
@@ -285,10 +286,12 @@ public class HostBuilder {
                     .filter(p -> p instanceof Kademlia && p.getProtocolDescriptor().getAnnounceProtocols().contains("/ipfs/kad/1.0.0"))
                     .map(p -> (Kademlia) p)
                     .findFirst();
-            // Identify the peer on every new connection. This is done in both directions (not just
-            // incoming) because a NATed node only makes outbound connections, and the peer's identify
-            // reply carries our observed (NAT-mapped) address, which is what reachability detection and
-            // AutoNAT need.
+            // Identify the peer on every new connection, in both directions. A NATed node only makes
+            // outbound connections, so we must learn our external address from those. jvm-libp2p dials
+            // from a fresh ephemeral port (both TCP and QUIC), so an outbound observation gives our
+            // external *IP* (stable) but a throwaway *port*; the AutoNAT candidate supplier below predicts
+            // our real address by pairing that IP with our listen port. Inbound observations already
+            // reflect our listen socket directly.
             b.getConnectionHandlers().add(connection -> {
                 PeerId remotePeer = connection.secureSession().getRemoteId();
                 Multiaddr remote = connection.remoteAddress().withP2P(remotePeer);
@@ -374,17 +377,49 @@ public class HostBuilder {
                 .findFirst()
                 .ifPresent(autonat -> {
                     Multihash ourId = Multihash.deserialize(host.getPeerId().getBytes());
-                    Supplier<List<Multiaddr>> candidates = () -> {
-                        List<Multiaddr> candidateAddrs = new ArrayList<>(reachability.getAllObservedAddresses());
-                        for (Multiaddr a : host.listenAddresses())
-                            if (PeerAddresses.isPublic(a, false))
-                                candidateAddrs.add(a);
-                        return candidateAddrs.stream().distinct().collect(Collectors.toList());
-                    };
+                    final Host natHost = host;
+                    Supplier<List<Multiaddr>> candidates = () ->
+                            predictedExternalAddresses(natHost, reachability, listenAddrs);
                     AutoNatClient client = new AutoNatClient(host, ourId, reachability, autonat, candidates);
                     host.addConnectionHandler(client::onConnection);
                     client.start();
                 });
         return host;
+    }
+
+    /**
+     * The addresses AutoNAT should ask peers to dial back. Because outbound observations only give a
+     * reliable external *IP* (the port is a throwaway ephemeral mapping), we predict our real address by
+     * pairing each observed IP with each of our listen ports/transports. Genuinely public listen
+     * addresses (and UPnP-mapped candidates) are included as-is.
+     */
+    private static List<Multiaddr> predictedExternalAddresses(Host host,
+                                                              ReachabilityManager reachability,
+                                                              List<String> listenAddrs) {
+        // the listen ports we could be reached on, per transport
+        List<Integer> tcpPorts = new ArrayList<>();
+        List<Integer> quicPorts = new ArrayList<>();
+        for (String listen : listenAddrs) {
+            Multiaddr la = new Multiaddr(listen);
+            if (la.has(Protocol.QUICV1) && la.has(Protocol.UDP))
+                quicPorts.add(Integer.parseInt(la.getFirstComponent(Protocol.UDP).getStringValue()));
+            else if (la.has(Protocol.TCP))
+                tcpPorts.add(Integer.parseInt(la.getFirstComponent(Protocol.TCP).getStringValue()));
+        }
+        Set<Multiaddr> predicted = new LinkedHashSet<>();
+        // pair each observed external IP with our listen ports
+        for (String observedHost : reachability.getObservedHosts(3)) {
+            String ip = (observedHost.contains(":") ? "/ip6/" : "/ip4/") + observedHost;
+            for (int port : tcpPorts)
+                predicted.add(new Multiaddr(ip + "/tcp/" + port));
+            for (int port : quicPorts)
+                predicted.add(new Multiaddr(ip + "/udp/" + port + "/quic-v1"));
+        }
+        // UPnP-mapped candidates already have real ports; and any genuinely public listen addresses
+        predicted.addAll(reachability.getLocalCandidates());
+        for (Multiaddr a : host.listenAddresses())
+            if (PeerAddresses.isPublic(a, false) && ! a.toString().contains("p2p-circuit"))
+                predicted.add(a);
+        return new ArrayList<>(predicted);
     }
 }

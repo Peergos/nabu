@@ -63,6 +63,17 @@ public class DcutrTest {
             Assert.assertEquals("direct connection is to the server",
                     server.getPeerId(), direct.secureSession().getRemoteId());
             System.out.println("DCUtR upgraded to direct connection at " + direct.remoteAddress());
+
+            // a successful hole punch should be recorded as an endpoint-independent NAT
+            org.peergos.protocol.autonat.ReachabilityManager.NatType natType = null;
+            for (int i = 0; i < 50; i++) {
+                natType = clientBuilder.getReachability().getNatType();
+                if (natType == org.peergos.protocol.autonat.ReachabilityManager.NatType.ENDPOINT_INDEPENDENT)
+                    break;
+                Thread.sleep(100);
+            }
+            Assert.assertEquals("successful hole punch implies an endpoint-independent NAT",
+                    org.peergos.protocol.autonat.ReachabilityManager.NatType.ENDPOINT_INDEPENDENT, natType);
         } finally {
             relay.stop();
             server.stop();

@@ -1,6 +1,7 @@
 package org.peergos.protocol.dcutr;
 
 import com.google.protobuf.*;
+import io.ipfs.multihash.Multihash;
 import io.libp2p.core.*;
 import io.libp2p.core.Stream;
 import io.libp2p.core.multiformats.*;
@@ -50,8 +51,10 @@ public class DcutrProtocol extends ProtobufProtocolHandler<DcutrProtocol.Control
     public static class Binding extends StrictProtocolBinding<Controller> implements HostConsumer {
         private final DcutrProtocol dcutr;
 
-        public Binding(Supplier<List<Multiaddr>> extraDialableAddresses, Consumer<Connection> onUpgraded) {
-            this(new DcutrProtocol(extraDialableAddresses, onUpgraded));
+        public Binding(Supplier<List<Multiaddr>> extraDialableAddresses,
+                       Consumer<Connection> onUpgraded,
+                       BiConsumer<Multihash, Boolean> onHolePunchOutcome) {
+            this(new DcutrProtocol(extraDialableAddresses, onUpgraded, onHolePunchOutcome));
         }
 
         private Binding(DcutrProtocol dcutr) {
@@ -68,12 +71,16 @@ public class DcutrProtocol extends ProtobufProtocolHandler<DcutrProtocol.Control
     private Host us;
     private final Supplier<List<Multiaddr>> extraDialableAddresses;
     private final Consumer<Connection> onUpgraded;
+    private final BiConsumer<Multihash, Boolean> onHolePunchOutcome;
     private final ScheduledExecutorService timer;
 
-    public DcutrProtocol(Supplier<List<Multiaddr>> extraDialableAddresses, Consumer<Connection> onUpgraded) {
+    public DcutrProtocol(Supplier<List<Multiaddr>> extraDialableAddresses,
+                         Consumer<Connection> onUpgraded,
+                         BiConsumer<Multihash, Boolean> onHolePunchOutcome) {
         super(Dcutr.HolePunch.getDefaultInstance(), TRAFFIC_LIMIT, TRAFFIC_LIMIT);
         this.extraDialableAddresses = extraDialableAddresses;
         this.onUpgraded = onUpgraded;
+        this.onHolePunchOutcome = onHolePunchOutcome;
         this.timer = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "dcutr");
             t.setDaemon(true);
@@ -101,7 +108,7 @@ public class DcutrProtocol extends ProtobufProtocolHandler<DcutrProtocol.Control
     @NotNull
     @Override
     protected CompletableFuture<Controller> onStartInitiator(@NotNull Stream stream) {
-        Session session = new Session(us, stream, true, this::dialableAddresses, timer, onUpgraded);
+        Session session = new Session(us, stream, true, this::dialableAddresses, timer, onUpgraded, onHolePunchOutcome);
         stream.pushHandler(session);
         return CompletableFuture.completedFuture(session);
     }
@@ -109,7 +116,7 @@ public class DcutrProtocol extends ProtobufProtocolHandler<DcutrProtocol.Control
     @NotNull
     @Override
     protected CompletableFuture<Controller> onStartResponder(@NotNull Stream stream) {
-        Session session = new Session(us, stream, false, this::dialableAddresses, timer, onUpgraded);
+        Session session = new Session(us, stream, false, this::dialableAddresses, timer, onUpgraded, onHolePunchOutcome);
         stream.pushHandler(session);
         return CompletableFuture.completedFuture(session);
     }
@@ -121,18 +128,21 @@ public class DcutrProtocol extends ProtobufProtocolHandler<DcutrProtocol.Control
         private final Supplier<List<Multiaddr>> ourAddresses;
         private final ScheduledExecutorService timer;
         private final Consumer<Connection> onUpgraded;
+        private final BiConsumer<Multihash, Boolean> onHolePunchOutcome;
         private final CompletableFuture<Connection> direct = new CompletableFuture<>();
         private volatile long connectSentAtNanos;
         private volatile List<Multiaddr> peerAddresses = List.of();
 
         Session(Host us, Stream stream, boolean initiator, Supplier<List<Multiaddr>> ourAddresses,
-                ScheduledExecutorService timer, Consumer<Connection> onUpgraded) {
+                ScheduledExecutorService timer, Consumer<Connection> onUpgraded,
+                BiConsumer<Multihash, Boolean> onHolePunchOutcome) {
             this.us = us;
             this.stream = stream;
             this.initiator = initiator;
             this.ourAddresses = ourAddresses;
             this.timer = timer;
             this.onUpgraded = onUpgraded;
+            this.onHolePunchOutcome = onHolePunchOutcome;
         }
 
         @Override
@@ -196,14 +206,23 @@ public class DcutrProtocol extends ProtobufProtocolHandler<DcutrProtocol.Control
 
         private void holePunch(List<Multiaddr> targets) {
             PeerId target = stream.remotePeerId();
-            targets.stream().limit(MAX_DIAL_ATTEMPTS).forEach(addr ->
-                    dialDirect(target, addr).thenAccept(conn -> {
-                        if (conn != null && direct.complete(conn)) {
-                            LOG.info("DCUtR established a direct connection to " + target + " at " + conn.remoteAddress());
-                            if (onUpgraded != null)
-                                onUpgraded.accept(conn);
-                        }
-                    }));
+            List<CompletableFuture<Connection>> dials = targets.stream()
+                    .limit(MAX_DIAL_ATTEMPTS)
+                    .map(addr -> dialDirect(target, addr))
+                    .collect(Collectors.toList());
+            dials.forEach(dial -> dial.thenAccept(conn -> {
+                if (conn != null && direct.complete(conn)) {
+                    LOG.info("DCUtR established a direct connection to " + target + " at " + conn.remoteAddress());
+                    if (onUpgraded != null)
+                        onUpgraded.accept(conn);
+                }
+            }));
+            // report the outcome (used to infer NAT type) once every attempt has resolved
+            CompletableFuture.allOf(dials.toArray(new CompletableFuture[0]))
+                    .whenComplete((v, t) -> {
+                        if (onHolePunchOutcome != null)
+                            onHolePunchOutcome.accept(Multihash.deserialize(target.getBytes()), direct.isDone());
+                    });
         }
 
         private CompletableFuture<Connection> dialDirect(PeerId target, Multiaddr addr) {
