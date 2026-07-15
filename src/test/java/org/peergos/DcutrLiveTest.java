@@ -8,6 +8,7 @@ import io.libp2p.protocol.*;
 import org.junit.*;
 import org.peergos.blockstore.*;
 import org.peergos.config.*;
+import org.peergos.protocol.IdentifyBuilder;
 import org.peergos.protocol.dht.*;
 
 import java.util.*;
@@ -18,8 +19,8 @@ import java.util.concurrent.*;
  * ({@code /p2p-circuit}), dial it over the relay, wait for the relayed peer to hole-punch us up to a
  * direct connection via DCUtR, and ping it over that direct connection.
  *
- * Manual and best-effort: it depends on finding a relay-only DCUtR-capable peer and on our own NAT being
- * hole-punchable, so it may not always succeed. Run explicitly with -Dtest=DcutrLiveTest.
+ * Manual and best-effort: it depends on finding a relay-only DCUtR-capable peer whose relay reservation
+ * is still live, so it may not always succeed. Run explicitly with -Dtest=DcutrLiveTest.
  */
 public class DcutrLiveTest {
 
@@ -36,6 +37,7 @@ public class DcutrLiveTest {
         Kademlia dht = builder.getWanDht().get();
 
         node.start().join();
+        IdentifyBuilder.addIdentifyProtocol(node, Collections.emptyList()); // register /ipfs/id/1.0.0
         System.out.println("=== DcutrLiveTest peerId=" + node.getPeerId() + " port=" + port);
         try {
             dht.bootstrapRoutingTable(node, Config.defaultBootstrapNodes, addr -> ! addr.contains("/wss/"));
@@ -81,8 +83,7 @@ public class DcutrLiveTest {
             try {
                 direct = upgraded.get(60, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
-                Assume.assumeNoException("DCUtR did not complete a direct connection (our NAT may not be "
-                        + "hole-punchable, or the peer didn't hole punch)", e);
+                Assume.assumeNoException("DCUtR did not complete a direct connection in this run", e);
                 return;
             }
             System.out.println("DCUtR upgraded to direct connection: " + direct.remoteAddress());
