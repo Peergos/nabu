@@ -58,6 +58,13 @@ public class LiveNatTest {
                     "[t+%3ds] conns=%d reachability=%s natType=%s observedCount=%d relayReservations=%d",
                     elapsed, connections, reach.getReachability(), reach.getNatType(),
                     reach.getAllObservedAddresses().size(), relayed.size()));
+            // With QUIC listen-port reuse, the observed UDP port should equal our listen port (=port);
+            // once enough peers agree, the address is promoted to a confirmed candidate.
+            // With QUIC listen-port reuse, peers observe our real external QUIC mapping here; once enough
+            // agree (endpoint-independent NAT), it is promoted to a confirmed candidate. A symmetric NAT
+            // remaps the port per-destination, so observations vary and candidates stays empty.
+            System.out.println("        observed:  " + reach.getAllObservedAddresses());
+            System.out.println("        candidates:" + reach.getCandidateAddresses());
         }
         System.out.println("=== Final listen addresses: " + node.node.listenAddresses());
         node.stop().join();
