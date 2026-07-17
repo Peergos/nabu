@@ -31,10 +31,6 @@ public class DcutrQuicTest {
     }
 
     @Test
-    @Ignore // Blocked on a pre-existing gap: circuit relay over QUIC returns CONNECTION_FAILED at the
-            // relay's HOP->STOP step (reproduces on the released jvm-libp2p 0.21.3 too, independent of
-            // QUIC listen-port reuse), so the relayed connection never forms and DCUtR never starts.
-            // Once relay-over-QUIC works, un-ignore to exercise the QUIC hole punch end to end.
     public void upgradeRelayedConnectionToDirect() throws Exception {
         HostBuilder relayBuilder = node(TestPorts.getPort(), h -> List.of(), c -> {});
         Host relay = relayBuilder.build();
