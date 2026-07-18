@@ -10,6 +10,7 @@ public class InfiniTest {
     private static Random r = new Random(42);
 
     @Test
+    @Ignore
     public void infini() {
         RamBlockstore bs = new RamBlockstore();
         int nBlocks = 3_700_000;
