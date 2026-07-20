@@ -65,10 +65,10 @@ public class IPNS {
         return entryBuilder.build().toByteArray();
     }
 
-    public static Cid getCidFromKey(ByteString key) {
+    public static Multihash getPublisherFromKey(ByteString key) {
         if (! key.startsWith(ByteString.copyFrom("/ipns/".getBytes(StandardCharsets.UTF_8))))
             throw new IllegalStateException("Unknown IPNS key space: " + key);
-        return Cid.cast(key.substring(6).toByteArray());
+        return Multihash.deserialize(key.substring(6).toByteArray());
     }
 
     public static byte[] createCborDataForIpnsEntry(byte[] value,
