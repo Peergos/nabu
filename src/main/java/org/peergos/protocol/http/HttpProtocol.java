@@ -10,6 +10,7 @@ import io.netty.channel.nio.*;
 import io.netty.channel.socket.nio.*;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.logging.*;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.ReferenceCountUtil;
 import org.jetbrains.annotations.*;
 
@@ -166,15 +167,19 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     }
 
     private static final NioEventLoopGroup pool = new NioEventLoopGroup();
+    private static final int PROXY_CONNECT_TIMEOUT_MILLIS = 10_000;
+    private static final int PROXY_RESPONSE_TIMEOUT_SECONDS = 60;
     public static void proxyRequest(FullHttpRequest msg,
                                     SocketAddress proxyTarget,
                                     Consumer<HttpContent> replyHandler) {
         Bootstrap b = new Bootstrap()
                 .group(pool)
                 .channel(NioSocketChannel.class)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, PROXY_CONNECT_TIMEOUT_MILLIS)
                 .handler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel ch) throws Exception {
+                        ch.pipeline().addLast(new ReadTimeoutHandler(PROXY_RESPONSE_TIMEOUT_SECONDS));
                         ch.pipeline().addLast(new HttpRequestEncoder());
                         ch.pipeline().addLast(new HttpResponseDecoder());
                         ch.pipeline().addLast(new HttpObjectAggregator(MAX_BODY_SIZE));
@@ -197,11 +202,13 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                 ch.writeAndFlush(copy).addListener(f -> {
                     if (! f.isSuccess()) {
                         ReferenceCountUtil.release(copy);
+                        ch.close();
                         sendErrorReply(replyHandler);
                     }
                 });
             else {
                 ReferenceCountUtil.release(copy);
+                ch.close();
                 sendErrorReply(replyHandler);
             }
         });
