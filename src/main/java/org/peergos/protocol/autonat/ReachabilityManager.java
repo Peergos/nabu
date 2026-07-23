@@ -136,20 +136,34 @@ public class ReachabilityManager {
 
     /**
      * Update the reachability verdict and the confirmed public addresses. Called by the AutoNAT client
-     * once dial-backs resolve. Listeners fire only when the verdict actually changes.
+     * once dial-backs resolve. Listeners fire only when the verdict actually changes, but the NAT status
+     * is logged whenever the verdict OR the set of confirmed external addresses changes.
      */
     public void setReachability(Reachability updated, Collection<Multiaddr> publicAddrs) {
+        Set<Multiaddr> updatedAddrs = publicAddrs == null ? Set.of() : new LinkedHashSet<>(publicAddrs);
         Reachability previous;
+        boolean addressesChanged;
         synchronized (this) {
             previous = this.reachability;
             this.reachability = updated;
+            addressesChanged = ! this.confirmedPublic.equals(updatedAddrs);
             this.confirmedPublic.clear();
-            if (publicAddrs != null)
-                this.confirmedPublic.addAll(publicAddrs);
+            this.confirmedPublic.addAll(updatedAddrs);
         }
+        if (previous != updated || addressesChanged)
+            logStatus(updated, updatedAddrs);
         if (previous != updated)
             for (Consumer<Reachability> listener : listeners)
                 listener.accept(updated);
+    }
+
+    private void logStatus(Reachability state, Set<Multiaddr> externalAddrs) {
+        String addrs = externalAddrs.isEmpty()
+                ? "none confirmed yet"
+                : externalAddrs.stream().map(Multiaddr::toString).collect(Collectors.joining(", "));
+        LOG.info("NAT traversal status: reachability=" + state
+                + ", NAT type=" + natType
+                + ", external addresses=[" + addrs + "]");
     }
 
     /** Register a callback fired whenever the reachability verdict transitions. */

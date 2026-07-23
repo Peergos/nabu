@@ -122,8 +122,6 @@ public class EmbeddedPeer {
                 .map(Multiaddr::new)
                 .collect(Collectors.toList()));
         LOG.info("Node started and listening on " + node.listenAddresses());
-        if (reachability != null)
-            reachability.addListener(this::logNatStatus);
         LOG.info("Bootstrapping IPFS routing table");
         if (bootstrap.isEmpty())
             LOG.warning("Starting with empty bootstrap list - you will not join the global dht");
@@ -149,17 +147,6 @@ public class EmbeddedPeer {
         });
         mdns.start();
         startPortForwarders();
-    }
-
-    /** Log our NAT traversal status and confirmed external addresses whenever reachability changes. */
-    private void logNatStatus(ReachabilityManager.Reachability state) {
-        List<Multiaddr> external = reachability.getConfirmedPublicAddresses();
-        String addrs = external.isEmpty()
-                ? "none confirmed yet"
-                : external.stream().map(Multiaddr::toString).collect(Collectors.joining(", "));
-        LOG.info("NAT traversal status changed: reachability=" + state
-                + ", NAT type=" + reachability.getNatType()
-                + ", external addresses=[" + addrs + "]");
     }
 
     /** Enable UPnP/NAT-PMP forwarding of the swarm ports. Must be called before {@link #start}. */
