@@ -9,6 +9,8 @@ import org.peergos.protocol.autonat.*;
 import org.peergos.protocol.dht.*;
 
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.logging.*;
 import java.util.stream.*;
 
 /**
@@ -26,6 +28,21 @@ public class LiveNatTest {
         List<MultiAddress> swarm = List.of(
                 new MultiAddress("/ip4/0.0.0.0/tcp/" + port),
                 new MultiAddress("/ip4/0.0.0.0/udp/" + port + "/quic-v1"));
+
+        // Capture the NAT-status log lines the ReachabilityManager emits, so we can prove that a real
+        // public address is logged eventually (rather than just eyeballing stdout).
+        List<String> natStatusLog = new CopyOnWriteArrayList<>();
+        Handler capture = new Handler() {
+            public void publish(LogRecord record) {
+                String msg = record.getMessage();
+                if (msg != null && msg.startsWith("NAT traversal status"))
+                    natStatusLog.add(msg);
+            }
+            public void flush() {}
+            public void close() {}
+        };
+        capture.setLevel(Level.ALL);
+        org.peergos.util.Logging.LOG().addHandler(capture);
 
         HostBuilder builder = new HostBuilder(new RamAddressBook()).generateIdentity();
         PrivKey priv = builder.getPrivateKey();
@@ -67,6 +84,17 @@ public class LiveNatTest {
             System.out.println("        candidates:" + reach.getCandidateAddresses());
         }
         System.out.println("=== Final listen addresses: " + node.node.listenAddresses());
+        System.out.println("=== NAT status log lines:");
+        natStatusLog.forEach(l -> System.out.println("        " + l));
+
+        // If AutoNAT confirmed us publicly reachable, at least one status line must carry a real
+        // (non-forced) public address - i.e. we actually logged our external IP eventually.
+        if (reach.getReachability() == ReachabilityManager.Reachability.PUBLIC) {
+            boolean loggedRealPublicIp = natStatusLog.stream()
+                    .anyMatch(l -> l.contains("reachability=PUBLIC") && ! l.contains("none confirmed yet"));
+            Assert.assertTrue("expected a NAT status line with a confirmed public address", loggedRealPublicIp);
+        }
+        org.peergos.util.Logging.LOG().removeHandler(capture);
         node.stop().join();
     }
 }
