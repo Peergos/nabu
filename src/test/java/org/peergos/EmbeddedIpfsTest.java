@@ -71,11 +71,11 @@ public class EmbeddedIpfsTest {
         });
         target.start();
 
-        HttpProtocol.HttpRequestProcessor http1 = (s, req, h) -> HttpProtocol.proxyRequest(req, proxyTarget, h);
+        HttpProtocol.HttpRequestProcessor http1 = (s, req, h) -> HttpProtocol.proxyRequest(req, proxyTarget, h, s.remotePeerId());
         EmbeddedIpfs node1 = build(Collections.emptyList(), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())), Optional.of(http1));
         node1.start(false);
 
-        HttpProtocol.HttpRequestProcessor http2 = (s, req, h) -> HttpProtocol.proxyRequest(req, new InetSocketAddress("localhost", 7778), h);
+        HttpProtocol.HttpRequestProcessor http2 = (s, req, h) -> HttpProtocol.proxyRequest(req, new InetSocketAddress("localhost", 7778), h, s.remotePeerId());
         EmbeddedIpfs node2 = build(node1.node.listenAddresses()
                 .stream()
                 .map(a -> new MultiAddress(a.toString()))

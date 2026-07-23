@@ -171,7 +171,8 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     private static final int PROXY_RESPONSE_TIMEOUT_SECONDS = 60;
     public static void proxyRequest(FullHttpRequest msg,
                                     SocketAddress proxyTarget,
-                                    Consumer<HttpContent> replyHandler) {
+                                    Consumer<HttpContent> replyHandler,
+                                    PeerId remote) {
         Bootstrap b = new Bootstrap()
                 .group(pool)
                 .channel(NioSocketChannel.class)
@@ -196,6 +197,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                 msg.uri(),
                 Unpooled.copiedBuffer(msg.content()));
         copy.headers().setAll(msg.headers());
+        copy.headers().set("Source", remote.toBase58());
 
         fut.addListener(x -> {
             if (x.isSuccess())
@@ -235,7 +237,7 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
     }
 
     public HttpProtocol(SocketAddress proxyTarget) {
-        this((s, req, replyHandler) -> proxyRequest(req, proxyTarget, replyHandler));
+        this((s, req, replyHandler) -> proxyRequest(req, proxyTarget, replyHandler, s.remotePeerId()));
     }
 
     @NotNull

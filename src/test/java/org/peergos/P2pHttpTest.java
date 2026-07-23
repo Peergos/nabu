@@ -70,7 +70,7 @@ public class P2pHttpTest {
             ByteBuf content = fullRequest.content();
             String bodyContent = content.toString(CharsetUtil.UTF_8);
             Assert.assertTrue("body content", requestBody.equals(bodyContent));
-            HttpProtocol.proxyRequest(req, new InetSocketAddress("127.0.0.1", localPort), h);
+            HttpProtocol.proxyRequest(req, new InetSocketAddress("127.0.0.1", localPort), h, s.remotePeerId());
         });
         HostBuilder builder2 = HostBuilder.create(TestPorts.getPort(),
                 new RamProviderStore(1000), new RamRecordStore(), blockstore2, (c, p, a) -> CompletableFuture.completedFuture(true));

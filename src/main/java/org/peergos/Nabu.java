@@ -36,7 +36,7 @@ public class Nabu {
     private static final Logger LOG = Logging.LOG();
 
     private static HttpProtocol.HttpRequestProcessor proxyHandler(MultiAddress target) {
-        return (s, req, h) -> HttpProtocol.proxyRequest(req, new InetSocketAddress(target.getHost(), target.getPort()), h);
+        return (s, req, h) -> HttpProtocol.proxyRequest(req, new InetSocketAddress(target.getHost(), target.getPort()), h, s.remotePeerId());
     }
 
     public Nabu(Args args) throws Exception {
