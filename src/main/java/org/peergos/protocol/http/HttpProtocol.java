@@ -198,6 +198,9 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
                 Unpooled.copiedBuffer(msg.content()));
         copy.headers().setAll(msg.headers());
         copy.headers().set("Source", remote.toBase58());
+        // Force the local API server to close the connection after responding, so its socket can't
+        // linger in CLOSE_WAIT. A fresh connection is opened per request anyway, so no reuse is lost.
+        copy.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
 
         fut.addListener(x -> {
             if (x.isSuccess())
