@@ -54,6 +54,11 @@ public class ReachabilityManager {
     private final List<Consumer<Reachability>> listeners = new CopyOnWriteArrayList<>();
     private volatile Reachability reachability = Reachability.UNKNOWN;
 
+    // Snapshot of what was last written to the NAT-status log, so we log only on a real change. Guarded by this.
+    private Reachability lastLoggedReachability = Reachability.UNKNOWN;
+    private NatType lastLoggedNatType = NatType.UNKNOWN;
+    private Set<Multiaddr> lastLoggedExternal = new LinkedHashSet<>();
+
     public ReachabilityManager() {
         this(3);
     }
@@ -69,6 +74,7 @@ public class ReachabilityManager {
         if (! PeerAddresses.isPublic(observed, false))
             return;
         observations.computeIfAbsent(observed, a -> new HashSet<>()).add(reporter);
+        logStatusIfChanged();
     }
 
     /** External addresses reported by at least {@code confirmationsRequired} distinct peers. */
@@ -122,8 +128,10 @@ public class ReachabilityManager {
      * AutoNAT client will ask peers to verify it. Only public addresses are kept.
      */
     public synchronized void addLocalCandidate(Multiaddr addr) {
-        if (addr != null && PeerAddresses.isPublic(addr, false))
+        if (addr != null && PeerAddresses.isPublic(addr, false)) {
             localCandidates.add(addr);
+            logStatusIfChanged();
+        }
     }
 
     public Reachability getReachability() {
@@ -136,34 +144,56 @@ public class ReachabilityManager {
 
     /**
      * Update the reachability verdict and the confirmed public addresses. Called by the AutoNAT client
-     * once dial-backs resolve. Listeners fire only when the verdict actually changes, but the NAT status
-     * is logged whenever the verdict OR the set of confirmed external addresses changes.
+     * once dial-backs resolve. Listeners fire only when the verdict actually changes; the NAT status is
+     * logged whenever the verdict, NAT type, or the set of known external addresses changes.
      */
     public void setReachability(Reachability updated, Collection<Multiaddr> publicAddrs) {
         Set<Multiaddr> updatedAddrs = publicAddrs == null ? Set.of() : new LinkedHashSet<>(publicAddrs);
         Reachability previous;
-        boolean addressesChanged;
         synchronized (this) {
             previous = this.reachability;
             this.reachability = updated;
-            addressesChanged = ! this.confirmedPublic.equals(updatedAddrs);
             this.confirmedPublic.clear();
             this.confirmedPublic.addAll(updatedAddrs);
+            logStatusIfChanged();
         }
-        if (previous != updated || addressesChanged)
-            logStatus(updated, updatedAddrs);
         if (previous != updated)
             for (Consumer<Reachability> listener : listeners)
                 listener.accept(updated);
     }
 
-    private void logStatus(Reachability state, Set<Multiaddr> externalAddrs) {
-        String addrs = externalAddrs.isEmpty()
-                ? "none confirmed yet"
-                : externalAddrs.stream().map(Multiaddr::toString).collect(Collectors.joining(", "));
-        LOG.info("NAT traversal status: reachability=" + state
+    /** The external addresses we currently know: AutoNAT-confirmed, peer-observed candidates, and UPnP-mapped. */
+    private Set<Multiaddr> knownExternalAddresses() {
+        Set<Multiaddr> ext = new LinkedHashSet<>(confirmedPublic);
+        for (Map.Entry<Multiaddr, Set<Multihash>> e : observations.entrySet())
+            if (e.getValue().size() >= confirmationsRequired)
+                ext.add(e.getKey());
+        ext.addAll(localCandidates);
+        return ext;
+    }
+
+    /**
+     * Log the NAT traversal status whenever the verdict, the inferred NAT type, or the set of known
+     * external addresses changes. Called while holding this lock from every place those change, so a newly
+     * discovered external address is logged even while we are still UNKNOWN/PRIVATE (i.e. before AutoNAT
+     * has confirmed it dialable).
+     */
+    private void logStatusIfChanged() {
+        Set<Multiaddr> ext = knownExternalAddresses();
+        if (reachability == lastLoggedReachability && natType == lastLoggedNatType && ext.equals(lastLoggedExternal))
+            return;
+        lastLoggedReachability = reachability;
+        lastLoggedNatType = natType;
+        lastLoggedExternal = ext;
+        String addrs = ext.isEmpty()
+                ? "none discovered yet"
+                : ext.stream().map(Multiaddr::toString).collect(Collectors.joining(", "));
+        String qualifier = ext.isEmpty() ? ""
+                : confirmedPublic.isEmpty() ? " (observed, not yet confirmed reachable)"
+                : " (confirmed reachable)";
+        LOG.info("NAT traversal status: reachability=" + reachability
                 + ", NAT type=" + natType
-                + ", external addresses=[" + addrs + "]");
+                + ", external addresses=[" + addrs + "]" + qualifier);
     }
 
     /** Register a callback fired whenever the reachability verdict transitions. */
@@ -186,6 +216,7 @@ public class ReachabilityManager {
             else
                 LOG.info("NAT type inferred: ENDPOINT_INDEPENDENT - a DCUtR hole punch succeeded, so direct "
                         + "connections are possible");
+            logStatusIfChanged();
         }
     }
 

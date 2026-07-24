@@ -91,7 +91,7 @@ public class LiveNatTest {
         // (non-forced) public address - i.e. we actually logged our external IP eventually.
         if (reach.getReachability() == ReachabilityManager.Reachability.PUBLIC) {
             boolean loggedRealPublicIp = natStatusLog.stream()
-                    .anyMatch(l -> l.contains("reachability=PUBLIC") && ! l.contains("none confirmed yet"));
+                    .anyMatch(l -> l.contains("reachability=PUBLIC") && l.contains("confirmed reachable"));
             Assert.assertTrue("expected a NAT status line with a confirmed public address", loggedRealPublicIp);
         }
         org.peergos.util.Logging.LOG().removeHandler(capture);

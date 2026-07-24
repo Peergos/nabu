@@ -136,4 +136,25 @@ public class ReachabilityManagerTest {
         Assert.assertTrue("a changed external IP is logged even without a verdict transition",
                 logged.stream().anyMatch(m -> m.contains("5.6.7.8")));
     }
+
+    @Test
+    public void logsObservedExternalAddressesBeforeConfirmation() {
+        List<String> logged = captureLog();
+        ReachabilityManager r = new ReachabilityManager(3);
+        Multiaddr quic = new Multiaddr("/ip4/1.2.3.4/udp/4001/quic-v1");
+
+        // Fewer than confirmationsRequired distinct reporters: not yet a candidate, nothing logged.
+        r.observeAddress(quic, peer(1));
+        r.observeAddress(quic, peer(2));
+        Assert.assertTrue("not logged until it is a real candidate (>=3 reporters)",
+                logged.stream().noneMatch(m -> m.contains("1.2.3.4")));
+
+        // Third distinct reporter promotes it to a candidate: log the observed external address even
+        // though reachability is still UNKNOWN and AutoNAT has not confirmed it.
+        r.observeAddress(quic, peer(3));
+        Assert.assertTrue("the observed external address is logged before confirmation",
+                logged.stream().anyMatch(m -> m.contains("NAT traversal status")
+                        && m.contains("reachability=UNKNOWN") && m.contains("1.2.3.4")
+                        && m.contains("observed")));
+    }
 }
