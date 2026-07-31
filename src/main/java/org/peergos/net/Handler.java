@@ -25,7 +25,11 @@ public abstract class Handler implements HttpHandler {
     public void handle(HttpExchange httpExchange) {
         try {
             if (!HttpUtil.allowedQuery(httpExchange)) {
-                httpExchange.sendResponseHeaders(403, 0);
+                // -1 means no response body. A length of 0 starts a chunked response that we never
+                // terminate, so the caller waits on the connection until it gives up - one parked
+                // connection per stray GET from a browser, health check or scanner.
+                httpExchange.sendResponseHeaders(403, -1);
+                httpExchange.close();
             } else {
                 handleCallToAPI(httpExchange);
             }

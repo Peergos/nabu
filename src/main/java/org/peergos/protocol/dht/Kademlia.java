@@ -30,6 +30,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
 
     private static final Logger LOG = Logging.LOG();
     public static final int BOOTSTRAP_PERIOD_MILLIS = 300_000;
+    private static final int IDENTIFY_TIMEOUT_SECONDS = 5;
     public static final String WAN_DHT_ID = "/ipfs/kad/1.0.0";
     public static final String LAN_DHT_ID = "/ipfs/lan/kad/1.0.0";
     private final KademliaEngine engine;
@@ -106,7 +107,16 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             PeerId ourPeerId = PeerId.fromBase58(peer.peerId.toBase58());
             StreamPromise<? extends IdentifyController> conn = new Identify().dial(us, ourPeerId, getPublic(peer));
             try {
-                conn.getController().join().id().join();
+                // Neither of these may be unbounded: bootstrap() runs on the node startup path and
+                // again on a timer every BOOTSTRAP_PERIOD_MILLIS, so a peer that accepts a
+                // connection and then stops responding would otherwise delay the node coming up and
+                // hold the bootstrap thread indefinitely.
+                conn.getController()
+                        .orTimeout(IDENTIFY_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                        .join()
+                        .id()
+                        .orTimeout(IDENTIFY_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                        .join();
             } finally {
                 conn.getStream().thenApply(s -> s.close());
             }
@@ -116,6 +126,8 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 return false;
             else if (e.getCause() instanceof NothingToCompleteException || e.getCause() instanceof NonCompleteException)
                 LOG.fine("Couldn't connect to " + peer.peerId);
+            else if (e.getCause() instanceof TimeoutException)
+                LOG.fine("Timeout connecting to " + peer.peerId + " addrs: " + peer.addresses);
             else
                 e.printStackTrace();
             return false;
@@ -311,10 +323,13 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     }
 
     private CompletableFuture<List<PeerAddresses>> getCloserPeers(byte[] key, PeerAddresses target, Host us) {
+        StreamPromise<? extends KademliaController> conn = null;
         try {
-            StreamPromise<? extends KademliaController> conn = dialPeer(target, us);
+            conn = dialPeer(target, us);
             KademliaController contr = conn.getController().orTimeout(2, TimeUnit.SECONDS).join();
-            return closeAfter(conn.getStream(), () -> contr.closerPeers(key));
+            CompletableFuture<List<PeerAddresses>> res = closeAfter(conn.getStream(), () -> contr.closerPeers(key));
+            conn = null; // closeAfter owns the stream from here
+            return res;
         } catch (Exception e) {
             if (e instanceof Libp2pException && e.getMessage().contains("Transport is closed"))
                 return CompletableFuture.completedFuture(Collections.emptyList());
@@ -331,6 +346,13 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
             else if (e.getCause() instanceof ClosedChannelException) {}
             else
                 e.printStackTrace();
+        } finally {
+            // The 2s timeout above is the normal outcome for an unreachable peer, and it leaves the
+            // dial still in flight. Without this the stream, and any connection the dial opened, is
+            // never released - and this runs under findClosestPeers on every p2p request for a peer
+            // that isn't in the address book.
+            if (conn != null)
+                conn.getStream().thenApply(s -> s.close());
         }
         return CompletableFuture.completedFuture(Collections.emptyList());
     }
