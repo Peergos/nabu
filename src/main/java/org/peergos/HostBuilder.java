@@ -30,6 +30,16 @@ import java.util.function.*;
 import java.util.stream.*;
 
 public class HostBuilder {
+
+    /** Yamux buffers pending writes per *connection*, not per stream, and a stream that overflows the
+     *  buffer is reset rather than made to wait. The default of 10 MiB is barely larger than one
+     *  HttpProtocol.MAX_BODY_SIZE response, so three concurrent 4MB proxied responses on a connection
+     *  were enough to reset each other - measured at 1053 of 15740 succeeding, against 100% for two.
+     *  Stream.writeAndFlush returns no future, so the overflow was invisible to us as well.
+     *  Keep this comfortably above MAX_BODY_SIZE times the number of large responses expected in
+     *  flight to a single peer at once. It is a ceiling, not an allocation. */
+    public static final int MAX_BUFFERED_CONNECTION_WRITES = 128 * 1024 * 1024;
+
     private PrivKey privKey;
     private PeerId peerId;
     private List<String> listenAddrs = new ArrayList<>();
@@ -201,7 +211,8 @@ public class HostBuilder {
 
     public Host build() {
         if (muxers.isEmpty())
-            muxers.addAll(List.of(StreamMuxerProtocol.getYamux(), StreamMuxerProtocol.getMplex()));
+            muxers.addAll(List.of(StreamMuxerProtocol.getYamux(MAX_BUFFERED_CONNECTION_WRITES),
+                    StreamMuxerProtocol.getMplex()));
         return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, relayHop, relayStop, relayCandidates, dcutr);
     }
 
