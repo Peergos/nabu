@@ -79,10 +79,15 @@ public class PeerAddresses {
     }
 
     public Dht.Message.Peer toProtobuf(Predicate<Multiaddr> filter) {
+        return toProtobuf(filter, Integer.MAX_VALUE);
+    }
+
+    public Dht.Message.Peer toProtobuf(Predicate<Multiaddr> filter, int maxAddresses) {
         return Dht.Message.Peer.newBuilder()
                 .setId(ByteString.copyFrom(peerId.toBytes()))
                 .addAllAddrs(addresses.stream()
                         .filter(filter)
+                        .limit(maxAddresses)
                         .map(a -> ByteString.copyFrom(a.serialize()))
                         .collect(Collectors.toList()))
                 .build();

@@ -46,6 +46,11 @@ public class KademliaEngine {
             .register();
 
     private static final int BUCKET_SIZE = 20;
+    /** Address books accumulate addresses for a peer over time, so a long lived node ends up holding
+     *  hundreds of stale addresses for some peers. Attaching all of them to a reply lets a ~40 byte
+     *  query provoke a reply three orders of magnitude larger, which is a lot of outbound bandwidth
+     *  to hand to anyone who asks. Real peers announce well under this many. */
+    public static final int MAX_ADDRESSES_PER_PEER = 10;
     private final ProviderStore providersStore;
     private final RecordStore ipnsStore;
     public final Router router;
@@ -104,6 +109,20 @@ public class KademliaEngine {
                 .collect(Collectors.toList());
     }
 
+    /** The closest peers we know to a key, ready to attach to a reply. Unlike {@link #getKClosestPeers}
+     *  this bounds the addresses we send per peer: locally we want every address we have as a dial
+     *  candidate, but on the wire an unbounded list is an amplification vector.
+     *
+     * @param exclude a peer to leave out, used to avoid telling a peer about themselves
+     */
+    public List<Dht.Message.Peer> closerPeers(byte[] key, Optional<Multihash> exclude) {
+        return getKClosestPeers(key, BUCKET_SIZE)
+                .stream()
+                .filter(p -> exclude.isEmpty() || ! p.peerId.equals(exclude.get()))
+                .map(p -> p.toProtobuf(a -> isPublic(a), MAX_ADDRESSES_PER_PEER))
+                .collect(Collectors.toList());
+    }
+
     public void addRecord(Multihash publisher, IpnsRecord record) {
         ipnsStore.put(publisher, record);
     }
@@ -139,10 +158,7 @@ public class KademliaEngine {
                         builder = builder.setRecord(Dht.Record.newBuilder()
                                 .setKey(msg.getKey())
                                 .setValue(ByteString.copyFrom(ipnsRecord.get().raw)).build());
-                    builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray(), BUCKET_SIZE)
-                            .stream()
-                            .map(p -> p.toProtobuf(a -> isPublic(a)))
-                            .collect(Collectors.toList()));
+                    builder = builder.addAllCloserPeers(closerPeers(msg.getKey().toByteArray(), Optional.empty()));
                     Dht.Message reply = builder.build();
                     stream.writeAndFlush(reply);
                     responderSentBytes.inc(reply.getSerializedSize());
@@ -172,10 +188,7 @@ public class KademliaEngine {
                     Dht.Message.Builder builder = msg.toBuilder();
                     builder = builder.addAllProviderPeers(providers.stream()
                             .collect(Collectors.toList()));
-                    builder = builder.addAllCloserPeers(getKClosestPeers(msg.getKey().toByteArray(), BUCKET_SIZE)
-                            .stream()
-                            .map(p -> p.toProtobuf(a -> isPublic(a)))
-                            .collect(Collectors.toList()));
+                    builder = builder.addAllCloserPeers(closerPeers(msg.getKey().toByteArray(), Optional.empty()));
                     Dht.Message reply = builder.build();
                     stream.writeAndFlush(reply);
                     responderSentBytes.inc(reply.getSerializedSize());
@@ -190,12 +203,8 @@ public class KademliaEngine {
                         // Only return ourselves (without addresses) if they are querying for us
                         // This is because all Go peers query for this to check live-ness
                         builder = builder.addCloserPeers(new PeerAddresses(ourPeerId, Collections.emptyList()).toProtobuf());
-                    } else
-                        builder = builder.addAllCloserPeers(getKClosestPeers(target, BUCKET_SIZE)
-                                .stream()
-                                .filter(p -> ! p.peerId.equals(sourcePeer)) // don't tell a peer about themselves
-                                .map(p -> p.toProtobuf(a -> isPublic(a)))
-                                .collect(Collectors.toList()));
+                    } else // don't tell a peer about themselves
+                        builder = builder.addAllCloserPeers(closerPeers(target, Optional.of(sourcePeer)));
                     Dht.Message reply = builder.build();
                     stream.writeAndFlush(reply);
                     responderSentBytes.inc(reply.getSerializedSize());
