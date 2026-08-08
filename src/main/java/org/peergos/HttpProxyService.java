@@ -43,34 +43,56 @@ public class HttpProxyService {
         Collection<Multiaddr> all = addressBook.get(peerId).join();
         if (! all.isEmpty())
             return all.toArray(Multiaddr[]::new);
-        Multiaddr[] allAddresses = null;
-        if (all.isEmpty()) {
-            List<PeerAddresses> closestPeers = dht.findClosestPeers(targetPeerId, 1, node);
-            Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetPeerId)).findFirst();
-            if (matching.isEmpty()) {
-                throw new ConnectionException("Target not found: " + targetPeerId);
-            }
-            PeerAddresses peer = matching.get();
-            allAddresses = peer.addresses.stream().map(a -> Multiaddr.fromString(a.toString())).toArray(Multiaddr[]::new);
-            addressBook.setAddrs(peerId, 0, allAddresses);
+        return lookupAddresses(node, dht, targetNodeId);
+    }
+
+    /** Ask the dht where a peer is now, replacing whatever we had cached for them. Cached addresses go
+     *  stale - a peer moves, or we cached one that was never dialable - and a node whose only cached
+     *  addresses are dead would otherwise never reach that peer again. */
+    public static Multiaddr[] lookupAddresses(Host node, Kademlia dht, Multihash targetNodeId) throws ConnectionException {
+        Multihash targetPeerId = targetNodeId.bareMultihash();
+        PeerId peerId = PeerId.fromBase58(targetPeerId.toBase58());
+        List<PeerAddresses> closestPeers = dht.findClosestPeers(targetPeerId, 1, node);
+        Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetPeerId)).findFirst();
+        if (matching.isEmpty()) {
+            throw new ConnectionException("Target not found: " + targetPeerId);
         }
+        Multiaddr[] allAddresses = matching.get().addresses.stream()
+                .map(a -> Multiaddr.fromString(a.toString()))
+                .toArray(Multiaddr[]::new);
+        node.getAddressBook().setAddrs(peerId, 0, allAddresses);
         return allAddresses;
+    }
+
+    /** Dial a peer, and if every address we have for them fails, ask the dht where they are now and try
+     *  the answer. Without this a single bad entry in the address book takes a peer out permanently: the
+     *  book is non empty, so we never look them up again, and every address in it is dead. */
+    private HttpProtocol.HttpController dial(PeerId peerId,
+                                             Multihash targetNodeId,
+                                             Multiaddr[] addressesToDial) throws ConnectionException {
+        try {
+            return p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
+        } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof ConnectionClosedException)
+                return p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
+            Multiaddr[] fresh;
+            try {
+                fresh = lookupAddresses(node, dht, targetNodeId);
+            } catch (Exception lookupFailed) {
+                throw e; // the dial failure is the more useful error
+            }
+            if (Set.copyOf(Arrays.asList(fresh)).equals(Set.copyOf(Arrays.asList(addressesToDial))))
+                throw e; // the dht has nothing new for us, so a retry would fail the same way
+            LOG.info("Re-resolved " + targetNodeId + " after failing to dial " + Arrays.toString(addressesToDial));
+            return p2pHttpBinding.dial(node, peerId, fresh).getController().join();
+        }
     }
 
     public ProxyResponse proxyRequest(Multihash targetNodeId, ProxyRequest request) throws IOException, ConnectionException {
         Multiaddr[] addressesToDial = getAddresses(node, dht, targetNodeId);
         PeerId peerId = PeerId.fromBase58(targetNodeId.bareMultihash().toBase58());
-        HttpProtocol.HttpController proxier;
-        try {
-            proxier = p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
-        } catch (Exception e) {
-            Throwable cause = e.getCause() != null ? e.getCause() : e;
-            if (cause instanceof ConnectionClosedException) {
-                proxier = p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
-            } else {
-                throw e;
-            }
-        }
+        HttpProtocol.HttpController proxier = dial(peerId, targetNodeId, addressesToDial);
         String urlParams = constructQueryParamString(request.queryParams);
         FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1,
                 HttpMethod.valueOf(request.method.name()),

@@ -299,17 +299,21 @@ public class HostBuilder {
                     .map(p -> (Kademlia) p)
                     .findFirst();
             // Identify the peer on every new connection, in both directions. A NATed node only makes
-            // outbound connections, so we must learn our external address from those. jvm-libp2p dials
-            // from a fresh ephemeral port (both TCP and QUIC), so an outbound observation gives our
-            // external *IP* (stable) but a throwaway *port*; the AutoNAT candidate supplier below predicts
-            // our real address by pairing that IP with our listen port. Inbound observations already
-            // reflect our listen socket directly.
+            // outbound connections, so we must learn our external address from those. We dial from our
+            // listen port where SO_REUSEPORT allows it, but when it doesn't (or a NAT rewrites the port)
+            // an outbound observation gives our external *IP* (stable) and a throwaway *port*; the AutoNAT
+            // candidate supplier below predicts our real address by pairing that IP with our listen port.
             b.getConnectionHandlers().add(connection -> {
                 PeerId remotePeer = connection.secureSession().getRemoteId();
-                Multiaddr remote = connection.remoteAddress().withP2P(remotePeer);
-                addrs.addAddrs(remotePeer, 0, remote);
                 addrs.getAddrs(remotePeer).thenAccept(existing -> {
                     boolean newPeer = existing.isEmpty();
+                    // Only the remote address of a connection *we* dialled is dialable - it is the address
+                    // we just dialled. On an incoming connection it is the peer's ephemeral source port,
+                    // which nothing is listening on, so caching it leaves a permanent "connection refused"
+                    // address in the book, and hands it on to everyone who asks us for that peer. Their real
+                    // listen addresses arrive below, from identify.
+                    if (connection.isInitiator())
+                        addrs.addAddrs(remotePeer, 0, connection.remoteAddress().withP2P(remotePeer));
                     StreamPromise<IdentifyController> stream = connection.muxerSession()
                             .createStream(new IdentifyBinding(new IdentifyProtocol()));
                     stream.getController()
