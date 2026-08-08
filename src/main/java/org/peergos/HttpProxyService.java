@@ -43,16 +43,20 @@ public class HttpProxyService {
         Collection<Multiaddr> all = addressBook.get(peerId).join();
         if (! all.isEmpty())
             return all.toArray(Multiaddr[]::new);
-        return lookupAddresses(node, dht, targetNodeId);
+        return lookupAddresses(node, dht, targetNodeId, true);
     }
 
-    /** Ask the dht where a peer is now, replacing whatever we had cached for them. Cached addresses go
-     *  stale - a peer moves, or we cached one that was never dialable - and a node whose only cached
-     *  addresses are dead would otherwise never reach that peer again. */
-    public static Multiaddr[] lookupAddresses(Host node, Kademlia dht, Multihash targetNodeId) throws ConnectionException {
+    /** Ask the network where a peer is now, replacing whatever we had cached for them. Cached addresses
+     *  go stale - a peer moves, or we cached one that was never dialable - and a node whose only cached
+     *  addresses are dead would otherwise never reach that peer again.
+     *
+     * @param useCached false to force a real dht query. The dht answers a single peer lookup from the
+     *                  address book when it can, which is no use to a caller escaping a bad entry.
+     */
+    public static Multiaddr[] lookupAddresses(Host node, Kademlia dht, Multihash targetNodeId, boolean useCached) throws ConnectionException {
         Multihash targetPeerId = targetNodeId.bareMultihash();
         PeerId peerId = PeerId.fromBase58(targetPeerId.toBase58());
-        List<PeerAddresses> closestPeers = dht.findClosestPeers(targetPeerId, 1, node);
+        List<PeerAddresses> closestPeers = dht.findClosestPeers(targetPeerId, 1, node, useCached);
         Optional<PeerAddresses> matching = closestPeers.stream().filter(p -> p.peerId.equals(targetPeerId)).findFirst();
         if (matching.isEmpty()) {
             throw new ConnectionException("Target not found: " + targetPeerId);
@@ -76,15 +80,19 @@ public class HttpProxyService {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             if (cause instanceof ConnectionClosedException)
                 return p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
+            // libp2p's anyComplete only reports the error of whichever dial finished last and drops the
+            // rest, so the exception names one arbitrary address out of the set. Log what we actually
+            // tried, otherwise there is no way to tell a peer with one dead address from one with thirty.
+            LOG.info("Failed to dial " + targetNodeId + " at all of " + Arrays.toString(addressesToDial));
             Multiaddr[] fresh;
             try {
-                fresh = lookupAddresses(node, dht, targetNodeId);
+                fresh = lookupAddresses(node, dht, targetNodeId, false);
             } catch (Exception lookupFailed) {
                 throw e; // the dial failure is the more useful error
             }
             if (Set.copyOf(Arrays.asList(fresh)).equals(Set.copyOf(Arrays.asList(addressesToDial))))
                 throw e; // the dht has nothing new for us, so a retry would fail the same way
-            LOG.info("Re-resolved " + targetNodeId + " after failing to dial " + Arrays.toString(addressesToDial));
+            LOG.info("Re-resolved " + targetNodeId + " to " + Arrays.toString(fresh));
             return p2pHttpBinding.dial(node, peerId, fresh).getController().join();
         }
     }

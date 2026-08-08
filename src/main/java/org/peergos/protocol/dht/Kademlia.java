@@ -191,23 +191,41 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     private final ExecutorService ioExec = Executors.newFixedThreadPool(16);
 
     public List<PeerAddresses> findClosestPeers(Multihash peerIdkey, int maxCount, Host us) {
-        if (maxCount == 1) {
+        return findClosestPeers(peerIdkey, maxCount, us, true);
+    }
+
+    /** @param useCached when false, skip the address book and routing table shortcuts and actually ask
+     *                   the network. A caller that has just found every address it has for a peer to be
+     *                   dead needs this: the shortcuts would hand it straight back the same dead addresses.
+     */
+    public List<PeerAddresses> findClosestPeers(Multihash peerIdkey, int maxCount, Host us, boolean useCached) {
+        if (maxCount == 1 && useCached) {
             Collection<Multiaddr> existing = addressBook.get(PeerId.fromBase58(peerIdkey.toBase58())).join();
             if (!existing.isEmpty())
                 return Collections.singletonList(new PeerAddresses(peerIdkey, new ArrayList<>(existing)));
         }
         byte[] key = peerIdkey.toBytes();
-        return findClosestPeers(key, maxCount, us);
+        return findClosestPeers(key, maxCount, us, useCached);
     }
     public List<PeerAddresses> findClosestPeers(byte[] key, int maxCount, Host us) {
+        return findClosestPeers(key, maxCount, us, true);
+    }
+    public List<PeerAddresses> findClosestPeers(byte[] key, int maxCount, Host us, boolean useCached) {
         Id keyId = Id.create(Hash.sha256(key), 256);
         SortedSet<RoutingEntry> closest = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
         SortedSet<RoutingEntry> toQuery = Collections.synchronizedSortedSet(new TreeSet<>((a, b) -> compareKeys(a, b, keyId)));
         List<PeerAddresses> localClosest = engine.getKClosestPeers(key, Math.max(6, maxCount));
         if (maxCount == 1) {
             Optional<PeerAddresses> match = localClosest.stream().filter(p -> Arrays.equals(p.peerId.toBytes(), key)).findFirst();
-            if (match.isPresent())
+            if (useCached && match.isPresent())
                 return Collections.singletonList(match.get());
+            if (! useCached)
+                // Don't seed the walk with the addresses we were told are dead. Querying the target with
+                // them fails, but still marks it as queried, so we would then discard the answer about it
+                // that we are here to get, and fall back to returning the dead addresses anyway.
+                localClosest = localClosest.stream()
+                        .filter(p -> ! Arrays.equals(p.peerId.toBytes(), key))
+                        .collect(Collectors.toList());
         }
         closest.addAll(localClosest.stream()
                 .map(p -> new RoutingEntry(Id.create(Hash.sha256(p.peerId.toBytes()), 256), p))
