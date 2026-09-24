@@ -30,6 +30,13 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
     private static final int TRAFFIC_LIMIT = 8 * 1024;
     private static final int DIAL_TIMEOUT_SECONDS = 15;
     private static final int DIAL_DATA_CHUNK = 4096;
+    // Dial-backs must not run on the Netty event loop that delivered the request: a blocking dial there
+    // freezes every connection on that loop.
+    private static final Executor dialBackExec = Executors.newFixedThreadPool(4, r -> {
+        Thread t = new Thread(r, "autonat-dialback");
+        t.setDaemon(true);
+        return t;
+    });
 
     public interface AutoNat2Controller {
         default CompletableFuture<Autonatv2.DialResponse> requestDial(List<Multiaddr> addrs, long nonce) {
@@ -171,6 +178,9 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
             Multiaddr chosenAddr = null;
             for (int i = 0; i < addrs.size(); i++) {
                 Multiaddr a = addrs.get(i);
+                // spec: servers must not dial relayed addresses
+                if (a.has(io.libp2p.core.multiformats.Protocol.P2PCIRCUIT))
+                    continue;
                 Multiaddr full = a.has(io.libp2p.core.multiformats.Protocol.P2P) ? a : a.withP2P(client);
                 boolean sameIp = observedIp != null && observedIp.equals(new MultiAddress(a.toString()).getHost());
                 boolean handled = us.getNetwork().getTransports().stream().anyMatch(t -> t.handles(full));
@@ -185,7 +195,9 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
                 return;
             }
             final int addrIdx = chosen;
-            dialBackAndProve(chosenAddr, client, nonce)
+            final Multiaddr target = chosenAddr;
+            CompletableFuture.supplyAsync(() -> dialBackAndProve(target, client, nonce), dialBackExec)
+                    .thenCompose(f -> f)
                     .whenComplete((dialStatus, err) -> respond(Autonatv2.DialResponse.ResponseStatus.OK, addrIdx,
                             err != null ? Autonatv2.DialStatus.E_DIAL_ERROR : dialStatus));
         }
