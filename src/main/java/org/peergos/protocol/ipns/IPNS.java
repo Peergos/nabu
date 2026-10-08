@@ -4,6 +4,7 @@ import com.google.protobuf.*;
 import crypto.pb.*;
 import io.ipfs.cid.*;
 import io.ipfs.multihash.*;
+import io.libp2p.core.*;
 import io.libp2p.core.crypto.*;
 import io.libp2p.crypto.keys.*;
 import org.peergos.cbor.*;
@@ -126,6 +127,9 @@ public class IPNS {
                 Crypto.PublicKey publicKey = Crypto.PublicKey.parseFrom(entry.getPubKey());
                 pub = RsaKt.unmarshalRsaPublicKey(publicKey.getData().toByteArray());
             }
+            // the signing key must be the one the record is published under, not just any key that verifies
+            if (! Arrays.equals(PeerId.fromPubKey(pub).getBytes(), signer.toBytes()))
+                return Optional.empty();
             if (! pub.verify(ByteString.copyFrom("ipns-signature:".getBytes()).concat(entry.getData()).toByteArray(),
                     entry.getSignatureV2().toByteArray()))
                 return Optional.empty();
