@@ -6,7 +6,7 @@
 
     <groupId>com.github.peergos</groupId>
     <artifactId>nabu</artifactId>
-    <version>v0.9</version>
+    <version>v0.9.1</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -18,7 +18,39 @@
         <version.multiaddr>1.5.0</version.multiaddr>
         <version.kubo-http>v1.4.4</version.kubo-http>
         <kotlin.version>1.9.10</kotlin.version>
+        <version.netty>4.2.19.Final</version.netty>
+        <version.tcnative>2.0.84.Final</version.tcnative>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${version.netty}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- transitive via jedis -->
+            <dependency>
+                <groupId>org.json</groupId>
+                <artifactId>json</artifactId>
+                <version>20260814</version>
+            </dependency>
+            <!-- transitive via jedis, matches the slf4j 2 that jetty needs in peergos -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>2.0.17</version>
+            </dependency>
+            <!-- transitive via portmapper -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.22.0</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <repositories>
         <repository>
@@ -72,9 +104,9 @@
                 <version>3.1.1</version>
 
                 <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
+                    <descriptors>
+                        <descriptor>src/assembly/jar-with-dependencies.xml</descriptor>
+                    </descriptors>
                 </configuration>
 
                 <executions>
@@ -109,7 +141,7 @@
         <dependency>
             <groupId>com.github.peergos</groupId>
             <artifactId>jvm-libp2p</artifactId>
-            <version>0.21.8</version>
+            <version>0.21.9</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
@@ -119,70 +151,70 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <version>2.0.70.Final</version>
+            <version>${version.tcnative}</version>
             <classifier>linux-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <version>2.0.70.Final</version>
+            <version>${version.tcnative}</version>
             <classifier>linux-aarch_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <version>2.0.70.Final</version>
+            <version>${version.tcnative}</version>
             <classifier>osx-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <version>2.0.70.Final</version>
+            <version>${version.tcnative}</version>
             <classifier>osx-aarch_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <version>2.0.70.Final</version>
+            <version>${version.tcnative}</version>
             <classifier>windows-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-native-quic</artifactId>
-            <version>4.2.10.Final</version>
+            <version>${version.netty}</version>
             <classifier>linux-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-native-quic</artifactId>
-            <version>4.2.10.Final</version>
+            <version>${version.netty}</version>
             <classifier>linux-aarch_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-native-quic</artifactId>
-            <version>4.2.10.Final</version>
+            <version>${version.netty}</version>
             <classifier>osx-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-native-quic</artifactId>
-            <version>4.2.10.Final</version>
+            <version>${version.netty}</version>
             <classifier>osx-aarch_64</classifier>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-native-quic</artifactId>
-            <version>4.2.10.Final</version>
+            <version>${version.netty}</version>
             <classifier>windows-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
@@ -194,7 +226,12 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-http2</artifactId>
-            <version>4.1.108.Final</version>
+            <version>${version.netty}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-protobuf</artifactId>
+            <version>${version.netty}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -207,9 +244,9 @@
             <version>4.1</version>
         </dependency>
         <dependency>
-            <groupId>com.github.dnsjava</groupId>
+            <groupId>dnsjava</groupId>
             <artifactId>dnsjava</artifactId>
-            <version>v3.5.2</version>
+            <version>3.6.5</version>
         </dependency>
         <dependency>
             <groupId>com.offbynull.portmapper</groupId>
