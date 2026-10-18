@@ -137,6 +137,31 @@ public class EmbeddedIpfsTest {
         node1.stop();
     }
 
+    /** The other tests resolve on the publishing node, which answers from its own record store. */
+    @Test
+    public void resolveValueFromAnotherNode() throws Exception {
+        RamRecordStore records = new RamRecordStore();
+        int port1 = TestPorts.getPort();
+        EmbeddedIpfs node1 = build(records, List.of(), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + port1)), Optional.empty());
+        node1.start(false);
+        MultiAddress node1Addr = new MultiAddress("/ip4/127.0.0.1/tcp/" + port1 + "/p2p/" + node1.node.getPeerId());
+        EmbeddedIpfs node2 = build(List.of(node1Addr), List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
+        node2.start(false);
+
+        PrivKey publisher = Ed25519Kt.generateEd25519KeyPair().getFirst();
+        byte[] value = "Held by another node".getBytes();
+        io.ipfs.multihash.Multihash pub = Multihash.deserialize(PeerId.fromPubKey(publisher.publicKey()).getBytes());
+        LocalDateTime expiry = LocalDateTime.now().plusHours(24);
+        byte[] signedRecord = IPNS.createSignedRecord(value, expiry, 1, 24 * 3600_000_000_000L, Optional.empty(), Optional.empty(), publisher);
+        records.put(pub, IPNS.parseAndValidateIpnsEntry(IPNS.getKey(pub), signedRecord).get().value);
+
+        byte[] res = node2.resolveValue(publisher.publicKey(), 1).join();
+        Assert.assertArrayEquals(value, res);
+
+        node1.stop();
+        node2.stop();
+    }
+
     @Test
     public void publishPresignedValue() throws Exception {
         EmbeddedIpfs node1 = build(BootstrapTest.BOOTSTRAP_NODES, List.of(new MultiAddress("/ip4/127.0.0.1/tcp/" + TestPorts.getPort())));
@@ -203,12 +228,16 @@ public class EmbeddedIpfsTest {
     }
 
     public static EmbeddedIpfs build(List<MultiAddress> bootstrap, List<MultiAddress> swarmAddresses, Optional<HttpProtocol.HttpRequestProcessor> http) {
+        return build(new RamRecordStore(), bootstrap, swarmAddresses, http);
+    }
+
+    public static EmbeddedIpfs build(RecordStore records, List<MultiAddress> bootstrap, List<MultiAddress> swarmAddresses, Optional<HttpProtocol.HttpRequestProcessor> http) {
         BlockRequestAuthoriser blockRequestAuthoriser = (c, p, a) -> CompletableFuture.completedFuture(true);
         HostBuilder builder = new HostBuilder(new RamAddressBook()).generateIdentity();
         PrivKey privKey = builder.getPrivateKey();
         PeerId peerId = builder.getPeerId();
         IdentitySection id = new IdentitySection(privKey.bytes(), peerId);
-        return EmbeddedIpfs.build(new RamRecordStore(), new RamBlockstore(), true, swarmAddresses, bootstrap,
+        return EmbeddedIpfs.build(records, new RamBlockstore(), true, swarmAddresses, bootstrap,
                 id, blockRequestAuthoriser, http);
     }
 }
