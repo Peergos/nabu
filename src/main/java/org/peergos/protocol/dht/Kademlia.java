@@ -396,7 +396,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                 .map(p -> {
                     StreamPromise<? extends KademliaController> conn = dialPeer(p, us);
                     return conn.getController()
-                            .thenCompose(contr -> contr.provide(block, ourAddrs))
+                            .thenComposeAsync(contr -> contr.provide(block, ourAddrs), ioExec)
                             .thenApply(res -> {
                                 conn.getStream().thenApply(s -> s.close());
                                 return res;
@@ -555,15 +555,17 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     private CompletableFuture<Optional<GetResult>> getValueFromPeer(PeerAddresses peer, Multihash publisher, Host us) {
         try {
             StreamPromise<? extends KademliaController> conn = dialPeer(peer, us);
+            // The controller completes on a netty thread before the stream is ready for a request, and the remote
+            // resets a stream written to from that callback, so the request is sent from our own executor.
             return conn.getController()
                     .orTimeout(1, TimeUnit.SECONDS)
-                    .thenCompose(controller -> controller.getValue(publisher)
-                            .orTimeout(1, TimeUnit.SECONDS)
-                            .thenApply(result -> {
-                                conn.getStream().thenApply(s -> s.close());
-                                return Optional.<GetResult>of(result);
-                            }))
-                    .exceptionally(e -> Optional.empty());
+                    .thenComposeAsync(controller -> closeAfter(conn.getStream(),
+                            () -> controller.getValue(publisher).orTimeout(1, TimeUnit.SECONDS)), ioExec)
+                    .thenApply(Optional::of)
+                    .exceptionally(e -> {
+                        conn.getStream().thenApply(s -> s.close());
+                        return Optional.empty();
+                    });
         } catch (Exception e) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
