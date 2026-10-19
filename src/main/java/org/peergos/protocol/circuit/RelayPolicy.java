@@ -4,6 +4,7 @@ import io.libp2p.core.*;
 import io.libp2p.core.multiformats.*;
 import io.libp2p.protocol.circuit.RelayTransport.CandidateRelay;
 
+import java.time.*;
 import java.util.*;
 import java.util.function.*;
 
@@ -12,8 +13,8 @@ import java.util.function.*;
  */
 public class RelayPolicy {
     public final Function<Host, List<CandidateRelay>> candidates;
-    /** The requestor and the address we observe it on. */
-    public final BiPredicate<PeerId, Multiaddr> mayReserve;
+    /** Given the requestor and the address we observe it on, how long a reservation to grant it, if any. */
+    public final BiFunction<PeerId, Multiaddr, Optional<Duration>> reserve;
     /** The reserved target and the initiator dialling it. */
     public final BiPredicate<PeerId, PeerId> mayConnect;
     public final int maxReservations;
@@ -28,18 +29,19 @@ public class RelayPolicy {
                        BiPredicate<PeerId, Multiaddr> mayReserve,
                        BiPredicate<PeerId, PeerId> mayConnect,
                        int maxReservations) {
-        this(candidates, mayReserve, mayConnect, maxReservations, 2, 0, Optional.empty());
+        this(candidates, (p, a) -> mayReserve.test(p, a) ? Optional.of(Duration.ofHours(1)) : Optional.empty(),
+                mayConnect, maxReservations, 2, 0, Optional.empty());
     }
 
     public RelayPolicy(Function<Host, List<CandidateRelay>> candidates,
-                       BiPredicate<PeerId, Multiaddr> mayReserve,
+                       BiFunction<PeerId, Multiaddr, Optional<Duration>> reserve,
                        BiPredicate<PeerId, PeerId> mayConnect,
                        int maxReservations,
                        int relaysHeld,
                        int relaysHeldWhilePublic,
                        Optional<RelayBandwidth> bandwidth) {
         this.candidates = candidates;
-        this.mayReserve = mayReserve;
+        this.reserve = reserve;
         this.mayConnect = mayConnect;
         this.maxReservations = maxReservations;
         this.relaysHeld = relaysHeld;

@@ -98,12 +98,30 @@ public class GatingRelayManagerTest {
         PeerId us = PeerId.fromPubKey(priv.publicKey());
         RelayBandwidth bw = new RelayBandwidth(1_000, 1_000, 1_000_000, 1_000_000);
         GatingRelayManager manager = new GatingRelayManager(priv, us, 5, 0, 3600, () -> true,
-                (p, a) -> true, (t, i) -> true, LocalDateTime::now, Optional.of(bw));
+                (p, a) -> Optional.of(Duration.ofHours(1)), (t, i) -> true, LocalDateTime::now, Optional.of(bw));
         PeerId target = PeerId.random();
         Assert.assertEquals(0, manager.createReservation(target, new Multiaddr("/ip4/1.2.3.4/tcp/4001")).get().maxBytes);
         Assert.assertEquals(0, manager.forwarded(target, 1_000));
         Assert.assertTrue(manager.forwarded(target, 1_000) > 0);
         Assert.assertEquals("unmetered", 0, new GatingRelayManager(priv, us, 5, 1 << 20, 120, () -> true).forwarded(target, 1 << 30));
+    }
+
+
+    @Test
+    public void thePolicySaysHowLongEachReservationLasts() {
+        PrivKey priv = Ed25519Kt.generateEd25519KeyPair().getFirst();
+        PeerId us = PeerId.fromPubKey(priv.publicKey());
+        PeerId leased = PeerId.random(), full = PeerId.random();
+        AtomicReference<LocalDateTime> now = new AtomicReference<>(LocalDateTime.of(2026, 1, 1, 0, 0));
+        GatingRelayManager manager = new GatingRelayManager(priv, us, 5, 0, 3600, () -> true,
+                (p, a) -> Optional.of(p.equals(leased) ? Duration.ofMinutes(15) : Duration.ofHours(1)),
+                (t, i) -> true, now::get, Optional.empty());
+        Multiaddr observed = new Multiaddr("/ip4/1.2.3.4/tcp/4001");
+        Assert.assertEquals(now.get().plusMinutes(15), manager.createReservation(leased, observed).get().expiry);
+        Assert.assertEquals(now.get().plusHours(1), manager.createReservation(full, observed).get().expiry);
+        now.set(now.get().plusMinutes(20));
+        Assert.assertFalse(manager.hasReservation(leased));
+        Assert.assertTrue(manager.hasReservation(full));
     }
 
 }

@@ -34,7 +34,7 @@ public class GatingRelayManager implements CircuitHopProtocol.RelayManager {
     private final long maxBytes;
     private final int durationSeconds;
     private final Supplier<Boolean> shouldRelay;
-    private final BiPredicate<PeerId, Multiaddr> mayReserve;
+    private final BiFunction<PeerId, Multiaddr, Optional<Duration>> reserve;
     private final BiPredicate<PeerId, PeerId> mayConnect;
     private final Supplier<LocalDateTime> clock;
     private final Optional<RelayBandwidth> bandwidth;
@@ -49,12 +49,14 @@ public class GatingRelayManager implements CircuitHopProtocol.RelayManager {
                               int durationSeconds, Supplier<Boolean> shouldRelay,
                               BiPredicate<PeerId, Multiaddr> mayReserve, BiPredicate<PeerId, PeerId> mayConnect,
                               Supplier<LocalDateTime> clock) {
-        this(priv, relayId, concurrent, maxBytes, durationSeconds, shouldRelay, mayReserve, mayConnect, clock, Optional.empty());
+        this(priv, relayId, concurrent, maxBytes, durationSeconds, shouldRelay,
+                (p, a) -> mayReserve.test(p, a) ? Optional.of(Duration.ofHours(1)) : Optional.empty(),
+                mayConnect, clock, Optional.empty());
     }
 
     public GatingRelayManager(PrivKey priv, PeerId relayId, int concurrent, long maxBytes,
                               int durationSeconds, Supplier<Boolean> shouldRelay,
-                              BiPredicate<PeerId, Multiaddr> mayReserve, BiPredicate<PeerId, PeerId> mayConnect,
+                              BiFunction<PeerId, Multiaddr, Optional<Duration>> reserve, BiPredicate<PeerId, PeerId> mayConnect,
                               Supplier<LocalDateTime> clock, Optional<RelayBandwidth> bandwidth) {
         this.bandwidth = bandwidth;
         this.priv = priv;
@@ -63,7 +65,7 @@ public class GatingRelayManager implements CircuitHopProtocol.RelayManager {
         this.maxBytes = maxBytes;
         this.durationSeconds = durationSeconds;
         this.shouldRelay = shouldRelay;
-        this.mayReserve = mayReserve;
+        this.reserve = reserve;
         this.mayConnect = mayConnect;
         this.clock = clock;
     }
@@ -77,7 +79,7 @@ public class GatingRelayManager implements CircuitHopProtocol.RelayManager {
         boolean metered = policy.bandwidth.isPresent();
         return new GatingRelayManager(priv, us, policy.maxReservations, metered ? 0 : DEFAULT_MAX_BYTES,
                 metered ? METERED_DURATION_SECONDS : DEFAULT_DURATION_SECONDS,
-                () -> reachability.getReachability() == Reachability.PUBLIC, policy.mayReserve, policy.mayConnect,
+                () -> reachability.getReachability() == Reachability.PUBLIC, policy.reserve, policy.mayConnect,
                 LocalDateTime::now, policy.bandwidth);
     }
 
@@ -103,12 +105,13 @@ public class GatingRelayManager implements CircuitHopProtocol.RelayManager {
         if (! shouldRelay.get())
             return Optional.empty();
         dropExpired();
-        if (! mayReserve.test(requestor, observedAddr))
-            return Optional.empty();
         if (reservations.size() >= concurrent && ! reservations.containsKey(requestor))
             return Optional.empty();
+        Optional<Duration> length = reserve.apply(requestor, observedAddr);
+        if (length.isEmpty())
+            return Optional.empty();
         LocalDateTime now = clock.get();
-        LocalDateTime expiry = now.plusHours(1);
+        LocalDateTime expiry = now.plus(length.get());
         byte[] voucher = CircuitHopProtocol.createVoucher(priv, relayId, requestor, now);
         Reservation resv = new Reservation(expiry, durationSeconds, maxBytes, voucher, new Multiaddr[]{observedAddr});
         reservations.put(requestor, resv);
