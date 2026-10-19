@@ -19,23 +19,27 @@ public class RelayPolicy {
     public final int maxReservations;
     /** How many relays to hold reservations on while not publicly reachable. */
     public final int relaysHeld;
+    /** And while publicly reachable, for a peer whose public address may not last. */
+    public final int relaysHeldWhilePublic;
 
     public RelayPolicy(Function<Host, List<CandidateRelay>> candidates,
                        BiPredicate<PeerId, Multiaddr> mayReserve,
                        BiPredicate<PeerId, PeerId> mayConnect,
                        int maxReservations) {
-        this(candidates, mayReserve, mayConnect, maxReservations, 2);
+        this(candidates, mayReserve, mayConnect, maxReservations, 2, 0);
     }
 
     public RelayPolicy(Function<Host, List<CandidateRelay>> candidates,
                        BiPredicate<PeerId, Multiaddr> mayReserve,
                        BiPredicate<PeerId, PeerId> mayConnect,
                        int maxReservations,
-                       int relaysHeld) {
+                       int relaysHeld,
+                       int relaysHeldWhilePublic) {
         this.candidates = candidates;
         this.mayReserve = mayReserve;
         this.mayConnect = mayConnect;
         this.maxReservations = maxReservations;
         this.relaysHeld = relaysHeld;
+        this.relaysHeldWhilePublic = relaysHeldWhilePublic;
     }
 }
