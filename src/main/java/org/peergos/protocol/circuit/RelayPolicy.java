@@ -17,14 +17,25 @@ public class RelayPolicy {
     /** The reserved target and the initiator dialling it. */
     public final BiPredicate<PeerId, PeerId> mayConnect;
     public final int maxReservations;
+    /** How many relays to hold reservations on while not publicly reachable. */
+    public final int relaysHeld;
 
     public RelayPolicy(Function<Host, List<CandidateRelay>> candidates,
                        BiPredicate<PeerId, Multiaddr> mayReserve,
                        BiPredicate<PeerId, PeerId> mayConnect,
                        int maxReservations) {
+        this(candidates, mayReserve, mayConnect, maxReservations, 2);
+    }
+
+    public RelayPolicy(Function<Host, List<CandidateRelay>> candidates,
+                       BiPredicate<PeerId, Multiaddr> mayReserve,
+                       BiPredicate<PeerId, PeerId> mayConnect,
+                       int maxReservations,
+                       int relaysHeld) {
         this.candidates = candidates;
         this.mayReserve = mayReserve;
         this.mayConnect = mayConnect;
         this.maxReservations = maxReservations;
+        this.relaysHeld = relaysHeld;
     }
 }

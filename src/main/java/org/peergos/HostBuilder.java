@@ -51,6 +51,7 @@ public class HostBuilder {
     private CircuitHopProtocol.Binding relayHop;
     private CircuitStopProtocol.Binding relayStop;
     private Function<Host, List<RelayTransport.CandidateRelay>> relayCandidates;
+    private int relaysHeld = 2;
     private DcutrProtocol.Binding dcutr;
 
     public HostBuilder(AddressBook addrs) {
@@ -83,6 +84,7 @@ public class HostBuilder {
         this.relayStop = new CircuitStopProtocol.Binding(new CircuitStopProtocol());
         this.relayHop = new CircuitHopProtocol.Binding(manager, relayStop);
         this.relayCandidates = policy.candidates;
+        this.relaysHeld = policy.relaysHeld;
         return this;
     }
 
@@ -223,7 +225,7 @@ public class HostBuilder {
         if (muxers.isEmpty())
             muxers.addAll(List.of(StreamMuxerProtocol.getYamux(MAX_BUFFERED_CONNECTION_WRITES),
                     StreamMuxerProtocol.getMplex()));
-        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, relayHop, relayStop, relayCandidates, dcutr);
+        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, relayHop, relayStop, relayCandidates, relaysHeld, dcutr);
     }
 
     public static Host build(PrivKey privKey,
@@ -252,6 +254,20 @@ public class HostBuilder {
                              CircuitHopProtocol.Binding relayHop,
                              CircuitStopProtocol.Binding relayStop,
                              Function<Host, List<RelayTransport.CandidateRelay>> relayCandidates,
+                             DcutrProtocol.Binding dcutr) {
+        return build(privKey, listenAddrs, protocols, muxers, addrs, reachability, relayHop, relayStop, relayCandidates, 2, dcutr);
+    }
+
+    public static Host build(PrivKey privKey,
+                             List<String> listenAddrs,
+                             List<ProtocolBinding> protocols,
+                             List<StreamMuxerProtocol> muxers,
+                             AddressBook addrs,
+                             ReachabilityManager reachability,
+                             CircuitHopProtocol.Binding relayHop,
+                             CircuitStopProtocol.Binding relayStop,
+                             Function<Host, List<RelayTransport.CandidateRelay>> relayCandidates,
+                             int relaysHeld,
                              DcutrProtocol.Binding dcutr) {
         Host host = BuilderJKt.hostJ(Builder.Defaults.None, b -> {
             b.getIdentity().setFactory(() -> privKey);
@@ -387,7 +403,7 @@ public class HostBuilder {
                             });
                             reachability.addListener(state -> {
                                 if (state == ReachabilityManager.Reachability.PRIVATE) {
-                                    rt.setRelayCount(2);
+                                    rt.setRelayCount(relaysHeld);
                                     autoRelayRunner.submit(rt::ensureEnoughCurrentRelays);
                                 } else if (state == ReachabilityManager.Reachability.PUBLIC) {
                                     rt.setRelayCount(0);
