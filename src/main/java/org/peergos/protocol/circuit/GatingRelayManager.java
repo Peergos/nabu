@@ -25,6 +25,8 @@ public class GatingRelayManager implements CircuitHopProtocol.RelayManager {
     // Enough headroom to establish a relayed connection and negotiate DCUtR over it.
     private static final long DEFAULT_MAX_BYTES = 1 << 20; // 1 MiB
     private static final int DEFAULT_DURATION_SECONDS = 120;
+    /** With bandwidth metered per target, a circuit lasts as long as the reservation it was made under. */
+    private static final int METERED_DURATION_SECONDS = 3600;
 
     private final PrivKey priv;
     private final PeerId relayId;
@@ -35,6 +37,7 @@ public class GatingRelayManager implements CircuitHopProtocol.RelayManager {
     private final BiPredicate<PeerId, Multiaddr> mayReserve;
     private final BiPredicate<PeerId, PeerId> mayConnect;
     private final Supplier<LocalDateTime> clock;
+    private final Optional<RelayBandwidth> bandwidth;
     private final Map<PeerId, Reservation> reservations = new HashMap<>();
 
     public GatingRelayManager(PrivKey priv, PeerId relayId, int concurrent, long maxBytes,
@@ -46,6 +49,14 @@ public class GatingRelayManager implements CircuitHopProtocol.RelayManager {
                               int durationSeconds, Supplier<Boolean> shouldRelay,
                               BiPredicate<PeerId, Multiaddr> mayReserve, BiPredicate<PeerId, PeerId> mayConnect,
                               Supplier<LocalDateTime> clock) {
+        this(priv, relayId, concurrent, maxBytes, durationSeconds, shouldRelay, mayReserve, mayConnect, clock, Optional.empty());
+    }
+
+    public GatingRelayManager(PrivKey priv, PeerId relayId, int concurrent, long maxBytes,
+                              int durationSeconds, Supplier<Boolean> shouldRelay,
+                              BiPredicate<PeerId, Multiaddr> mayReserve, BiPredicate<PeerId, PeerId> mayConnect,
+                              Supplier<LocalDateTime> clock, Optional<RelayBandwidth> bandwidth) {
+        this.bandwidth = bandwidth;
         this.priv = priv;
         this.relayId = relayId;
         this.concurrent = concurrent;
@@ -63,8 +74,16 @@ public class GatingRelayManager implements CircuitHopProtocol.RelayManager {
     }
 
     public static GatingRelayManager withPolicy(PrivKey priv, PeerId us, RelayPolicy policy, ReachabilityManager reachability) {
-        return new GatingRelayManager(priv, us, policy.maxReservations, DEFAULT_MAX_BYTES, DEFAULT_DURATION_SECONDS,
-                () -> reachability.getReachability() == Reachability.PUBLIC, policy.mayReserve, policy.mayConnect, LocalDateTime::now);
+        boolean metered = policy.bandwidth.isPresent();
+        return new GatingRelayManager(priv, us, policy.maxReservations, metered ? 0 : DEFAULT_MAX_BYTES,
+                metered ? METERED_DURATION_SECONDS : DEFAULT_DURATION_SECONDS,
+                () -> reachability.getReachability() == Reachability.PUBLIC, policy.mayReserve, policy.mayConnect,
+                LocalDateTime::now, policy.bandwidth);
+    }
+
+    @Override
+    public long forwarded(PeerId target, long bytes) {
+        return bandwidth.map(b -> b.charge(target, bytes)).orElse(0L);
     }
 
     /** Without this a relay fills up with reservations that expired long ago and refuses every new one. */

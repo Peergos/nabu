@@ -8,6 +8,7 @@ import org.junit.*;
 import org.peergos.protocol.circuit.*;
 
 import java.time.*;
+import java.util.*;
 import java.util.concurrent.atomic.*;
 
 public class GatingRelayManagerTest {
@@ -72,6 +73,37 @@ public class GatingRelayManagerTest {
         Assert.assertTrue(manager.allowConnection(known, friend).isPresent());
         Assert.assertTrue(manager.allowConnection(known, stranger).isEmpty());
         Assert.assertTrue("no reservation, no connection", manager.allowConnection(stranger, friend).isEmpty());
+    }
+
+
+    @Test
+    public void bandwidthIsMeteredPerTargetAcrossCircuitsAndInTotal() {
+        long[] nanos = {0};
+        RelayBandwidth bw = new RelayBandwidth(1_000, 10_000, 3_000, 30_000, () -> nanos[0]);
+        PeerId a = PeerId.random(), b = PeerId.random();
+        Assert.assertEquals("within the burst", 0, bw.charge(a, 6_000));
+        Assert.assertEquals("another circuit to the same target shares its budget", 0, bw.charge(a, 4_000));
+        Assert.assertEquals("a second of debt at 1 KB/s", 1_000, bw.charge(a, 1_000));
+        Assert.assertEquals("another target has its own", 0, bw.charge(b, 10_000));
+        nanos[0] += 2_000_000_000L;
+        Assert.assertEquals("paid off, and a second's worth refilled", 0, bw.charge(a, 1_000));
+
+        Assert.assertEquals(0, bw.charge(PeerId.random(), 10_000));
+        Assert.assertTrue("a fresh target, but the relay's total has run out", bw.charge(PeerId.random(), 10_000) > 0);
+    }
+
+    @Test
+    public void aMeteredRelayLiftsThePerCircuitLimit() {
+        PrivKey priv = Ed25519Kt.generateEd25519KeyPair().getFirst();
+        PeerId us = PeerId.fromPubKey(priv.publicKey());
+        RelayBandwidth bw = new RelayBandwidth(1_000, 1_000, 1_000_000, 1_000_000);
+        GatingRelayManager manager = new GatingRelayManager(priv, us, 5, 0, 3600, () -> true,
+                (p, a) -> true, (t, i) -> true, LocalDateTime::now, Optional.of(bw));
+        PeerId target = PeerId.random();
+        Assert.assertEquals(0, manager.createReservation(target, new Multiaddr("/ip4/1.2.3.4/tcp/4001")).get().maxBytes);
+        Assert.assertEquals(0, manager.forwarded(target, 1_000));
+        Assert.assertTrue(manager.forwarded(target, 1_000) > 0);
+        Assert.assertEquals("unmetered", 0, new GatingRelayManager(priv, us, 5, 1 << 20, 120, () -> true).forwarded(target, 1 << 30));
     }
 
 }

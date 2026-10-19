@@ -21,12 +21,14 @@ public class RelayPolicy {
     public final int relaysHeld;
     /** And while publicly reachable, for a peer whose public address may not last. */
     public final int relaysHeldWhilePublic;
+    /** Without it, each circuit is limited instead, enough to set up a connection and hole-punch. */
+    public final Optional<RelayBandwidth> bandwidth;
 
     public RelayPolicy(Function<Host, List<CandidateRelay>> candidates,
                        BiPredicate<PeerId, Multiaddr> mayReserve,
                        BiPredicate<PeerId, PeerId> mayConnect,
                        int maxReservations) {
-        this(candidates, mayReserve, mayConnect, maxReservations, 2, 0);
+        this(candidates, mayReserve, mayConnect, maxReservations, 2, 0, Optional.empty());
     }
 
     public RelayPolicy(Function<Host, List<CandidateRelay>> candidates,
@@ -34,12 +36,14 @@ public class RelayPolicy {
                        BiPredicate<PeerId, PeerId> mayConnect,
                        int maxReservations,
                        int relaysHeld,
-                       int relaysHeldWhilePublic) {
+                       int relaysHeldWhilePublic,
+                       Optional<RelayBandwidth> bandwidth) {
         this.candidates = candidates;
         this.mayReserve = mayReserve;
         this.mayConnect = mayConnect;
         this.maxReservations = maxReservations;
         this.relaysHeld = relaysHeld;
         this.relaysHeldWhilePublic = relaysHeldWhilePublic;
+        this.bandwidth = bandwidth;
     }
 }
