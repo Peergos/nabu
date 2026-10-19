@@ -77,6 +77,15 @@ public class HostBuilder {
         return this;
     }
 
+    /** Relaying and choosing relays as the policy says, rather than for and through any peer. */
+    public HostBuilder enableRelay(RelayPolicy policy) {
+        CircuitHopProtocol.RelayManager manager = GatingRelayManager.withPolicy(privKey, peerId, policy, reachability);
+        this.relayStop = new CircuitStopProtocol.Binding(new CircuitStopProtocol());
+        this.relayHop = new CircuitHopProtocol.Binding(manager, relayStop);
+        this.relayCandidates = policy.candidates;
+        return this;
+    }
+
     public HostBuilder enableDcutr() {
         return enableDcutr(conn -> {});
     }

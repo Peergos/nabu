@@ -13,6 +13,7 @@ import io.libp2p.core.multiformats.Protocol;
 import io.libp2p.core.multistream.ProtocolBinding;
 import io.libp2p.discovery.MDnsDiscovery;
 import io.libp2p.protocol.Ping;
+import io.libp2p.protocol.circuit.RelayTransport;
 import org.peergos.blockstore.*;
 import org.peergos.blockstore.metadatadb.BlockMetadataStore;
 import org.peergos.blockstore.metadatadb.JdbcBlockMetadataStore;
@@ -183,6 +184,28 @@ public class EmbeddedPeer {
                                      List<MultiAddress> announce,
                                      AddressBook addrs,
                                      Optional<HttpProtocol.HttpRequestProcessor> handler) {
+        return build(records, swarmAddresses, bootstrap, identity, announce, addrs, handler, Optional.empty());
+    }
+
+    /** The addresses we are reachable on through the relays we hold reservations on. */
+    public List<Multiaddr> relayAddresses() {
+        return node.getNetwork().getTransports().stream()
+                .filter(t -> t instanceof RelayTransport)
+                .flatMap(t -> ((RelayTransport) t).listenAddresses().stream())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * @param relays which relays we reserve on and whom we relay for; absent, any peer we know of
+     */
+    public static EmbeddedPeer build(RecordStore records,
+                                     List<MultiAddress> swarmAddresses,
+                                     List<MultiAddress> bootstrap,
+                                     IdentitySection identity,
+                                     List<MultiAddress> announce,
+                                     AddressBook addrs,
+                                     Optional<HttpProtocol.HttpRequestProcessor> handler,
+                                     Optional<RelayPolicy> relays) {
         ProviderStore providers = new RamProviderStore(10_000);
 
         HostBuilder builder = new HostBuilder(addrs)
@@ -208,10 +231,12 @@ public class EmbeddedPeer {
         httpHandler.ifPresent(protocols::add);
 
         // Circuit relay v2 (upstream), only relaying for others when we are publicly reachable
-        Host node = builder.addProtocols(protocols)
-                .enableRelay(Relay.candidateRelaySource(dht))
-                .enableDcutr()
-                .build();
+        builder.addProtocols(protocols);
+        if (relays.isPresent())
+            builder.enableRelay(relays.get());
+        else
+            builder.enableRelay(Relay.candidateRelaySource(dht));
+        Host node = builder.enableDcutr().build();
 
         EmbeddedPeer peer = new EmbeddedPeer(node, records, dht, httpHandler, bootstrap, announce);
         peer.reachability = builder.getReachability();
