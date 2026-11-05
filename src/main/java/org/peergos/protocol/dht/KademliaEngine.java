@@ -102,8 +102,9 @@ public class KademliaEngine {
         }
         return nodes.stream()
                 .map(n -> {
-                    List<Multiaddr> addrs = new ArrayList<>(addressBook.getAddrs(PeerId.fromBase58(n.getLink())).join());
-                    return new PeerAddresses(Multihash.fromBase58(n.getLink()), addrs);
+                    Multihash peer = Multihash.fromBase58(n.getLink());
+                    List<Multiaddr> addrs = new ArrayList<>(addressBook.getAddrs(new PeerId(peer.toBytes())).join());
+                    return new PeerAddresses(peer, addrs);
                 })
                 .filter(p -> ! p.addresses.isEmpty())
                 .collect(Collectors.toList());
