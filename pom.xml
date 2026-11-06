@@ -31,6 +31,13 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- jvm-libp2p's QUIC is the kwik based Netty fork (https://github.com/Peergos/netty/tree/kwik); without
+                 this the bom would replace it with netty's own, which needs the quiche native libraries -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-codec-classes-quic</artifactId>
+                <version>${version.netty}-kwik</version>
+            </dependency>
             <!-- transitive via jedis -->
             <dependency>
                 <groupId>org.json</groupId>
@@ -141,7 +148,7 @@
         <dependency>
             <groupId>com.github.peergos</groupId>
             <artifactId>jvm-libp2p</artifactId>
-            <version>0.21.12</version>
+            <version>0.22.0</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
@@ -180,41 +187,6 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
             <version>${version.tcnative}</version>
-            <classifier>windows-x86_64</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-native-quic</artifactId>
-            <version>${version.netty}</version>
-            <classifier>linux-x86_64</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-native-quic</artifactId>
-            <version>${version.netty}</version>
-            <classifier>linux-aarch_64</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-native-quic</artifactId>
-            <version>${version.netty}</version>
-            <classifier>osx-x86_64</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-native-quic</artifactId>
-            <version>${version.netty}</version>
-            <classifier>osx-aarch_64</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-native-quic</artifactId>
-            <version>${version.netty}</version>
             <classifier>windows-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
