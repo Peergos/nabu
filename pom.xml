@@ -31,13 +31,6 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <!-- jvm-libp2p's QUIC is the kwik based Netty fork (https://github.com/Peergos/netty/tree/kwik); without
-                 this the bom would replace it with netty's own, which needs the quiche native libraries -->
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-codec-classes-quic</artifactId>
-                <version>${version.netty}-kwik</version>
-            </dependency>
             <!-- transitive via jedis -->
             <dependency>
                 <groupId>org.json</groupId>
