@@ -106,10 +106,10 @@ public class HttpProxyTest {
         System.out.println("Done in " + (System.currentTimeMillis() - t0) + "mS");
 
         try {
-            String peerId = "QmUUv85Z8fq5VMBDVRZfSVVrNKss5J5M2j17mB3CWVxK78";
+            String peerId = "12D3KooWHDE1NPUkiW1oohsVgBe5EJwXkFBEHzUw2wxmqPQwy59j";
 //            String peerId = "QmVdFZgHnEgcedCS2G2ZNiEN59LuVrnRm7z3yXtEBv2XiF";
             List<PeerAddresses> closestPeers = dht.findClosestPeers(Multihash.fromBase58(peerId), 1, node1);
-//            Multiaddr address2 = new Multiaddr("/ip4/50.116.48.246/tcp/4001/p2p/QmUUv85Z8fq5VMBDVRZfSVVrNKss5J5M2j17mB3CWVxK78");
+//            Multiaddr address2 = new Multiaddr("/ip4/23.239.12.40/tcp/4001/p2p/12D3KooWHDE1NPUkiW1oohsVgBe5EJwXkFBEHzUw2wxmqPQwy59j");
             Multiaddr[] addrs = closestPeers.get(0).addresses.stream().map(a -> new Multiaddr(a.toString())).toArray(Multiaddr[]::new);
 
             FullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST,

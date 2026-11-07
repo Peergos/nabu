@@ -10,8 +10,8 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <kotlin.version>1.6.21</kotlin.version>
         <version.junit>4.13.2</version.junit>
         <version.hamcrest>2.2</version.hamcrest>
@@ -141,7 +141,7 @@
         <dependency>
             <groupId>com.github.peergos</groupId>
             <artifactId>jvm-libp2p</artifactId>
-            <version>0.21.12</version>
+            <version>0.21.16</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
@@ -180,41 +180,6 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
             <version>${version.tcnative}</version>
-            <classifier>windows-x86_64</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-native-quic</artifactId>
-            <version>${version.netty}</version>
-            <classifier>linux-x86_64</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-native-quic</artifactId>
-            <version>${version.netty}</version>
-            <classifier>linux-aarch_64</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-native-quic</artifactId>
-            <version>${version.netty}</version>
-            <classifier>osx-x86_64</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-native-quic</artifactId>
-            <version>${version.netty}</version>
-            <classifier>osx-aarch_64</classifier>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-native-quic</artifactId>
-            <version>${version.netty}</version>
             <classifier>windows-x86_64</classifier>
             <scope>runtime</scope>
         </dependency>
