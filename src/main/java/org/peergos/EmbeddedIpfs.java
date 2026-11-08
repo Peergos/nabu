@@ -314,7 +314,7 @@ public class EmbeddedIpfs {
         Optional<HttpProtocol.Binding> httpHandler = handler.map(HttpProtocol.Binding::new);
 
         List<ProtocolBinding> protocols = new ArrayList<>();
-        protocols.add(new Ping());
+        protocols.add(new IdleTimeoutPing());
         protocols.add(new AutonatProtocol.Binding());
         protocols.addAll(AutonatV2.protocols());
         Optional<Bitswap> bitswap = runBitswap ?

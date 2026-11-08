@@ -4,6 +4,7 @@ import io.libp2p.core.*;
 import io.libp2p.protocol.*;
 import io.prometheus.client.*;
 import org.jetbrains.annotations.*;
+import org.peergos.protocol.StreamTimeouts;
 import org.peergos.protocol.dht.pb.Dht;
 
 import java.util.concurrent.*;
@@ -49,7 +50,8 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
     @Override
     protected CompletableFuture<KademliaController> onStartResponder(@NotNull Stream stream) {
         engine.addIncomingConnection(stream.remotePeerId());
-        IncomingRequestHandler handler = new IncomingRequestHandler(engine);
+        StreamTimeouts.closeWhenIdle(stream);
+        IncomingRequestHandler handler = new IncomingRequestHandler(engine, stream);
         stream.pushHandler(handler);
         return CompletableFuture.completedFuture(handler);
     }
@@ -100,14 +102,22 @@ public class KademliaProtocol extends ProtobufProtocolHandler<KademliaController
 
     class IncomingRequestHandler implements ProtocolMessageHandler<Dht.Message>, KademliaController {
         private final KademliaEngine engine;
+        private final Stream stream;
 
-        public IncomingRequestHandler(KademliaEngine engine) {
+        public IncomingRequestHandler(KademliaEngine engine, Stream stream) {
             this.engine = engine;
+            this.stream = stream;
         }
 
         @Override
         public void onMessage(@NotNull Stream stream, Dht.Message msg) {
             requestHandlers.execute(() -> engine.receiveRequest(msg, stream.remotePeerId(), stream));
+        }
+
+        /** e.g. a request we can't decode: receiveRequest, which closes the stream once it has replied, never runs */
+        @Override
+        public void onException(@Nullable Throwable cause) {
+            stream.close();
         }
 
         @Override

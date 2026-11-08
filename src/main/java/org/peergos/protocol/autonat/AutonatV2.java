@@ -10,6 +10,7 @@ import io.libp2p.core.transport.*;
 import io.libp2p.protocol.*;
 import org.jetbrains.annotations.*;
 import org.peergos.HostConsumer;
+import org.peergos.protocol.StreamTimeouts;
 import org.peergos.protocol.autonat.pb.*;
 
 import java.util.*;
@@ -30,6 +31,10 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
     private static final int TRAFFIC_LIMIT = 8 * 1024;
     private static final int DIAL_TIMEOUT_SECONDS = 15;
     private static final int DIAL_DATA_CHUNK = 4096;
+    // go-libp2p's defaults. Clients that can't settle their reachability keep asking, and a bootstrap node is asked
+    // by every one of them.
+    static final int MAX_REQUESTS_PER_PEER_PER_MINUTE = 12;
+    static final int MAX_REQUESTS_PER_MINUTE = 60;
     // Dial-backs must not run on the Netty event loop that delivered the request: a blocking dial there
     // freezes every connection on that loop.
     private static final Executor dialBackExec = Executors.newFixedThreadPool(4, r -> {
@@ -74,6 +79,7 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
 
     private Host us;
     private final AutonatV2DialBack.Binding dialBack;
+    private final RateLimiter limiter = new RateLimiter(MAX_REQUESTS_PER_PEER_PER_MINUTE, MAX_REQUESTS_PER_MINUTE);
 
     public AutonatV2(AutonatV2DialBack.Binding dialBack) {
         super(Autonatv2.Message.getDefaultInstance(), TRAFFIC_LIMIT, TRAFFIC_LIMIT);
@@ -91,7 +97,8 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
     @NotNull
     @Override
     protected CompletableFuture<AutoNat2Controller> onStartResponder(@NotNull Stream stream) {
-        Receiver receiver = new Receiver(us, stream, dialBack);
+        StreamTimeouts.closeWhenIdle(stream);
+        Receiver receiver = new Receiver(us, stream, dialBack, limiter);
         stream.pushHandler(receiver);
         return CompletableFuture.completedFuture(receiver);
     }
@@ -126,6 +133,7 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
         public void onMessage(@NotNull Stream stream, Autonatv2.Message msg) {
             if (msg.hasDialResponse()) {
                 result.complete(msg.getDialResponse());
+                stream.close();
             } else if (msg.hasDialDataRequest()) {
                 // Some servers require us to send data before dialing addresses on a different IP.
                 long remaining = msg.getDialDataRequest().getNumBytes();
@@ -140,6 +148,17 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
                 }
             }
         }
+
+        @Override
+        public void onClosed(@NotNull Stream stream) {
+            result.completeExceptionally(new ConnectionClosedException("Stream closed before a dial response"));
+        }
+
+        @Override
+        public void onException(@Nullable Throwable cause) {
+            result.completeExceptionally(cause != null ? cause : new IllegalStateException("Stream error"));
+            stream.close();
+        }
     }
 
     /** Server side: dials one of the requested addresses back and proves it via the dial-back nonce. */
@@ -147,20 +166,28 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
         private final Host us;
         private final Stream stream;
         private final AutonatV2DialBack.Binding dialBack;
+        private final RateLimiter limiter;
 
-        Receiver(Host us, Stream stream, AutonatV2DialBack.Binding dialBack) {
+        Receiver(Host us, Stream stream, AutonatV2DialBack.Binding dialBack, RateLimiter limiter) {
             this.us = us;
             this.stream = stream;
             this.dialBack = dialBack;
+            this.limiter = limiter;
         }
 
         @Override
         public void onMessage(@NotNull Stream p2pstream, Autonatv2.Message msg) {
-            if (! msg.hasDialRequest())
+            if (! msg.hasDialRequest()) {
+                stream.close(); // we never ask for dial data, so nothing else is expected
                 return;
+            }
             Autonatv2.DialRequest req = msg.getDialRequest();
             long nonce = req.getNonce();
             PeerId client = stream.remotePeerId();
+            if (! limiter.allow(client, System.currentTimeMillis())) {
+                respond(Autonatv2.DialResponse.ResponseStatus.E_REQUEST_REJECTED, 0, Autonatv2.DialStatus.UNUSED);
+                return;
+            }
             String observedIp = new MultiAddress(stream.getConnection().remoteAddress().toString()).getHost();
 
             List<Multiaddr> addrs = req.getAddrsList().stream()
@@ -238,6 +265,13 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
             return res;
         }
 
+        @Override
+        public void onException(@Nullable Throwable cause) {
+            stream.close();
+        }
+
+        /** One request per stream: closing it once answered stops every request leaving a stream open on both
+         *  sides, which on a bootstrap node, asked by every client, built up without limit. */
         private void respond(Autonatv2.DialResponse.ResponseStatus status, int addrIdx, Autonatv2.DialStatus dialStatus) {
             stream.writeAndFlush(Autonatv2.Message.newBuilder()
                     .setDialResponse(Autonatv2.DialResponse.newBuilder()
@@ -245,6 +279,39 @@ public class AutonatV2 extends ProtobufProtocolHandler<AutonatV2.AutoNat2Control
                             .setAddrIdx(addrIdx)
                             .setDialStatus(dialStatus))
                     .build());
+            stream.close();
+        }
+    }
+
+    /** Requests in the last minute, per peer and in total. */
+    static class RateLimiter {
+        private static final long WINDOW_MILLIS = 60_000;
+        private final int perPeer, total;
+        private final Map<PeerId, ArrayDeque<Long>> recent = new HashMap<>();
+        private final ArrayDeque<Long> all = new ArrayDeque<>();
+
+        RateLimiter(int perPeer, int total) {
+            this.perPeer = perPeer;
+            this.total = total;
+        }
+
+        synchronized boolean allow(PeerId peer, long now) {
+            long cutoff = now - WINDOW_MILLIS;
+            while (! all.isEmpty() && all.peekFirst() <= cutoff)
+                all.pollFirst();
+            ArrayDeque<Long> times = recent.computeIfAbsent(peer, p -> new ArrayDeque<>());
+            while (! times.isEmpty() && times.peekFirst() <= cutoff)
+                times.pollFirst();
+            if (times.size() >= perPeer || all.size() >= total) {
+                if (times.isEmpty())
+                    recent.remove(peer);
+                return false;
+            }
+            times.addLast(now);
+            all.addLast(now);
+            if (recent.size() > 4 * total) // only peers with a request in the window matter
+                recent.values().removeIf(t -> t.isEmpty() || t.peekLast() <= cutoff);
+            return true;
         }
     }
 }

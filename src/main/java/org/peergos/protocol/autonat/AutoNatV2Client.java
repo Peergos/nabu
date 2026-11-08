@@ -32,6 +32,8 @@ public class AutoNatV2Client {
     // so late-appearing addresses (a UPnP mapping, a freshly-confirmed QUIC address) don't wait out the
     // full recheck interval.
     private static final long POLL_INTERVAL_SECONDS = 20;
+    // A dial-back takes at most twice the server's 15s dial timeout
+    private static final long REQUEST_TIMEOUT_SECONDS = 45;
 
     private enum AddrStatus { REACHABLE, UNREACHABLE, UNKNOWN }
 
@@ -46,6 +48,11 @@ public class AutoNatV2Client {
     // address, so a verdict reflects agreement across distinct peers.
     private final Map<Multiaddr, Map<Multihash, Boolean>> addrVotes = new ConcurrentHashMap<>();
     private final Set<Multihash> inFlight = ConcurrentHashMap.newKeySet();
+    // Peers whose last answer said nothing about our reachability, e.g. a refusal because our candidates aren't on
+    // the address they see us at, as for a node behind NAT. Asking them again every poll would ask every peer we
+    // dialed every 20s forever, so each is left alone for a while, twice as long after each such answer.
+    private final Map<Multihash, Backoff> backoffs = new ConcurrentHashMap<>();
+    private record Backoff(long until, long millis) {}
     private volatile Thread recheckThread;
 
     public AutoNatV2Client(Host us,
@@ -80,6 +87,9 @@ public class AutoNatV2Client {
 
     private void probe(Connection conn) {
         Multihash peer = Multihash.deserialize(conn.secureSession().getRemoteId().getBytes());
+        Backoff backoff = backoffs.get(peer);
+        if (backoff != null && System.currentTimeMillis() < backoff.until())
+            return;
         if (! inFlight.add(peer))
             return;
         List<Multiaddr> candidates = candidateAddresses.get();
@@ -96,25 +106,53 @@ public class AutoNatV2Client {
                 ordered.add(a);
         long nonce = ThreadLocalRandom.current().nextLong();
         CompletableFuture<Boolean> dialBack = nonces.expect(nonce);
-        conn.muxerSession().createStream(autonat).getController()
+        StreamPromise<AutonatV2.AutoNat2Controller> request = conn.muxerSession().createStream(autonat);
+        request.getController()
                 .thenCompose(controller -> controller.requestDial(ordered, nonce))
+                .orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .whenComplete((resp, err) -> {
+                    // one request per stream, however it ended
+                    request.getStream().thenAccept(Stream::close);
                     inFlight.remove(peer);
                     nonces.forget(nonce);
-                    if (err != null || resp == null)
-                        return; // peer doesn't speak autonat v2, or the request failed
-                    if (resp.getStatus() != Autonatv2.DialResponse.ResponseStatus.OK)
-                        return; // refused / rejected - says nothing about reachability
-                    int idx = resp.getAddrIdx();
-                    if (idx < 0 || idx >= ordered.size())
-                        return; // the server must tell us which address it actually dialed
-                    Multiaddr dialed = ordered.get(idx);
-                    if (resp.getDialStatus() == Autonatv2.DialStatus.OK && dialBack.getNow(false))
-                        recordVote(dialed, peer, true);
-                    else if (resp.getDialStatus() == Autonatv2.DialStatus.E_DIAL_ERROR)
-                        recordVote(dialed, peer, false);
-                    // E_DIAL_BACK_ERROR / UNUSED are inconclusive
+                    if (! recordResult(peer, ordered, resp, err, dialBack))
+                        backOff(peer);
                 });
+    }
+
+    /** @return whether the answer voted on one of our addresses */
+    private boolean recordResult(Multihash peer,
+                                 List<Multiaddr> ordered,
+                                 Autonatv2.DialResponse resp,
+                                 Throwable err,
+                                 CompletableFuture<Boolean> dialBack) {
+        if (err != null || resp == null)
+            return false; // peer doesn't speak autonat v2, or the request failed
+        if (resp.getStatus() != Autonatv2.DialResponse.ResponseStatus.OK)
+            return false; // refused / rejected - says nothing about reachability
+        int idx = resp.getAddrIdx();
+        if (idx < 0 || idx >= ordered.size())
+            return false; // the server must tell us which address it actually dialed
+        Multiaddr dialed = ordered.get(idx);
+        if (resp.getDialStatus() == Autonatv2.DialStatus.OK && dialBack.getNow(false)) {
+            recordVote(dialed, peer, true);
+            backoffs.remove(peer);
+            return true;
+        }
+        if (resp.getDialStatus() == Autonatv2.DialStatus.E_DIAL_ERROR) {
+            recordVote(dialed, peer, false);
+            backoffs.remove(peer);
+            return true;
+        }
+        return false; // E_DIAL_BACK_ERROR / UNUSED are inconclusive
+    }
+
+    private void backOff(Multihash peer) {
+        long max = TimeUnit.MINUTES.toMillis(RECHECK_INTERVAL_MINUTES);
+        backoffs.compute(peer, (p, previous) -> {
+            long millis = previous == null ? TimeUnit.SECONDS.toMillis(POLL_INTERVAL_SECONDS) : Math.min(max, 2 * previous.millis());
+            return new Backoff(System.currentTimeMillis() + millis, millis);
+        });
     }
 
     /** The still-undecided candidate this peer hasn't voted on yet, preferring the least-tested one. */
@@ -212,6 +250,7 @@ public class AutoNatV2Client {
     /** Full re-test: discard all results and re-probe from scratch (periodic refresh). */
     public void recheck() {
         addrVotes.clear();
+        backoffs.clear();
         for (Connection conn : us.getNetwork().getConnections())
             if (conn.isInitiator())
                 probe(conn);
