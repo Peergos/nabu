@@ -14,6 +14,7 @@ import io.libp2p.protocol.*;
 import io.libp2p.protocol.circuit.CircuitHopProtocol;
 import io.libp2p.protocol.circuit.CircuitStopProtocol;
 import io.libp2p.protocol.circuit.RelayTransport;
+import org.peergos.protocol.IdleTimeoutPing;
 import org.peergos.protocol.dcutr.*;
 import io.libp2p.security.noise.*;
 import io.libp2p.transport.quic.QuicTransport;
@@ -191,7 +192,7 @@ public class HostBuilder {
                 .anyMatch(a -> Multiaddr.fromString(a.toString()).has(Protocol.TCP));
         Kademlia dht = new Kademlia(new KademliaEngine(ourPeerId, providers, records, Optional.of(blocks)), false, quicEnabled, tcpEnabled);
         return builder.addProtocols(List.of(
-                        new Ping(),
+                        new IdleTimeoutPing(),
                         new AutonatProtocol.Binding(),
                         new Bitswap(new BitswapEngine(blocks, authoriser, Bitswap.MAX_MESSAGE_SIZE, blockAggressivePeers)),
                         dht))
