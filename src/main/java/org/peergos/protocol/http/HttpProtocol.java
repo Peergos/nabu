@@ -1,5 +1,7 @@
 package org.peergos.protocol.http;
 
+import org.peergos.protocol.StreamTimeouts;
+
 import io.libp2p.core.*;
 import io.libp2p.core.multistream.*;
 import io.libp2p.protocol.*;
@@ -96,7 +98,14 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             copy.headers().setAll(withTargetHost.headers());
 
             stream.writeAndFlush(copy);
-            return res;
+            // a peer that never replies would otherwise hold this stream, and our caller, open for good
+            return res.orTimeout(StreamTimeouts.HTTP_RESPONSE_SECONDS, TimeUnit.SECONDS)
+                    .whenComplete((r, err) -> {
+                        if (err instanceof TimeoutException) {
+                            queue.remove(res);
+                            stream.close();
+                        }
+                    });
         }
     }
 
@@ -122,6 +131,20 @@ public class HttpProtocol extends ProtocolHandler<HttpProtocol.HttpController> {
             if (reply instanceof LastHttpContent) {
                 ctx.channel().close();
             }
+        }
+
+        /** The local server closed the connection without responding: no exception, so without this nothing replies
+         *  on the p2p stream, and it, and the requester's end, stay open for good. */
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+            if (!replied) {
+                replied = true;
+                FullHttpResponse error = new DefaultFullHttpResponse(
+                        HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY, Unpooled.EMPTY_BUFFER);
+                error.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+                replyProcessor.accept(error);
+            }
+            super.channelInactive(ctx);
         }
 
         @Override
