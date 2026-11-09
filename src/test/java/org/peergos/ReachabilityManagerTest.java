@@ -81,6 +81,23 @@ public class ReachabilityManagerTest {
     }
 
     @Test
+    public void observationsStayBoundedAcrossEphemeralPorts() {
+        ReachabilityManager r = new ReachabilityManager(3);
+        Multiaddr quic = new Multiaddr("/ip4/1.2.3.4/udp/4001/quic-v1");
+        for (int i = 0; i < 20_000; i++) {
+            r.observeAddress(new Multiaddr("/ip4/1.2.3.4/tcp/" + (10_000 + i % 50_000)), peer(i));
+            if (i % 3 == 0)
+                r.observeAddress(new Multiaddr("/ip4/" + (i % 200 + 5) + ".9.9.9/tcp/" + (10_000 + i)), peer(i));
+            if (i % 100 == 0)
+                r.observeAddress(quic, peer(i / 100 % 3));
+        }
+        Assert.assertTrue(r.getAllObservedAddresses().size() <= 256);
+        Assert.assertTrue(r.getObservedHosts(1).size() <= 64);
+        Assert.assertEquals(List.of(quic), r.getCandidateAddresses());
+        Assert.assertTrue(r.getObservedHosts(3).contains("1.2.3.4"));
+    }
+
+    @Test
     public void natTypeInferredFromHolePunchOutcomes() {
         ReachabilityManager r = new ReachabilityManager();
         Assert.assertEquals(ReachabilityManager.NatType.UNKNOWN, r.getNatType());
