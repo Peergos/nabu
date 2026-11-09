@@ -45,8 +45,13 @@ public class ReachabilityManager {
 
     // Distinct remote peers that must observe an address before we treat it as a real candidate.
     private final int confirmationsRequired;
-    // Candidate external addresses observed by remote peers, mapped to the distinct peers reporting each.
-    private final Map<Multiaddr, Set<Multihash>> observations = new HashMap<>();
+    // Observed addresses and hosts, each mapped to the distinct peers reporting it. TCP is observed at a new ephemeral
+    // port on nearly every connection, so both are bounded, evicting whatever was least recently observed.
+    private static final int MAX_OBSERVED_ADDRESSES = 256;
+    private static final int MAX_OBSERVED_HOSTS = 64;
+    private static final int MAX_REPORTERS = 32;
+    private final Map<Multiaddr, Set<Multihash>> observations = boundedLru(MAX_OBSERVED_ADDRESSES);
+    private final Map<String, Set<Multihash>> observedHosts = boundedLru(MAX_OBSERVED_HOSTS);
     // Addresses AutoNAT has confirmed are dialable from the public internet.
     private final Set<Multiaddr> confirmedPublic = new LinkedHashSet<>();
     // Self-discovered candidate addresses (e.g. from UPnP/NAT-PMP port mapping) to be verified by AutoNAT.
@@ -73,8 +78,25 @@ public class ReachabilityManager {
             return;
         if (! PeerAddresses.isPublic(observed, false))
             return;
-        observations.computeIfAbsent(observed, a -> new HashSet<>()).add(reporter);
+        addReporter(observations.computeIfAbsent(observed, a -> new HashSet<>()), reporter);
+        String host = hostOf(observed);
+        if (host != null)
+            addReporter(observedHosts.computeIfAbsent(host, h -> new HashSet<>()), reporter);
         logStatusIfChanged();
+    }
+
+    private static void addReporter(Set<Multihash> reporters, Multihash reporter) {
+        if (reporters.size() < MAX_REPORTERS)
+            reporters.add(reporter);
+    }
+
+    private static <K, V> Map<K, V> boundedLru(int max) {
+        return new LinkedHashMap<>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+                return size() > max;
+            }
+        };
     }
 
     /** External addresses reported by at least {@code confirmationsRequired} distinct peers. */
@@ -98,13 +120,7 @@ public class ReachabilityManager {
      * pair these with our listen port to predict our real external address for AutoNAT to verify.
      */
     public synchronized Set<String> getObservedHosts(int minReporters) {
-        Map<String, Set<Multihash>> reportersByHost = new HashMap<>();
-        for (Map.Entry<Multiaddr, Set<Multihash>> e : observations.entrySet()) {
-            String host = hostOf(e.getKey());
-            if (host != null)
-                reportersByHost.computeIfAbsent(host, k -> new HashSet<>()).addAll(e.getValue());
-        }
-        return reportersByHost.entrySet().stream()
+        return observedHosts.entrySet().stream()
                 .filter(e -> e.getValue().size() >= minReporters)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
