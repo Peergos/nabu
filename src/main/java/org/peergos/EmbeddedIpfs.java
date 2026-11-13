@@ -181,7 +181,7 @@ public class EmbeddedIpfs {
             if (!remote.equals(node.getPeerId())) {
                 LOG.info(node.getPeerId() + " found local peer: " + remote.toBase58() + ", addrs: " + peerInfo.getAddresses());
                 Multiaddr[] remoteAddrs = peerInfo.getAddresses().toArray(new Multiaddr[0]);
-                KademliaController ctr = dht.dial(node, remote, remoteAddrs).getController().join();
+                KademliaController ctr = dht.dial(node, remote, Ipv6Route.dialable(remoteAddrs)).getController().join();
                 ctr.closerPeers(node.getPeerId().getBytes()).join();
                 node.getAddressBook().addAddrs(remote, 0, remoteAddrs);
             }

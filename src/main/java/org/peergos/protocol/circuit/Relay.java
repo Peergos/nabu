@@ -50,6 +50,7 @@ public class Relay {
                     addrs.addAll(us.getAddressBook().getAddrs(peerId).join());
                 addrs = addrs.stream()
                         .filter(a -> ! a.toString().contains("p2p-circuit"))
+                        .filter(Ipv6Route::isDialable)
                         .distinct()
                         .collect(Collectors.toList());
                 if (! addrs.isEmpty())

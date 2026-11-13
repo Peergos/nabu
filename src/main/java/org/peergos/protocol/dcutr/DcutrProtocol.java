@@ -11,6 +11,7 @@ import io.libp2p.protocol.*;
 import io.libp2p.transport.quic.*;
 import org.jetbrains.annotations.*;
 import org.peergos.HostConsumer;
+import org.peergos.Ipv6Route;
 import org.peergos.protocol.dcutr.pb.*;
 
 import java.util.*;
@@ -181,13 +182,14 @@ public class DcutrProtocol extends ProtobufProtocolHandler<DcutrProtocol.Control
                     .collect(Collectors.toList());
             switch (msg.getType()) {
                 case CONNECT: {
-                    peerAddresses = peer;
+                    // filtered here rather than in holePunch, so no route lookup delays the timed dials
+                    peerAddresses = peer.stream().filter(Ipv6Route::isDialable).collect(Collectors.toList());
                     if (initiator) {
                         // B received A's CONNECT reply: measure RTT, SYNC, then punch after half the RTT
                         long rttNanos = System.nanoTime() - connectSentAtNanos;
                         send(Dcutr.HolePunch.Type.SYNC);
                         long halfRttMillis = Math.max(0, rttNanos / 2 / 1_000_000);
-                        List<Multiaddr> targets = peer;
+                        List<Multiaddr> targets = peerAddresses;
                         timer.schedule(() -> holePunch(targets), halfRttMillis, TimeUnit.MILLISECONDS);
                     } else {
                         // A received B's CONNECT: reply with our addresses (A dials on SYNC)

@@ -150,7 +150,7 @@ public class Bitswap extends StrictProtocolBinding<BitswapController> implements
         Multiaddr[] addr = addrs.get(peer).join().toArray(new Multiaddr[0]);
         if (addr.length == 0)
             throw new IllegalStateException("No addresses known for peer " + peer);
-        BitswapController controller = dial(us, peer, addr).getController().join();
+        BitswapController controller = dial(us, peer, Ipv6Route.dialable(addr)).getController().join();
         action.accept(controller);
     }
 

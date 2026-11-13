@@ -62,6 +62,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
                     }
                 })
                 .filter(filter)
+                .filter(a -> Ipv6Route.isDialable(Multiaddr.fromString(a)))
                 .collect(Collectors.toList());
         List<? extends Future<? extends KademliaController>> futures = resolved.stream()
                 .map(addr -> {
@@ -378,6 +379,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
     private Multiaddr[] getPublic(PeerAddresses target) {
         return target.addresses.stream()
                 .filter(a -> localDht || PeerAddresses.isPublic(a, false))
+                .filter(Ipv6Route::isDialable)
                 .collect(Collectors.toList()).toArray(new Multiaddr[0]);
     }
 
@@ -385,6 +387,7 @@ public class Kademlia extends StrictProtocolBinding<KademliaController> implemen
         Multiaddr[] multiaddrs = target.addresses.stream()
                 .map(a -> Multiaddr.fromString(a.toString()))
                 .filter(a -> ! a.has(Protocol.DNS) && ! a.has(Protocol.DNS4) && ! a.has(Protocol.DNS6))
+                .filter(Ipv6Route::isDialable)
                 .collect(Collectors.toList()).toArray(new Multiaddr[0]);
         return dial(us, PeerId.fromBase58(target.peerId.toBase58()), multiaddrs);
     }

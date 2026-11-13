@@ -74,6 +74,7 @@ public class HttpProxyService {
     private HttpProtocol.HttpController dial(PeerId peerId,
                                              Multihash targetNodeId,
                                              Multiaddr[] addressesToDial) throws ConnectionException {
+        addressesToDial = Ipv6Route.dialable(addressesToDial);
         try {
             return p2pHttpBinding.dial(node, peerId, addressesToDial).getController().join();
         } catch (Exception e) {
@@ -86,7 +87,7 @@ public class HttpProxyService {
             LOG.info("Failed to dial " + targetNodeId + " at all of " + Arrays.toString(addressesToDial));
             Multiaddr[] fresh;
             try {
-                fresh = lookupAddresses(node, dht, targetNodeId, false);
+                fresh = Ipv6Route.dialable(lookupAddresses(node, dht, targetNodeId, false));
             } catch (Exception lookupFailed) {
                 throw e; // the dial failure is the more useful error
             }
